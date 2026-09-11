@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #f8fafc;
+    color: #1e293b;
+    font-family: 'Prompt', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}
+
+/* Custom Utilities */
+.scenery-gradient {
+  background: linear-gradient(135deg, #0f766e 0%, #115e59 55%, #093b38 100%);
+}
+
+.scenery-card-shadow {
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+}
+
+.scenery-card-hover {
+  transition: all 0.2s ease-in-out;
+}
+.scenery-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -4px rgba(15, 118, 110, 0.12), 0 4px 12px -2px rgba(15, 118, 110, 0.04);
+}
+
+/* Custom scrollbar for horizontal department tabs */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
