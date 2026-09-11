@@ -2,9 +2,9 @@ import { Ticket, Department, Technician, SortOrder } from '../types';
 import { INITIAL_TICKETS, INITIAL_DEPARTMENTS, INITIAL_TECHNICIANS } from '../data/mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
-const LOCAL_STORAGE_TICKETS = 'scenery_repair_v2_tickets';
-const LOCAL_STORAGE_DEPTS = 'scenery_repair_v2_departments';
-const LOCAL_STORAGE_TECHS = 'scenery_repair_v2_technicians';
+const LOCAL_STORAGE_TICKETS = 'scenery_repair_v3_tickets';
+const LOCAL_STORAGE_DEPTS = 'scenery_repair_v3_departments';
+const LOCAL_STORAGE_TECHS = 'scenery_repair_v3_technicians';
 
 class TicketService {
   private tickets: Ticket[] = [];
@@ -25,6 +25,14 @@ class TicketService {
 
       const savedTechs = localStorage.getItem(LOCAL_STORAGE_TECHS);
       this.technicians = savedTechs ? JSON.parse(savedTechs) : INITIAL_TECHNICIANS;
+
+      // Merge new initial technicians if missing
+      const existingTechNames = new Set(this.technicians.map(t => t.name));
+      INITIAL_TECHNICIANS.forEach(initTech => {
+        if (!existingTechNames.has(initTech.name)) {
+          this.technicians.push(initTech);
+        }
+      });
     } catch (e) {
       this.tickets = INITIAL_TICKETS;
       this.departments = INITIAL_DEPARTMENTS;
@@ -300,10 +308,70 @@ class TicketService {
     this.saveToLocalStorage();
   }
 
+  public async addTechnician(tech: { name: string; role?: string; phone?: string }): Promise<Technician[]> {
+    const trimmedName = tech.name.trim();
+    if (!trimmedName) return [...this.technicians];
+
+    const existing = this.technicians.find(t => t.name.toLowerCase() === trimmedName.toLowerCase());
+    if (existing) {
+      existing.status = 'active';
+      if (tech.role) existing.role = tech.role.trim();
+      if (tech.phone) existing.phone = tech.phone.trim();
+    } else {
+      const newTech: Technician = {
+        id: 'tech-' + Date.now(),
+        name: trimmedName,
+        role: tech.role?.trim() || 'ช่างซ่อมบำรุง',
+        status: 'active',
+        phone: tech.phone?.trim() || ''
+      };
+      this.technicians.push(newTech);
+
+      if (isSupabaseConfigured && supabase) {
+        try {
+          await supabase.from('technicians').insert([{
+            name: newTech.name,
+            role: newTech.role,
+            status: newTech.status,
+            phone: newTech.phone
+          }]);
+        } catch (e) {
+          console.warn('Supabase add technician failed:', e);
+        }
+      }
+    }
+
+    this.saveToLocalStorage();
+    return [...this.technicians];
+  }
+
+  public async deleteTechnician(idOrName: string): Promise<Technician[]> {
+    const target = this.technicians.find(t => t.id === idOrName || t.name === idOrName);
+    this.technicians = this.technicians.filter(t => t.id !== idOrName && t.name !== idOrName);
+    this.saveToLocalStorage();
+
+    if (isSupabaseConfigured && supabase && target) {
+      try {
+        await supabase.from('technicians').delete().or(`id.eq.${target.id},name.eq.${target.name}`);
+      } catch (e) {
+        console.warn('Supabase delete technician failed:', e);
+      }
+    }
+
+    return [...this.technicians];
+  }
+
   public async setTechnicianStatus(name: string, status: 'active' | 'inactive'): Promise<Technician[]> {
     const item = this.technicians.find(t => t.name === name);
     if (item) {
       item.status = status;
+      if (isSupabaseConfigured && supabase) {
+        try {
+          await supabase.from('technicians').update({ status }).eq('name', name);
+        } catch (e) {
+          console.warn('Supabase update technician status failed:', e);
+        }
+      }
     } else {
       this.technicians.push({
         id: 'tech-' + Date.now(),
