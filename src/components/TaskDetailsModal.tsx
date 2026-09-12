@@ -341,13 +341,13 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
             })()}
           </div>
 
-          {/* Section 4: Parts & Cost Management */}
+          {/* Section 4: Parts Management */}
           <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-3 border border-slate-200/40">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[20px] text-primary">inventory_2</span>
                 <span className="font-label-lg text-label-lg text-on-surface font-bold">
-                  อะไหล่และค่าใช้จ่ายซ่อมบำรุง
+                  รายการอะไหล่และอุปกรณ์ที่ใช้
                 </span>
               </div>
               <span className="font-label-sm text-label-sm px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed font-semibold">
@@ -362,11 +362,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                     Expansion Valve Danfoss R404A
                   </span>
                   <span className="font-body-sm text-body-sm text-on-surface-variant">
-                    รหัส: DF-VLV-404 • จำนวน: 1 ชิ้น
+                    รหัสพัสดุ: DF-VLV-404
                   </span>
                 </div>
-                <span className="font-label-lg text-label-lg text-on-surface font-bold shrink-0">
-                  ฿1,850
+                <span className="px-2.5 py-1 bg-surface-container-high text-on-surface text-xs font-bold rounded-lg shrink-0">
+                  จำนวน 1 ชิ้น
                 </span>
               </div>
 
@@ -376,11 +376,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                     น้ำยาแอร์ R404A (กระบอก 3 kg)
                   </span>
                   <span className="font-body-sm text-body-sm text-on-surface-variant">
-                    รหัส: GAS-R404-03 • จำนวน: 1 ถัง
+                    รหัสพัสดุ: GAS-R404-03
                   </span>
                 </div>
-                <span className="font-label-lg text-label-lg text-on-surface font-bold shrink-0">
-                  ฿950
+                <span className="px-2.5 py-1 bg-surface-container-high text-on-surface text-xs font-bold rounded-lg shrink-0">
+                  จำนวน 1 ถัง
                 </span>
               </div>
             </div>
@@ -396,27 +396,6 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               <span className="material-symbols-outlined text-[18px] text-primary">add_circle</span>
               + เบิกอะไหล่เพิ่มจากคลังกลาง
             </button>
-
-            {/* Cost Breakdown */}
-            <div className="mt-2 pt-3 bg-surface-container-low p-3 rounded-lg flex flex-col gap-1.5">
-              <div className="flex justify-between items-center text-on-surface-variant font-body-sm text-body-sm">
-                <span>รวมมูลค่าอะไหล่ (2 รายการ)</span>
-                <span>฿2,800</span>
-              </div>
-              <div className="flex justify-between items-center text-on-surface-variant font-body-sm text-body-sm">
-                <span>ค่าแรงและบริการเทคนิคพิเศษ</span>
-                <span>฿500</span>
-              </div>
-              <div className="h-px bg-surface-container-highest my-1"></div>
-              <div className="flex justify-between items-center">
-                <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
-                  รวมค่าใช้จ่ายทั้งสิ้น
-                </span>
-                <span className="font-headline-sm text-headline-sm text-primary font-bold">
-                  ฿3,300
-                </span>
-              </div>
-            </div>
           </div>
 
           {/* Section 5: Technician Repair Notes */}

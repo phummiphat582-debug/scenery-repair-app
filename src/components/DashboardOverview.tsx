@@ -56,11 +56,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     const completed = tickets.filter(t => t.status === 'completed').length;
     const overdue = tickets.filter(t => t.isOverdue || (t.priority === 'critical' && t.status !== 'completed')).length;
     
-    // Sum real cost
-    const totalCost = tickets.reduce((sum, t) => sum + (t.totalCost || 0), 0);
-    const formattedCost = new Intl.NumberFormat('th-TH').format(totalCost);
-
-    return { total, pending, inProgress, waitingParts, waitingInspect, completed, overdue, formattedCost };
+    return { total, pending, inProgress, waitingParts, waitingInspect, completed, overdue };
   }, [tickets]);
 
   // Filtered tickets for feed
@@ -298,17 +294,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
           </div>
 
-          {/* Card: MTD Cost */}
-          <div className="min-w-[150px] flex-shrink-0 bg-surface-container-lowest rounded-xl p-space-sm shadow-sm flex flex-col justify-between border border-slate-200/40">
-            <div className="flex items-center justify-between text-primary">
-              <span className="font-label-sm text-label-sm font-medium">ค่าใช้จ่ายเดือนนี้</span>
-              <span className="material-symbols-outlined text-[18px]">receipt_long</span>
+          {/* Card: Completed */}
+          <div className="min-w-[130px] flex-shrink-0 bg-surface-container-lowest rounded-xl p-space-sm shadow-sm flex flex-col justify-between border border-slate-200/40">
+            <div className="flex items-center justify-between text-teal-700">
+              <span className="font-label-sm text-label-sm font-medium">เสร็จสิ้นแล้ว</span>
+              <span className="material-symbols-outlined text-[18px]">check_circle</span>
             </div>
-            <div className="mt-2">
-              <span className="font-headline-sm text-headline-sm text-primary font-bold">
-                ฿{kpis.formattedCost}
+            <div className="mt-2 flex items-baseline gap-1">
+              <span className="font-headline-lg-mobile text-headline-lg-mobile text-teal-700 font-bold">
+                {kpis.completed}
               </span>
-              <span className="font-label-sm text-label-sm text-on-surface-variant block">งบประมาณฟาร์ม</span>
+              <span className="font-label-sm text-label-sm text-teal-600 font-medium">งานเสร็จ</span>
             </div>
           </div>
         </div>
