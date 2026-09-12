@@ -5,6 +5,7 @@ interface HeaderProps {
   currentTab: NavTab;
   userRole?: UserRole;
   onSwitchRole?: () => void;
+  onSelectRole?: (role: UserRole) => void;
   onOpenNotifications?: () => void;
   urgentCount?: number;
   subtitle?: string;
@@ -14,46 +15,56 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   currentTab,
-  userRole = 'technician',
+  userRole = 'requester',
   onSwitchRole,
+  onSelectRole,
   onOpenNotifications,
-  urgentCount = 3,
+  urgentCount = 0,
   subtitle,
   onBack,
   showBack = false
 }) => {
   const getSubtext = () => {
     if (subtitle) return subtitle;
-    if (userRole === 'requester') return 'หน้าผู้แจ้งซ่อม (Requester Portal)';
+    if (userRole === 'requester') return 'หน้าแจ้งงานสำหรับแผนก (Department Requester Portal)';
     switch (currentTab) {
       case 'dashboard':
-        return 'Dashboard Overview';
+        return 'ภาพรวมระบบ & KPIs งานซ่อม';
       case 'technician':
-        return 'Technician Tasks';
+        return 'แถบงานช่าง & ดำเนินการ';
       case 'new-request':
-        return 'New Request';
+        return 'เปิดใบแจ้งซ่อมด่วน';
       case 'all-requests':
-        return 'All Requests & Queues';
+        return 'ตารางรับงานตามคิว & ทุกรายการ';
       case 'settings':
-        return 'Settings & Data Sync';
+        return 'ตั้งค่า & อัปเดตเวรช่าง';
       default:
         return 'Scenery Farm Maintenance';
     }
   };
 
+  const handleSelectRole = (targetRole: UserRole) => {
+    if (onSelectRole) {
+      onSelectRole(targetRole);
+    } else if (onSwitchRole && userRole !== targetRole) {
+      onSwitchRole();
+    }
+  };
+
   return (
-    <header className="fixed top-0 inset-x-0 z-50 bg-surface/85 backdrop-blur-xl pt-safe shadow-[0_1px_8px_rgba(0,0,0,0.04)] border-b border-slate-200/40">
-      <div className="h-20 px-margin flex items-center justify-between gap-space-sm max-w-7xl mx-auto">
+    <header className="fixed top-0 inset-x-0 z-50 bg-surface/90 backdrop-blur-xl pt-safe shadow-sm border-b border-slate-200/60">
+      {/* Top Bar */}
+      <div className="h-16 px-margin flex items-center justify-between gap-space-sm max-w-7xl mx-auto">
         
-        {/* Left Side */}
+        {/* Left Side: Logo & Portal Info */}
         <div className="flex items-center gap-space-sm min-w-0">
           {showBack && onBack ? (
             <button
               onClick={onBack}
               aria-label="ย้อนกลับ"
-              className="w-10 h-10 flex items-center justify-center text-on-surface rounded-full hover:bg-surface-container-high transition-colors shrink-0 cursor-pointer"
+              className="w-9 h-9 flex items-center justify-center text-on-surface rounded-full hover:bg-surface-container-high transition-colors shrink-0 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[24px]">arrow_back</span>
+              <span className="material-symbols-outlined text-[22px]">arrow_back</span>
             </button>
           ) : null}
 
@@ -68,60 +79,83 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-space-xs">
-              <span className="font-headline-sm text-headline-sm text-primary tracking-tight truncate leading-tight uppercase font-bold">
+              <span className="font-headline-sm text-[15px] sm:text-headline-sm text-primary tracking-tight truncate leading-tight uppercase font-extrabold">
                 SCENERY FARM
               </span>
               
               {/* Role Indicator Pill */}
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full font-label-sm text-[11px] shrink-0 font-bold ${
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-[10px] shrink-0 font-bold ${
                 userRole === 'requester'
-                  ? 'bg-amber-100 text-amber-900 border border-amber-200'
-                  : 'bg-secondary-fixed text-on-secondary-fixed'
+                  ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                  : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
               }`}>
-                {userRole === 'requester' ? '👤 ผู้แจ้งซ่อม' : '🛠️ ช่าง/หัวหน้า'}
+                {userRole === 'requester' ? '🏢 แผนกที่แจ้งงาน' : '🛠️ ระบบช่างรับงาน'}
               </span>
             </div>
-            <span className="font-label-sm text-label-sm text-on-surface-variant truncate">
+            <span className="font-label-sm text-[11px] text-on-surface-variant truncate">
               {getSubtext()}
             </span>
           </div>
         </div>
 
-        {/* Right Side Icons & Role Switcher */}
+        {/* Center / Right: Desktop Portal Switcher */}
+        <div className="hidden md:flex items-center bg-surface-container-high p-1 rounded-2xl border border-slate-200 shadow-inner">
+          <button
+            type="button"
+            onClick={() => handleSelectRole('requester')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              userRole === 'requester'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+            }`}
+          >
+            <span>🏢 หน้าแจ้งงาน (สำหรับแผนก)</span>
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => handleSelectRole('technician')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              userRole === 'technician'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+            }`}
+          >
+            <span>🛠️ หน้าระบบช่างรับงาน 🔒</span>
+          </button>
+        </div>
+
+        {/* Right Side Icons */}
         <div className="flex items-center gap-2 shrink-0">
           
-          {/* Quick Role Switcher Button */}
-          {onSwitchRole && (
-            <button
-              onClick={onSwitchRole}
-              type="button"
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
-                userRole === 'requester'
-                  ? 'bg-primary text-white hover:bg-primary-container'
-                  : 'bg-surface-container-high hover:bg-surface-variant text-on-surface'
-              }`}
-              title={userRole === 'requester' ? 'เข้าสู่ระบบช่าง/หลังบ้าน' : 'สลับไปหน้าผู้แจ้ง'}
-            >
-              <span className="material-symbols-outlined text-[16px]">
-                {userRole === 'requester' ? 'lock' : 'person'}
-              </span>
-              <span className="hidden sm:inline">
-                {userRole === 'requester' ? 'เข้าสู่ระบบช่าง' : 'หน้าผู้แจ้ง'}
-              </span>
-            </button>
-          )}
+          {/* Mobile Switch Button */}
+          <button
+            onClick={() => handleSelectRole(userRole === 'requester' ? 'technician' : 'requester')}
+            type="button"
+            className={`md:hidden px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-xs ${
+              userRole === 'requester'
+                ? 'bg-primary text-white'
+                : 'bg-surface-container-high text-on-surface'
+            }`}
+            title={userRole === 'requester' ? 'เข้าสู่ระบบช่าง' : 'สลับไปหน้าแผนกแจ้ง'}
+          >
+            <span className="material-symbols-outlined text-[15px]">
+              {userRole === 'requester' ? 'lock' : 'business'}
+            </span>
+            <span>{userRole === 'requester' ? 'ระบบช่าง' : 'หน้าแผนก'}</span>
+          </button>
 
           {/* Notifications (only active in technician role) */}
           {userRole === 'technician' && (
             <button
               onClick={onOpenNotifications}
               aria-label="การแจ้งเตือน"
-              className="relative w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
+              className="relative w-9 h-9 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
               type="button"
             >
-              <span className="material-symbols-outlined text-[22px]">notifications</span>
+              <span className="material-symbols-outlined text-[20px]">notifications</span>
               {urgentCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-error text-on-error font-label-sm text-[10px] ring-2 ring-surface font-bold">
+                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-error text-on-error font-label-sm text-[10px] ring-2 ring-surface font-bold">
                   {urgentCount}
                 </span>
               )}
@@ -129,15 +163,46 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           <div 
-            className="w-9 h-9 rounded-full bg-primary flex items-center justify-center shrink-0 shadow-sm cursor-pointer"
-            title={userRole === 'requester' ? 'ผู้ใช้งานทั่วไป / แผนกในฟาร์ม' : 'คุณสมชาย (หัวหน้าฝ่ายซ่อมบำรุง)'}
+            onClick={() => handleSelectRole(userRole === 'requester' ? 'technician' : 'requester')}
+            className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-xs cursor-pointer ${
+              userRole === 'requester' ? 'bg-amber-600 text-white' : 'bg-primary text-white'
+            }`}
+            title={userRole === 'requester' ? 'ผู้แจ้งซ่อม (แผนกในฟาร์ม)' : 'ฝ่ายซ่อมบำรุง (ทีมช่าง)'}
           >
-            <span className="material-symbols-outlined text-on-primary text-[18px]">
-              {userRole === 'requester' ? 'person_outline' : 'engineering'}
+            <span className="material-symbols-outlined text-[17px]">
+              {userRole === 'requester' ? 'business' : 'engineering'}
             </span>
           </div>
         </div>
 
+      </div>
+
+      {/* Mobile Sub-Row: Sticky Dual Portal Switcher */}
+      <div className="md:hidden px-3 pb-2 pt-0.5 max-w-7xl mx-auto">
+        <div className="flex w-full bg-surface-container-high p-1 rounded-xl border border-slate-200 shadow-inner">
+          <button
+            type="button"
+            onClick={() => handleSelectRole('requester')}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+              userRole === 'requester'
+                ? 'bg-primary text-white shadow-xs'
+                : 'text-on-surface-variant hover:text-on-surface'
+            }`}
+          >
+            <span>🏢 หน้าแจ้งงาน (แผนก)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSelectRole('technician')}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+              userRole === 'technician'
+                ? 'bg-primary text-white shadow-xs'
+                : 'text-on-surface-variant hover:text-on-surface'
+            }`}
+          >
+            <span>🛠️ ระบบช่างรับงาน 🔒</span>
+          </button>
+        </div>
       </div>
     </header>
   );

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Ticket, Department, Technician } from '../types';
+import { ConfirmModal } from './ConfirmModal';
 
 interface DashboardOverviewProps {
   tickets: Ticket[];
@@ -25,6 +26,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
   const [selectedZoneFilter, setSelectedZoneFilter] = useState<string>('all');
+  const [callConfirmTech, setCallConfirmTech] = useState<{ name: string; phone: string } | null>(null);
 
   // Format today's date in Thai
   const todayText = useMemo(() => {
@@ -35,28 +37,30 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     });
   }, []);
 
-  // Most critical urgent ticket for emergency banner
+  // Most critical urgent ticket for emergency banner (ONLY if real emergency exists)
   const emergencyTicket = useMemo(() => {
     return (
       tickets.find(t => t.priority === 'critical' && t.status !== 'completed' && t.status !== 'cancelled') ||
       tickets.find(t => t.priority === 'high' && t.status !== 'completed' && t.status !== 'cancelled') ||
-      tickets[0]
+      null
     );
   }, [tickets]);
 
-  // Counts for KPIs
+  // Counts for KPIs - purely dynamic from real tickets
   const kpis = useMemo(() => {
     const total = tickets.length;
     const pending = tickets.filter(t => t.status === 'pending' || t.status === 'assigned').length;
     const inProgress = tickets.filter(t => t.status === 'in_progress').length;
     const waitingParts = tickets.filter(t => t.status === 'waiting_parts').length;
+    const waitingInspect = tickets.filter(t => t.status === 'waiting_inspect').length;
+    const completed = tickets.filter(t => t.status === 'completed').length;
     const overdue = tickets.filter(t => t.isOverdue || (t.priority === 'critical' && t.status !== 'completed')).length;
     
-    // Sum cost
-    const totalCost = tickets.reduce((sum, t) => sum + (t.totalCost || 2500), 0);
-    const formattedCost = new Intl.NumberFormat('th-TH').format(totalCost > 0 ? totalCost : 38500);
+    // Sum real cost
+    const totalCost = tickets.reduce((sum, t) => sum + (t.totalCost || 0), 0);
+    const formattedCost = new Intl.NumberFormat('th-TH').format(totalCost);
 
-    return { total, pending, inProgress, waitingParts, overdue, formattedCost };
+    return { total, pending, inProgress, waitingParts, waitingInspect, completed, overdue, formattedCost };
   }, [tickets]);
 
   // Filtered tickets for feed
@@ -318,8 +322,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             { id: 'pending', label: `รอตรวจสอบ (${kpis.pending})` },
             { id: 'in_progress', label: `กำลังทำ (${kpis.inProgress})` },
             { id: 'waiting_parts', label: `รออะไหล่ (${kpis.waitingParts})` },
-            { id: 'waiting_inspect', label: 'รอตรวจรับ (4)' },
-            { id: 'completed', label: 'เสร็จสิ้น (22)' }
+            { id: 'waiting_inspect', label: `รอตรวจรับ (${kpis.waitingInspect})` },
+            { id: 'completed', label: `เสร็จสิ้น (${kpis.completed})` }
           ].map(pill => (
             <button
               key={pill.id}
@@ -362,161 +366,170 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
       {/* 7. Work Order Cards List */}
       <section className="px-margin flex flex-col gap-space-sm mb-space-lg">
-        {filteredTickets.map(ticket => {
-          const isWaitingParts = ticket.status === 'waiting_parts';
-          const isCompleted = ticket.status === 'completed' || ticket.status === 'waiting_inspect';
-          const isEmergency = ticket.priority === 'critical' || ticket.priority === 'high';
+        {filteredTickets.length === 0 ? (
+          <div className="p-12 text-center bg-surface-container-lowest rounded-3xl border border-dashed border-slate-300 text-on-surface-variant flex flex-col items-center gap-3 my-2">
+            <div className="w-14 h-14 rounded-2xl bg-primary-fixed/30 text-primary flex items-center justify-center">
+              <span className="material-symbols-outlined text-[28px]">assignment_turned_in</span>
+            </div>
+            <h4 className="text-base font-bold text-on-surface">ไม่มีรายการแจ้งซ่อมในหมวดนี้</h4>
+            <p className="text-xs text-on-surface-variant max-w-sm">
+              ข้อมูลระบบเป็นปัจจุบันแบบคลีน เมื่อมีใบแจ้งซ่อมใหม่เข้ามาจะแสดงที่นี่ทันที
+            </p>
+          </div>
+        ) : (
+          filteredTickets.map(ticket => {
+            const isWaitingParts = ticket.status === 'waiting_parts';
+            const isCompleted = ticket.status === 'completed' || ticket.status === 'waiting_inspect';
+            const isEmergency = ticket.priority === 'critical' || ticket.priority === 'high';
 
-          // Accent strip color
-          let stripColor = 'bg-primary-container';
-          if (isEmergency) stripColor = 'bg-error';
-          else if (isWaitingParts) stripColor = 'bg-secondary-container';
-          else if (isCompleted) stripColor = 'bg-tertiary-container';
+            // Accent strip color
+            let stripColor = 'bg-primary-container';
+            if (isEmergency) stripColor = 'bg-error';
+            else if (isWaitingParts) stripColor = 'bg-secondary-container';
+            else if (isCompleted) stripColor = 'bg-tertiary-container';
 
-          return (
-            <article
-              key={ticket.id}
-              className="relative bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm flex flex-col border border-slate-200/40"
-            >
-              {/* Status Left Accent Strip */}
-              <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${stripColor}`}></div>
+            return (
+              <article
+                key={ticket.id}
+                className="relative bg-surface-container-lowest rounded-2xl overflow-hidden shadow-xs hover:shadow-sm flex flex-col border border-slate-200/60"
+              >
+                {/* Status Left Accent Strip */}
+                <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${stripColor}`}></div>
 
-              <div className="p-space-md pl-5 flex flex-col gap-space-xs">
-                {/* Header Row */}
-                <div className="flex items-center justify-between gap-space-xs">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-label-md text-label-md font-bold text-primary tracking-tight">
-                      #{ticket.requestId}
-                    </span>
-                    {isEmergency && (
-                      <span className="px-2 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">
-                        {ticket.priority === 'critical' ? 'ด่วนที่สุด' : 'ด่วนมาก'}
+                <div className="p-space-md pl-5 flex flex-col gap-space-xs">
+                  {/* Header Row */}
+                  <div className="flex items-center justify-between gap-space-xs flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-label-md text-label-md font-bold text-primary tracking-tight">
+                        #{ticket.requestId}
                       </span>
-                    )}
+                      {ticket.category && (
+                        <span className="px-2 py-0.5 rounded-full bg-primary-fixed/40 text-primary font-bold text-[10px]">
+                          {ticket.category}
+                        </span>
+                      )}
+                      {isEmergency && (
+                        <span className="px-2 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">
+                          {ticket.priority === 'critical' ? 'ด่วนที่สุด' : 'ด่วนมาก'}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <span className={`px-2.5 py-0.5 rounded-full font-label-sm text-label-sm font-semibold flex items-center gap-1 ${
+                      ticket.status === 'in_progress'
+                        ? 'bg-primary-fixed text-on-primary-fixed'
+                        : ticket.status === 'waiting_parts'
+                        ? 'bg-secondary-fixed text-on-secondary-fixed-variant'
+                        : ticket.status === 'completed'
+                        ? 'bg-tertiary-fixed text-on-tertiary-fixed'
+                        : 'bg-surface-container text-on-surface-variant'
+                    }`}>
+                      {ticket.status === 'in_progress' && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></span>
+                      )}
+                      {ticket.status === 'in_progress' && 'กำลังดำเนินการ'}
+                      {ticket.status === 'waiting_parts' && 'รออะไหล่'}
+                      {ticket.status === 'pending' && 'รอตรวจสอบ'}
+                      {ticket.status === 'assigned' && 'รับงานแล้ว'}
+                      {ticket.status === 'waiting_inspect' && 'รอตรวจรับ'}
+                      {ticket.status === 'completed' && 'เสร็จสิ้น'}
+                    </span>
                   </div>
-                  
-                  <span className={`px-2.5 py-0.5 rounded-full font-label-sm text-label-sm font-semibold flex items-center gap-1 ${
-                    ticket.status === 'in_progress'
-                      ? 'bg-primary-fixed text-on-primary-fixed'
-                      : ticket.status === 'waiting_parts'
-                      ? 'bg-secondary-fixed text-on-secondary-fixed-variant'
-                      : ticket.status === 'completed'
-                      ? 'bg-tertiary-fixed text-on-tertiary-fixed'
-                      : 'bg-surface-container text-on-surface-variant'
-                  }`}>
-                    {ticket.status === 'in_progress' && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></span>
-                    )}
-                    {ticket.status === 'in_progress' && 'กำลังดำเนินการ'}
-                    {ticket.status === 'waiting_parts' && 'รออะไหล่'}
-                    {ticket.status === 'pending' && 'รอตรวจสอบ'}
-                    {ticket.status === 'assigned' && 'รับงานแล้ว'}
-                    {ticket.status === 'waiting_inspect' && 'รอตรวจรับ'}
-                    {ticket.status === 'completed' && 'เสร็จสิ้น'}
-                  </span>
-                </div>
 
-                {/* Location */}
-                <div className="flex items-center gap-1.5 text-on-surface-variant font-label-sm text-label-sm">
-                  <span className="material-symbols-outlined text-[16px] text-secondary">location_on</span>
-                  <span className="font-semibold text-on-surface">{ticket.department}</span>
-                  <span className="text-outline">•</span>
-                  <span>{ticket.location}</span>
-                </div>
+                  {/* Location */}
+                  <div className="flex items-center gap-1.5 text-on-surface-variant font-label-sm text-label-sm">
+                    <span className="material-symbols-outlined text-[16px] text-secondary">location_on</span>
+                    <span className="font-semibold text-on-surface">{ticket.department}</span>
+                    <span className="text-outline">•</span>
+                    <span>{ticket.location}</span>
+                  </div>
 
-                {/* Title */}
-                <h4 className="font-headline-sm text-headline-sm text-on-surface font-bold leading-snug">
-                  {ticket.title}
-                </h4>
+                  {/* Title */}
+                  <h4 className="font-headline-sm text-headline-sm text-on-surface font-bold leading-snug">
+                    {ticket.title}
+                  </h4>
 
-                {/* Part info alert box if waiting parts */}
-                {isWaitingParts && (
-                  <div className="p-2.5 rounded-lg bg-surface-container-low flex items-start gap-2 border border-secondary-container/20">
-                    <span className="material-symbols-outlined text-secondary-container text-[20px] shrink-0 mt-0.5">
-                      build_circle
-                    </span>
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-label-sm text-label-sm text-on-surface font-semibold truncate">
-                        รอชิ้นส่วน: Compressor Expansion Valve
+                  {/* Part info alert box if waiting parts */}
+                  {isWaitingParts && (
+                    <div className="p-2.5 rounded-lg bg-surface-container-low flex items-start gap-2 border border-secondary-container/20">
+                      <span className="material-symbols-outlined text-secondary-container text-[20px] shrink-0 mt-0.5">
+                        build_circle
                       </span>
-                      <span className="font-body-sm text-body-sm text-on-surface-variant">
-                        ซัพพลายเออร์แจ้งส่งมอบช่วงบ่ายวันนี้
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-label-sm text-label-sm text-on-surface font-semibold truncate">
+                          สถานะอะไหล่: {ticket.remark || 'กำลังสั่งซื้อชิ้นส่วนทดแทน'}
+                        </span>
+                        <span className="font-body-sm text-body-sm text-on-surface-variant">
+                          อยู่ระหว่างรอของส่งมอบเพื่อนำเข้าติดตั้ง
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Requester & Technician grid */}
+                  <div className="grid grid-cols-2 gap-2 mt-1 py-2 px-3 rounded-lg bg-surface-container-low">
+                    <div className="flex flex-col">
+                      <span className="font-label-sm text-label-sm text-on-surface-variant">ผู้แจ้งเหตุ</span>
+                      <span className="font-body-sm text-body-sm text-on-surface font-medium truncate">
+                        {ticket.requesterName}
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-label-sm text-label-sm text-on-surface-variant">ช่างผู้รับผิดชอบ</span>
+                      <span className="font-body-sm text-body-sm text-primary font-semibold truncate flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[14px]">handyman</span>
+                        {ticket.technicianName || 'ยังไม่กำหนด'}
                       </span>
                     </div>
                   </div>
-                )}
 
-                {/* Requester & Technician grid */}
-                <div className="grid grid-cols-2 gap-2 mt-1 py-2 px-3 rounded-lg bg-surface-container-low">
-                  <div className="flex flex-col">
-                    <span className="font-label-sm text-label-sm text-on-surface-variant">ผู้แจ้งเหตุ</span>
-                    <span className="font-body-sm text-body-sm text-on-surface font-medium truncate">
-                      {ticket.requesterName}
+                  {/* Bottom row: urgency and time */}
+                  <div className="flex items-center justify-between pt-1 text-on-surface-variant font-label-sm text-label-sm">
+                    <span className="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-medium">
+                      ความเร่งด่วน: {getUrgencyText(ticket.priority)}
+                    </span>
+                    <span className="flex items-center gap-0.5 text-outline font-medium">
+                      <span className="material-symbols-outlined text-[14px]">schedule</span> วันนี้
                     </span>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="font-label-sm text-label-sm text-on-surface-variant">ช่างผู้รับผิดชอบ</span>
-                    <span className="font-body-sm text-body-sm text-primary font-semibold truncate flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[14px]">handyman</span>
-                      {ticket.technicianName || 'ยังไม่กำหนด'}
-                    </span>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100">
+                    <button
+                      onClick={() => {
+                        const targetName = ticket.technicianName || ticket.requesterName || 'ศูนย์ซ่อมฟาร์ม';
+                        const targetPhone = ticket.technicianPhone || ticket.requesterPhone || '081-234-5678';
+                        setCallConfirmTech({ name: targetName, phone: targetPhone });
+                      }}
+                      className="flex-1 bg-surface-container-high hover:bg-surface-container text-on-surface rounded-lg py-2 font-label-md text-label-md font-semibold text-center min-h-[42px] flex items-center justify-center gap-1 cursor-pointer"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">call</span>
+                      โทรหาช่าง
+                    </button>
+                    <button
+                      onClick={() => onSelectTicket(ticket)}
+                      className="flex-1 bg-primary hover:bg-primary-container text-on-primary rounded-lg py-2 font-label-md text-label-md font-semibold text-center shadow active:scale-98 transition-transform min-h-[42px] flex items-center justify-center gap-1 cursor-pointer"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">visibility</span>
+                      ดูรายละเอียด
+                    </button>
                   </div>
-                </div>
 
-                {/* Bottom row: urgency and time */}
-                <div className="flex items-center justify-between pt-1 text-on-surface-variant font-label-sm text-label-sm">
-                  <span className="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-medium">
-                    ความเร่งด่วน: {getUrgencyText(ticket.priority)}
-                  </span>
-                  <span className="flex items-center gap-0.5 text-outline font-medium">
-                    <span className="material-symbols-outlined text-[14px]">schedule</span> วันนี้
-                  </span>
                 </div>
-
-                {/* Action Buttons */}
-                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100">
-                  <button
-                    onClick={() => {
-                      if (ticket.requesterPhone) window.open(`tel:${ticket.requesterPhone}`);
-                      else alert('โทรติดต่อช่างประจำการ: 084-427-0787');
-                    }}
-                    className="flex-1 bg-surface-container-high hover:bg-surface-container text-on-surface rounded-lg py-2 font-label-md text-label-md font-semibold text-center min-h-[42px] flex items-center justify-center gap-1 cursor-pointer"
-                    type="button"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">call</span>
-                    โทรหาช่าง
-                  </button>
-                  <button
-                    onClick={() => onSelectTicket(ticket)}
-                    className="flex-1 bg-primary hover:bg-primary-container text-on-primary rounded-lg py-2 font-label-md text-label-md font-semibold text-center shadow active:scale-98 transition-transform min-h-[42px] flex items-center justify-center gap-1 cursor-pointer"
-                    type="button"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">visibility</span>
-                    ดูรายละเอียด
-                  </button>
-                </div>
-
-              </div>
-            </article>
-          );
-        })}
+              </article>
+            );
+          })
+        )}
       </section>
 
       {/* 8. Floating Shortcut Bar */}
       <aside className="sticky bottom-24 z-30 px-margin flex items-center justify-center pointer-events-none">
         <div className="pointer-events-auto bg-surface-container-lowest/95 backdrop-blur-md rounded-full px-4 py-2 shadow-xl flex items-center gap-3 border border-slate-200/60">
           <button
-            onClick={() => alert('สรุปงบประมาณรวม 9 แผนกประจำเดือนนี้: ฿38,500 จากงบประมาณ ฿50,000')}
-            className="flex items-center gap-1.5 text-primary font-label-md text-label-md font-bold px-2 py-1 rounded-full hover:bg-surface-container-high transition-colors cursor-pointer bg-transparent border-none"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[20px]">pie_chart</span>
-            <span>สรุปงบประมาณแยกแผนก</span>
-          </button>
-          <div className="w-px h-5 bg-outline-variant"></div>
-          <button
             onClick={onOpenFarmMap}
-            className="flex items-center gap-1.5 text-on-surface-variant hover:text-primary font-label-md text-label-md font-semibold px-2 py-1 rounded-full hover:bg-surface-container-high transition-colors cursor-pointer bg-transparent border-none"
+            className="flex items-center gap-1.5 text-on-surface-variant hover:text-primary font-label-md text-label-md font-semibold px-3 py-1 rounded-full hover:bg-surface-container-high transition-colors cursor-pointer bg-transparent border-none"
             type="button"
           >
             <span className="material-symbols-outlined text-[20px]">map</span>
@@ -524,6 +537,23 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </button>
         </div>
       </aside>
+
+      {/* Phone Call Confirmation Modal */}
+      {callConfirmTech && (
+        <ConfirmModal
+          isOpen={!!callConfirmTech}
+          title="ยืนยันการโทรออก"
+          message={`คุณต้องการโทรติดต่อ "${callConfirmTech.name}" ที่หมายเลข ${callConfirmTech.phone} ใช่หรือไม่?`}
+          confirmText="โทรออกทันที"
+          cancelText="ยกเลิก"
+          confirmVariant="primary"
+          onConfirm={() => {
+            window.location.href = `tel:${callConfirmTech.phone}`;
+            setCallConfirmTech(null);
+          }}
+          onCancel={() => setCallConfirmTech(null)}
+        />
+      )}
 
     </div>
   );

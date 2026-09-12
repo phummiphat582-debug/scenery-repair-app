@@ -29,6 +29,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<'create' | 'track'>('create');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('all');
   const [isDutyModalOpen, setIsDutyModalOpen] = useState(false);
 
   // Call confirmation modal
@@ -42,6 +43,10 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
   // Filter tickets for tracking
   const filteredTickets = useMemo(() => {
     return tickets.filter(t => {
+      if (selectedDeptFilter !== 'all' && t.department !== selectedDeptFilter) {
+        return false;
+      }
+
       const matchSearch = 
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.requestId.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -55,7 +60,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       if (filterStatus === 'completed') return t.status === 'completed' || t.status === 'waiting_inspect';
       return true;
     });
-  }, [tickets, searchQuery, filterStatus]);
+  }, [tickets, searchQuery, filterStatus, selectedDeptFilter]);
 
   const statusLabel = (status: string) => {
     switch (status) {
@@ -101,32 +106,37 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
     <div className="w-full max-w-4xl mx-auto px-4 py-4 space-y-5 animate-in fade-in duration-200">
       
       {/* 1. Welcoming & Role Banner */}
-      <div className="p-5 sm:p-6 bg-gradient-to-r from-primary to-primary-container text-white rounded-3xl shadow-lg border border-primary-fixed/20 relative overflow-hidden">
+      <div className="p-5 sm:p-6 bg-gradient-to-r from-primary via-primary to-primary-container text-white rounded-3xl shadow-lg border border-primary-fixed/20 relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 opacity-10 pointer-events-none">
           <Wrench className="w-48 h-48 text-white" />
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-secondary-fixed text-xs font-bold mb-2">
-              <span>👤 หน้าผู้แจ้งซ่อม (Requester Portal)</span>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-secondary-fixed text-xs font-bold mb-2">
+              <span>🏢 หน้าแจ้งงาน (สำหรับแผนกที่แจ้งงาน)</span>
             </div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-              ระบบแจ้งซ่อมบำรุง The Scenery Vintage Farm
+              ระบบแจ้งซ่อมสำหรับแผนก • Scenery Farm
             </h1>
-            <p className="text-xs sm:text-sm text-primary-fixed mt-1 max-w-xl">
-              แจ้งปัญหาอุปกรณ์ เครื่องจักร อาคารสถานที่ ดูช่างที่มาทำงานวันนี้ และโทรติดต่อช่างได้โดยตรง
+            <p className="text-xs sm:text-sm text-primary-fixed mt-1 max-w-xl leading-relaxed">
+              สำหรับพนักงานทุกแผนก (คาเฟ่, วิลล่า, โรงแกะ, กิจกรรม ฯลฯ) ส่งใบแจ้งซ่อม ตรวจสอบรายชื่อช่างที่มาปฏิบัติงานวันนี้ โทรติดต่อช่าง และติดตามสถานะงานซ่อม
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={onSwitchToTechnician}
-            className="self-start sm:self-center px-4 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 border border-white/20 shadow-sm cursor-pointer shrink-0 active:scale-95"
-          >
-            <Shield className="w-4 h-4 text-secondary-fixed" />
-            <span>เข้าสู่ระบบช่าง / หลังบ้าน 🛠️</span>
-          </button>
+          <div className="flex flex-col sm:items-end gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={onSwitchToTechnician}
+              className="self-start sm:self-auto px-4 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 border border-white/25 shadow-sm cursor-pointer active:scale-95"
+            >
+              <Shield className="w-4 h-4 text-secondary-fixed" />
+              <span>หน้าระบบช่างรับงาน (PIN 1234) 🛠️</span>
+            </button>
+            <span className="text-[11px] text-primary-fixed/80">
+              *หน้ารับงานของทีมช่างแยกอยู่อีกส่วน
+            </span>
+          </div>
         </div>
       </div>
 
@@ -275,6 +285,20 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
               />
             </div>
 
+            {/* Department Filter Dropdown */}
+            <div className="shrink-0">
+              <select
+                value={selectedDeptFilter}
+                onChange={(e) => setSelectedDeptFilter(e.target.value)}
+                className="w-full sm:w-auto h-[42px] px-3 bg-surface-container-lowest border border-slate-200 rounded-2xl text-xs font-bold text-on-surface outline-none focus:border-primary shadow-xs cursor-pointer"
+              >
+                <option value="all">🏢 ทุกแผนก</option>
+                {departments.map(d => (
+                  <option key={d.id} value={d.name}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
               {[
                 { id: 'all', label: 'ทั้งหมด' },
@@ -302,9 +326,9 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
           {filteredTickets.length === 0 ? (
             <div className="p-12 text-center bg-surface-container-lowest rounded-3xl border border-dashed border-slate-200 text-on-surface-variant flex flex-col items-center gap-3">
               <Clock className="w-10 h-10 text-slate-300" />
-              <span className="text-sm font-semibold">ยังไม่มีประวัติการแจ้งซ่อมในระบบ</span>
+              <span className="text-sm font-semibold">ยังไม่มีประวัติการแจ้งซ่อมในหมวดนี้</span>
               <p className="text-xs text-slate-400 max-w-sm">
-                เมื่อท่านส่งใบแจ้งซ่อม รายการจะแสดงสถานะและชื่อช่างผู้รับผิดชอบตรงนี้
+                เมื่อแผนกของท่านส่งใบแจ้งซ่อม รายการจะแสดงสถานะ คิวงาน และชื่อช่างผู้รับผิดชอบตรงนี้
               </p>
               <button
                 type="button"
@@ -316,10 +340,11 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3.5">
-              {filteredTickets.map(ticket => {
+              {filteredTickets.map((ticket, idx) => {
                 const sBadge = statusLabel(ticket.status);
                 const techPhone = getTechPhone(ticket);
                 const isAssigned = !!ticket.technicianName;
+                const queueNum = ticket.queueNumber || (idx + 1);
 
                 return (
                   <div
@@ -328,10 +353,18 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                   >
                     {/* Top Row: Request ID, Date, Status */}
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono text-xs font-extrabold text-primary bg-primary-fixed/40 px-2.5 py-1 rounded-full">
                           #{ticket.requestId}
                         </span>
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                          คิวที่ #{queueNum}
+                        </span>
+                        {ticket.category && (
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary-fixed/30 text-primary border border-primary/20">
+                            {ticket.category}
+                          </span>
+                        )}
                         <span className="text-[11px] text-on-surface-variant">
                           {new Date(ticket.createdAt).toLocaleDateString('th-TH', {
                             day: 'numeric',
@@ -359,13 +392,18 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                       <h3 className="font-bold text-sm sm:text-base text-on-surface">
                         {ticket.title}
                       </h3>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-on-surface-variant flex-wrap">
-                        <span className="flex items-center gap-1">
+                      {ticket.description && (
+                        <p className="text-xs text-on-surface-variant mt-1 line-clamp-2">
+                          {ticket.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2 text-xs text-on-surface-variant flex-wrap">
+                        <span className="flex items-center gap-1 font-semibold text-on-surface">
                           <MapPin className="w-3.5 h-3.5 text-primary" />
                           {ticket.location}
                         </span>
                         <span>•</span>
-                        <span>{ticket.department}</span>
+                        <span className="font-medium text-primary">{ticket.department}</span>
                         <span>•</span>
                         <span>ผู้แจ้ง: {ticket.requesterName}</span>
                       </div>

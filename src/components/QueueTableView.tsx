@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Ticket, Department } from '../types';
 import { Phone, CheckCircle2, Clock, Wrench, AlertTriangle, ChevronRight, Eye } from 'lucide-react';
+import { ConfirmModal } from './ConfirmModal';
 
 interface QueueTableViewProps {
   tickets: Ticket[];
@@ -15,6 +16,8 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
   onSelectTicket,
   onQuickAccept
 }) => {
+  const [callConfirmTech, setCallConfirmTech] = useState<{ name: string; phone: string } | null>(null);
+
   const deptMap = React.useMemo(() => {
     const map = new Map<string, Department>();
     departments.forEach(d => map.set(d.name, d));
@@ -144,6 +147,13 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
 
                     {/* ปัญหาที่แจ้งซ่อม */}
                     <td className="py-3.5 px-4">
+                      {ticket.category && (
+                        <div className="mb-1">
+                          <span className="px-2 py-0.5 rounded-md bg-primary-fixed/40 text-primary font-bold text-[10px]">
+                            {ticket.category}
+                          </span>
+                        </div>
+                      )}
                       <div className="font-bold text-on-surface text-xs line-clamp-1 group-hover:text-primary transition-colors">
                         {ticket.title}
                       </div>
@@ -168,14 +178,15 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
                             {ticket.technicianName}
                           </span>
                           {ticket.technicianPhone ? (
-                            <a
-                              href={`tel:${ticket.technicianPhone}`}
-                              className="inline-flex items-center gap-1 text-[11px] font-bold text-primary bg-primary-fixed/40 px-2 py-0.5 rounded-full hover:bg-primary hover:text-white transition-colors w-fit"
+                            <button
+                              type="button"
+                              onClick={() => setCallConfirmTech({ name: ticket.technicianName!, phone: ticket.technicianPhone! })}
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-primary bg-primary-fixed/40 px-2 py-0.5 rounded-full hover:bg-primary hover:text-white transition-colors w-fit cursor-pointer active:scale-95"
                               title="กดโทรออกหาช่าง"
                             >
                               <Phone className="w-3 h-3" />
                               <span>{ticket.technicianPhone}</span>
-                            </a>
+                            </button>
                           ) : (
                             <span className="text-[10px] text-slate-400">(ยังไม่มีเบอร์)</span>
                           )}
@@ -224,6 +235,23 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
         </div>
 
       </div>
+
+      {/* Phone Call Confirmation Modal */}
+      {callConfirmTech && (
+        <ConfirmModal
+          isOpen={!!callConfirmTech}
+          title="ยืนยันการโทรออก"
+          message={`คุณต้องการโทรติดต่อ "${callConfirmTech.name}" ที่หมายเลข ${callConfirmTech.phone} ใช่หรือไม่?`}
+          confirmText="โทรออกทันที"
+          cancelText="ยกเลิก"
+          confirmVariant="primary"
+          onConfirm={() => {
+            window.location.href = `tel:${callConfirmTech.phone}`;
+            setCallConfirmTech(null);
+          }}
+          onCancel={() => setCallConfirmTech(null)}
+        />
+      )}
     </div>
   );
 };

@@ -39,7 +39,7 @@ export const PartsModal: React.FC<PartsModalProps> = ({ isOpen, onClose, ticket 
           <div>
             <label className="font-label-sm text-label-sm text-on-surface-variant">สำหรับใบงาน</label>
             <div className="p-2 rounded-lg bg-surface-container-low text-xs font-bold text-primary">
-              #{ticket?.requestId || 'MN-2024-0141'}: {ticket?.title || 'แอร์ห้องเย็น Bakery & Craft'}
+              {ticket ? `#${ticket.requestId}: ${ticket.title}` : 'ระบุใบงานทั่วไป (ศูนย์ซ่อมบำรุง)'}
             </div>
           </div>
 

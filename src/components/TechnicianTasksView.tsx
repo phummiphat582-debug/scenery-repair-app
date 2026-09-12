@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Ticket, Technician } from '../types';
 import { ConfirmModal } from './ConfirmModal';
+import { Phone, CheckCircle2, Clock, Wrench, AlertTriangle, AlertCircle, Eye, Check, ChevronRight, Package, RefreshCw } from 'lucide-react';
 
 interface TechnicianTasksViewProps {
   tickets: Ticket[];
@@ -22,7 +23,7 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
   onOpenPartsModal
 }) => {
   const [activeTab, setActiveTab] = useState<'today' | 'waiting' | 'history'>('today');
-  const [selectedZone, setSelectedZone] = useState('all');
+  const [selectedZone, setSelectedZone] = useState<string>('all');
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
   const [confirmConfig, setConfirmConfig] = useState<{
@@ -35,14 +36,48 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
     onConfirm: () => void;
   } | null>(null);
 
-  // Active technician (defaults to first tech)
-  const currentTech = technicians[0] || {
-    id: 't-1',
-    name: 'ช่างสมชาย (หัวหน้าช่าง)',
-    role: 'หัวหน้าฝ่ายซ่อมบำรุง',
-    code: 'T-042',
-    phone: '081-234-5678'
-  };
+  // Active technician (defaults to first active on-duty tech or first tech)
+  const currentTech = useMemo(() => {
+    return technicians.find(t => t.isOnDutyToday) || technicians[0] || {
+      id: 't-1',
+      name: 'ช่างสมชาย (หัวหน้าช่าง)',
+      role: 'หัวหน้าฝ่ายซ่อมบำรุง',
+      phone: '081-234-5678'
+    };
+  }, [technicians]);
+
+  // Dynamic metrics computed from real tickets prop
+  const pendingOrAssignedCount = useMemo(() => 
+    tickets.filter(t => t.status === 'pending' || t.status === 'assigned').length, [tickets]);
+  const inProgressCount = useMemo(() => 
+    tickets.filter(t => t.status === 'in_progress').length, [tickets]);
+  const waitingPartsCount = useMemo(() => 
+    tickets.filter(t => t.status === 'waiting_parts').length, [tickets]);
+  const completedCount = useMemo(() => 
+    tickets.filter(t => t.status === 'completed').length, [tickets]);
+
+  // Dynamic filter by activeTab
+  const tabFilteredTasks = useMemo(() => {
+    if (activeTab === 'today') {
+      return tickets.filter(t => t.status === 'pending' || t.status === 'assigned' || t.status === 'in_progress');
+    } else if (activeTab === 'waiting') {
+      return tickets.filter(t => t.status === 'waiting_parts' || t.status === 'waiting_inspect');
+    } else {
+      return tickets.filter(t => t.status === 'completed' || t.status === 'cancelled');
+    }
+  }, [tickets, activeTab]);
+
+  // Distinct departments in tickets for filter
+  const availableDepts = useMemo(() => {
+    const set = new Set(tickets.map(t => t.department).filter(Boolean));
+    return Array.from(set);
+  }, [tickets]);
+
+  // Final filtered list
+  const finalTasks = useMemo(() => {
+    if (selectedZone === 'all') return tabFilteredTasks;
+    return tabFilteredTasks.filter(t => t.department === selectedZone);
+  }, [tabFilteredTasks, selectedZone]);
 
   const handleAcceptWork = (ticket: Ticket) => {
     setConfirmConfig({
@@ -106,468 +141,319 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full pb-16">
+    <div className="flex flex-col w-full pb-20">
       
-      {/* 1. Sync & Connectivity Status Banner */}
-      <section className="px-margin pt-space-sm pb-space-xs">
-        <div className="flex items-center justify-between px-space-md py-space-xs rounded-full bg-primary-fixed text-on-primary-fixed shadow-sm">
-          <div className="flex items-center gap-space-xs min-w-0">
-            <span className="relative flex h-2.5 w-2.5 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
-            </span>
-            <span className="font-label-sm text-label-sm truncate font-medium">
-              เชื่อมต่อระบบคลังฟาร์มออนไลน์ • ซิงค์เมื่อ 1 นาทีที่แล้ว
-            </span>
-          </div>
-          <span className="material-symbols-outlined text-[16px] text-primary shrink-0">cloud_done</span>
-        </div>
-      </section>
-
-      {/* 2. Technician Profile Header */}
-      <header className="px-margin py-space-sm">
-        <div className="relative overflow-hidden rounded-xl bg-primary text-on-primary p-space-md shadow-md">
-          <div className="absolute -right-6 -bottom-6 w-32 h-32 rounded-full bg-primary-container opacity-40 pointer-events-none"></div>
-          <div className="flex items-center gap-space-md relative z-10">
+      {/* 1. Header Profile & Real-Time Counters */}
+      <header className="px-margin pt-3">
+        <div className="rounded-3xl bg-gradient-to-br from-primary via-primary to-primary-container p-space-md text-white shadow-lg border border-primary-fixed/30">
+          <div className="flex items-center gap-space-sm">
             <div className="relative shrink-0">
-              <img
-                className="w-14 h-14 rounded-full object-cover shadow-sm ring-2 ring-primary-fixed"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYB2PFeA-M3r405BGFajCzKCm0AsBLbZuVDeUyCkEcden4KiWIXAyksZtC-7qTCmzUmcgGyohPl7PaRUthRc5GjrFt9jfizuRrfeOu060wxEbfz1h3nXcqfd__YxLxUKxMV-arf_pVfOcFLdYA-TfVwnoKCtOh4Xay5oqkb7YLzGI7P3yYJyb51w-Xki13kvjWl_cHUDwNufvT1g_k_MhwnDYt470UXHiVA8O6BuqE1MEWTghHIs0jew"
-                alt="Portrait of Anurak, Thai farm technician"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-              />
-              <span
-                className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-tertiary-fixed border-2 border-primary flex items-center justify-center"
-                title="On Duty"
-              >
-                <span className="w-2 h-2 rounded-full bg-tertiary-container"></span>
+              <span className="w-14 h-14 rounded-2xl bg-white/20 text-white flex items-center justify-center font-bold text-xl shadow-inner border border-white/20">
+                {currentTech.name.slice(4, 5) || currentTech.name.slice(0, 1) || 'ช'}
               </span>
+              <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-400 ring-2 ring-primary"></span>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-space-xs flex-wrap">
+
+            <div className="flex flex-col min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="font-headline-sm text-headline-sm text-on-primary tracking-tight truncate font-bold">
                   {currentTech.name}
                 </h1>
-                <span className="font-label-sm text-label-sm px-2 py-0.5 rounded-full bg-tertiary-container text-tertiary-fixed font-semibold">
-                  รหัส {currentTech.code || 'T-042'}
+                <span className="font-label-sm text-xs px-2.5 py-0.5 rounded-full bg-white/20 text-white font-semibold">
+                  {currentTech.phone || '081-234-5678'}
                 </span>
               </div>
-              <p className="font-body-sm text-body-sm text-primary-fixed-dim truncate">
-                {currentTech.role || 'ช่างระบบไฟและเครื่องกล • สายซ่อมบำรุง A'}
+              <p className="font-body-sm text-body-sm text-primary-fixed truncate mt-0.5">
+                {currentTech.role}
               </p>
-              <div className="mt-1 flex items-center gap-1 text-tertiary-fixed font-label-sm text-label-sm">
-                <span className="material-symbols-outlined text-[15px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  verified
-                </span>
-                <span>พร้อมปฏิบัติงาน (On Duty) เข้ากะเช้า</span>
+              <div className="mt-1 flex items-center gap-1 text-secondary-fixed text-xs font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>สถานะ: พร้อมปฏิบัติงาน (On Duty)</span>
               </div>
             </div>
           </div>
 
-          {/* Quick Metrics Counters */}
-          <div className="grid grid-cols-4 gap-space-xs mt-space-md pt-space-sm bg-primary-container/60 rounded-lg p-2 text-center">
+          {/* Real-time Dynamic Metrics Counters */}
+          <div className="grid grid-cols-4 gap-2 mt-4 pt-3 border-t border-white/15 text-center">
             <div className="flex flex-col items-center">
-              <span className="font-headline-sm text-headline-sm text-secondary-fixed font-bold">1</span>
-              <span className="font-label-sm text-label-sm text-primary-fixed-dim">รับงาน</span>
+              <span className="font-headline-sm text-lg sm:text-xl text-amber-300 font-extrabold">
+                {pendingOrAssignedCount}
+              </span>
+              <span className="text-[11px] text-primary-fixed font-medium">รอรับงาน</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="font-headline-sm text-headline-sm text-tertiary-fixed font-bold">2</span>
-              <span className="font-label-sm text-label-sm text-primary-fixed-dim">กำลังทำ</span>
+              <span className="font-headline-sm text-lg sm:text-xl text-emerald-300 font-extrabold">
+                {inProgressCount}
+              </span>
+              <span className="text-[11px] text-primary-fixed font-medium">กำลังทำ</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="font-headline-sm text-headline-sm text-secondary-container font-bold">1</span>
-              <span className="font-label-sm text-label-sm text-primary-fixed-dim">รออะไหล่</span>
+              <span className="font-headline-sm text-lg sm:text-xl text-orange-300 font-extrabold">
+                {waitingPartsCount}
+              </span>
+              <span className="text-[11px] text-primary-fixed font-medium">รออะไหล่</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="font-headline-sm text-headline-sm text-on-primary font-bold">3</span>
-              <span className="font-label-sm text-label-sm text-primary-fixed-dim">เสร็จแล้ว</span>
+              <span className="font-headline-sm text-lg sm:text-xl text-white font-extrabold">
+                {completedCount}
+              </span>
+              <span className="text-[11px] text-primary-fixed font-medium">เสร็จสิ้น</span>
             </div>
           </div>
         </div>
       </header>
 
-      {/* 3. Segmented Mode Switcher */}
-      <section className="px-margin py-space-xs">
-        <div className="flex items-center p-1 rounded-xl bg-surface-container gap-1 shadow-sm" role="tablist">
+      {/* 2. Dynamic Segmented Tabs */}
+      <section className="px-margin py-3">
+        <div className="flex items-center p-1.5 rounded-2xl bg-surface-container-low border border-slate-200 gap-1 shadow-xs">
           <button
             onClick={() => setActiveTab('today')}
-            className={`flex-1 min-h-[44px] py-2 px-2 rounded-lg font-label-md text-label-md font-semibold text-center transition-all flex items-center justify-center gap-1 cursor-pointer ${
+            className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm text-center transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'today'
-                ? 'bg-surface-container-lowest text-primary shadow-sm'
+                ? 'bg-primary text-white shadow-sm'
                 : 'text-on-surface-variant hover:text-on-surface'
             }`}
             type="button"
           >
-            <span>งานวันนี้</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-primary text-on-primary font-label-sm text-[11px]">
-              3
+            <span>งานที่ต้องทำ</span>
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+              activeTab === 'today' ? 'bg-white text-primary' : 'bg-surface-container-high text-on-surface'
+            }`}>
+              {pendingOrAssignedCount + inProgressCount}
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab('waiting')}
-            className={`flex-1 min-h-[44px] py-2 px-2 rounded-lg font-label-md text-label-md font-semibold text-center transition-all flex items-center justify-center gap-1 cursor-pointer ${
+            className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm text-center transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'waiting'
-                ? 'bg-surface-container-lowest text-primary shadow-sm'
+                ? 'bg-primary text-white shadow-sm'
                 : 'text-on-surface-variant hover:text-on-surface'
             }`}
             type="button"
           >
-            <span>รออะไหล่</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-surface-container-highest text-on-surface font-label-sm text-[11px]">
-              1
+            <span>รออะไหล่ / รอตรวจ</span>
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+              activeTab === 'waiting' ? 'bg-white text-primary' : 'bg-surface-container-high text-on-surface'
+            }`}>
+              {waitingPartsCount}
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab('history')}
-            className={`flex-1 min-h-[44px] py-2 px-2 rounded-lg font-label-md text-label-md font-semibold text-center transition-all flex items-center justify-center gap-1 cursor-pointer ${
+            className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs sm:text-sm text-center transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'history'
-                ? 'bg-surface-container-lowest text-primary shadow-sm'
+                ? 'bg-primary text-white shadow-sm'
                 : 'text-on-surface-variant hover:text-on-surface'
             }`}
             type="button"
           >
-            <span>ประวัติงาน</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-surface-container-highest text-on-surface font-label-sm text-[11px]">
-              28
+            <span>งานเสร็จสิ้น</span>
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+              activeTab === 'history' ? 'bg-white text-primary' : 'bg-surface-container-high text-on-surface'
+            }`}>
+              {completedCount}
             </span>
           </button>
         </div>
       </section>
 
-      {/* 4. Zone Pill Filter */}
-      <section className="py-space-xs px-margin overflow-x-auto no-scrollbar flex items-center gap-space-xs">
-        {[
-          { id: 'all', label: 'ทุกจุดในฟาร์ม (4)', icon: 'tune' },
-          { id: 'cafe', label: 'โซนคาเฟ่ & เบเกอรี่ (1)', dot: 'bg-secondary-container' },
-          { id: 'pasture', label: 'คอกแกะ Pasture C (1)', dot: 'bg-primary' },
-          { id: 'barn', label: 'โรงเก็บฟาง & แปลงหญ้า (1)', dot: 'bg-outline' }
-        ].map(z => (
+      {/* 3. Zone Pill Filter (Dynamic from tickets) */}
+      {availableDepts.length > 0 && (
+        <section className="py-1 px-margin overflow-x-auto no-scrollbar flex items-center gap-2">
           <button
-            key={z.id}
-            onClick={() => setSelectedZone(z.id)}
-            className={`shrink-0 min-h-[36px] px-3.5 py-1.5 rounded-full font-label-sm text-label-sm flex items-center gap-1 shadow-sm transition-all cursor-pointer ${
-              selectedZone === z.id
-                ? 'bg-primary text-on-primary font-semibold'
-                : 'bg-surface-container-lowest text-on-surface hover:bg-surface-container-low'
+            onClick={() => setSelectedZone('all')}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold shadow-xs transition-all cursor-pointer ${
+              selectedZone === 'all'
+                ? 'bg-primary text-white font-bold'
+                : 'bg-surface-container-lowest border border-slate-200 text-on-surface hover:bg-surface-container'
             }`}
             type="button"
           >
-            {z.icon && <span className="material-symbols-outlined text-[16px]">{z.icon}</span>}
-            {z.dot && <span className={`w-2 h-2 rounded-full ${z.dot}`}></span>}
-            <span>{z.label}</span>
+            ทุกแผนก ({tabFilteredTasks.length})
           </button>
-        ))}
-      </section>
+          {availableDepts.map(dept => {
+            const cnt = tabFilteredTasks.filter(t => t.department === dept).length;
+            return (
+              <button
+                key={dept}
+                onClick={() => setSelectedZone(dept)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold shadow-xs transition-all cursor-pointer ${
+                  selectedZone === dept
+                    ? 'bg-primary text-white font-bold'
+                    : 'bg-surface-container-lowest border border-slate-200 text-on-surface hover:bg-surface-container'
+                }`}
+                type="button"
+              >
+                {dept} ({cnt})
+              </button>
+            );
+          })}
+        </section>
+      )}
 
-      {/* 5. Task Queue Feed */}
-      <div className="px-margin flex flex-col gap-space-md mt-space-xs">
-        
-        {/* TASK 1: ACTIVE NOW (IN PROGRESS) */}
-        <article className="relative overflow-hidden rounded-xl bg-surface-container-lowest shadow-md p-space-md border border-slate-200/40">
-          <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-error"></div>
-          <div className="pl-space-xs flex flex-col gap-space-xs">
-            <div className="flex items-start justify-between gap-space-xs">
-              <div className="flex items-center gap-space-xs flex-wrap">
-                <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
-                  #MN-2024-0141
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm flex items-center gap-0.5 font-bold">
-                  <span className="material-symbols-outlined text-[14px]">bolt</span> ด่วนมาก
-                </span>
-              </div>
-              <span className="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1 shrink-0">
-                <span className="material-symbols-outlined text-[14px]">schedule</span> 09:30 น.
-              </span>
+      {/* 4. Real Tasks Feed (Clean Slate when empty) */}
+      <div className="px-margin flex flex-col gap-3.5 mt-2">
+        {finalTasks.length === 0 ? (
+          <div className="p-12 text-center bg-surface-container-lowest rounded-3xl border border-dashed border-slate-300 text-on-surface-variant flex flex-col items-center gap-3 my-4">
+            <div className="w-14 h-14 rounded-2xl bg-primary-fixed/30 text-primary flex items-center justify-center">
+              <Wrench className="w-8 h-8" />
             </div>
-
-            <h2 className="font-headline-sm text-headline-sm text-on-surface leading-tight mt-0.5 font-bold">
-              แอร์ห้องเย็น Bakery & Craft ตัดการทำงาน
-            </h2>
-            <div className="flex items-center gap-space-xs text-on-surface-variant font-body-sm text-body-sm">
-              <span className="material-symbols-outlined text-[18px] text-primary">pin_drop</span>
-              <span className="font-semibold text-on-surface">อาคาร Bakery Workshop โซนหน้าฟาร์ม</span>
-            </div>
-            <p className="font-body-sm text-body-sm text-on-surface-variant bg-surface-container-low p-2.5 rounded-lg mt-1">
-              อุณหภูมิห้องเย็นพุ่งขึ้นถึง 18°C (ปกติ 4°C) วัตถุดิบเนยสดและวิปครีมเสี่ยงเสียหาย ช่างตรวจเบื้องต้นพบน้ำแข็งเกาะคอยล์เย็น
+            <h3 className="text-base font-bold text-on-surface">
+              ไม่มีงานซ่อมค้างในหน้านี้
+            </h3>
+            <p className="text-xs text-on-surface-variant max-w-sm">
+              ข้อมูลเดโม่ถูกเคลียร์ออกเรียบร้อยแล้ว เมื่อแผนกต่างๆ แจ้งงานซ่อมเข้ามา รายการงานจะปรากฏที่นี่ทันที
             </p>
-
-            {/* Progress Tracker Mini Bar */}
-            <div className="mt-1 flex flex-col gap-1">
-              <div className="flex justify-between font-label-sm text-label-sm text-on-surface-variant">
-                <span>สถานะ: กำลังล้างแผงระบายความร้อน</span>
-                <span className="text-primary font-semibold">65%</span>
-              </div>
-              <div className="w-full bg-surface-container-high h-2 rounded-full overflow-hidden">
-                <div
-                  className="bg-primary-container h-full rounded-full transition-all duration-300"
-                  style={{ width: '65%' }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Attached Photo Evidence */}
-            <div className="mt-1 flex items-center gap-space-xs overflow-x-auto pb-1">
-              <img
-                className="w-16 h-16 rounded-lg object-cover shadow-sm shrink-0"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZBWBnZIQsLMZAsDsAR4zfQ-zC9F8sWHgr2VLP_oEWEm88ab8yiwBRiFHCxffeHFcKLWmeR3AJFwUhJqhig6Rcqq8_xJfsIJFBeRpcKsz57JJOucP7hkdVv-RgXd9SqYhVN0vzIm8Z_cL25A9Yw8pD8amCdaelwgSvQd4fzMvgb2ENqe7a9wsRjK3JiJ2xzpSM6CAl8TfbR1T3-BJ-UjPvRHSArsh6nJeIcH-QpMaIBxIGxAWaw_wICw"
-                alt="Cold storage evaporator coil"
-              />
-              <button
-                onClick={() => alert('เปิดกล้องสมาร์ตโฟนสำหรับแนบภาพถ่ายความคืบหน้าระหว่างซ่อม')}
-                className="w-16 h-16 rounded-lg bg-surface-container flex flex-col items-center justify-center text-primary hover:bg-surface-container-high transition-colors shrink-0 cursor-pointer"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-[24px]">add_a_photo</span>
-                <span className="font-label-sm text-[10px] mt-0.5">เพิ่มรูป</span>
-              </button>
-              <div className="p-2 rounded-lg bg-surface-container-low text-on-surface-variant flex-1 min-w-[120px] text-left">
-                <span className="font-label-sm text-label-sm block font-semibold text-primary">อุปกรณ์ที่ใช้</span>
-                <span className="font-body-sm text-body-sm text-on-surface-variant truncate block">
-                  เกจวัดน้ำยา R410A, ปั๊มฉีด
-                </span>
-              </div>
-            </div>
-
-            {/* Quick 1-Click Action Buttons */}
-            <div className="grid grid-cols-2 gap-space-xs mt-space-sm pt-space-xs border-t border-slate-100">
-              <button
-                onClick={() => onOpenPartsModal(tickets[0])}
-                className="min-h-[48px] px-3 rounded-lg bg-surface-container text-primary font-label-md text-label-md flex items-center justify-center gap-1.5 active:scale-98 transition-transform font-semibold cursor-pointer"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-[20px]">inventory_2</span>
-                <span>บันทึกผล/เบิกอะไหล่</span>
-              </button>
-              <button
-                onClick={() => handleCompleteWork(tickets[0] || { id: 't1', requestId: 'MN-2024-0141' } as any)}
-                className="min-h-[48px] px-3 rounded-lg bg-primary-container text-on-primary font-label-md text-label-md flex items-center justify-center gap-1.5 shadow-sm active:scale-98 transition-transform font-semibold cursor-pointer"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-[20px]">check_circle</span>
-                <span>ส่งตรวจรับงาน</span>
-              </button>
-            </div>
           </div>
-        </article>
+        ) : (
+          finalTasks.map(ticket => {
+            const isPending = ticket.status === 'pending' || ticket.status === 'assigned';
+            const isInProgress = ticket.status === 'in_progress';
+            const isWaitingParts = ticket.status === 'waiting_parts';
+            const isCritical = ticket.priority === 'critical' || ticket.priority === 'high';
 
-        {/* TASK 2: ASSIGNED / NEEDS ACCEPTANCE */}
-        <article className="relative overflow-hidden rounded-xl bg-surface-container-lowest shadow-md p-space-md border border-slate-200/40">
-          <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-secondary-container"></div>
-          <div className="pl-space-xs flex flex-col gap-space-xs">
-            <div className="flex items-start justify-between gap-space-xs">
-              <div className="flex items-center gap-space-xs flex-wrap">
-                <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
-                  #MN-2024-0143
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm flex items-center gap-0.5 font-bold">
-                  <span className="material-symbols-outlined text-[14px]">assignment_turned_in</span> งานใหม่รอรับ
-                </span>
-              </div>
-              <span className="font-label-sm text-label-sm text-secondary font-semibold flex items-center gap-0.5 shrink-0">
-                <span className="material-symbols-outlined text-[14px]">history</span> 15 นาทีที่แล้ว
-              </span>
-            </div>
-
-            <h2 className="font-headline-sm text-headline-sm text-on-surface leading-tight mt-0.5 font-bold">
-              ปั๊มน้ำคอกแกะโซน C รั่วซึม แรงดันตก
-            </h2>
-            <div className="flex items-center gap-space-xs text-on-surface-variant font-body-sm text-body-sm">
-              <span className="material-symbols-outlined text-[18px] text-primary">place</span>
-              <span className="font-semibold text-on-surface">Pasture C (โรงเรือนให้อาหารแกะหลังที่ 2)</span>
-            </div>
-            <div className="flex items-center gap-space-xs p-2 rounded-lg bg-surface-container-low text-on-surface-variant font-body-sm text-body-sm">
-              <span className="material-symbols-outlined text-[18px] text-primary">supervisor_account</span>
-              <span>มอบหมายโดย: <strong>หัวหน้าสมชาย (ผจก.ฝ่ายบำรุงรักษา)</strong></span>
-            </div>
-            <p className="font-body-sm text-body-sm text-on-surface-variant">
-              น้ำไหลอ่อนกระทบรางน้ำดื่มฝูงแกะ 60 ตัว มีน้ำรั่วเจิ่งนองบริเวณฐานปั๊ม Mitsubishi 250W ต้องการช่างเข้าตรวจสอบท่อข้อต่อ PVC
-            </p>
-
-            {/* Prominent Acceptance Workflow */}
-            <div className="flex flex-col gap-space-xs mt-space-sm pt-1 border-t border-slate-100">
-              <button
-                onClick={() => handleAcceptWork(tickets[1] || { id: 't2', requestId: 'MN-2024-0143' } as any)}
-                disabled={acceptingId !== null}
-                className="w-full min-h-[52px] px-4 rounded-xl bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center justify-center gap-2 shadow-md active:scale-98 transition-all hover:bg-primary-container cursor-pointer font-bold"
-                type="button"
+            return (
+              <article 
+                key={ticket.id}
+                className="relative overflow-hidden rounded-3xl bg-surface-container-lowest shadow-xs hover:shadow-md p-4 sm:p-5 border border-slate-200/80 transition-all flex flex-col gap-3"
               >
-                {acceptingId ? (
-                  <>
-                    <span className="material-symbols-outlined animate-spin text-[24px]">sync</span>
-                    <span>กำลังบันทึกรับงาน...</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined text-[24px]">task_alt</span>
-                    <span>แตะเพื่อ 'กดรับงาน' (Accept Work Order)</span>
-                  </>
-                )}
-              </button>
+                {/* Left urgency colored stripe */}
+                <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
+                  isCritical ? 'bg-red-500' : isInProgress ? 'bg-emerald-500' : 'bg-amber-500'
+                }`}></div>
 
-              <div className="grid grid-cols-2 gap-space-xs">
-                <button
-                  onClick={() => window.open('tel:0844270787')}
-                  className="min-h-[44px] px-3 rounded-lg bg-surface-container text-on-surface font-label-md text-label-md flex items-center justify-center gap-1.5 active:scale-98 transition-transform cursor-pointer font-semibold"
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-[18px] text-primary">phone</span>
-                  <span>โทรหาผู้แจ้ง/หัวหน้า</span>
-                </button>
-                <button
-                  onClick={() => handleDeclineWork(tickets[1] || { id: 't2', requestId: 'MN-2024-0143' } as any)}
-                  className="min-h-[44px] px-3 rounded-lg bg-surface-container text-error font-label-md text-label-md flex items-center justify-center gap-1.5 active:scale-98 transition-transform cursor-pointer font-semibold"
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-[18px]">event_busy</span>
-                  <span>แจ้งติดภารกิจอื่น</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </article>
+                {/* Card Top: Request ID, Priority, Date */}
+                <div className="pl-1.5 flex items-start justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-extrabold text-primary bg-primary-fixed/40 px-2.5 py-1 rounded-full">
+                      #{ticket.requestId}
+                    </span>
+                    {isCritical && (
+                      <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold text-[11px] border border-red-200 animate-pulse">
+                        ด่วนมาก
+                      </span>
+                    )}
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface">
+                      {ticket.department}
+                    </span>
+                  </div>
 
-        {/* TASK 3: WAITING FOR PARTS */}
-        <article className="relative overflow-hidden rounded-xl bg-surface-container-lowest shadow-md p-space-md border border-slate-200/40">
-          <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-outline"></div>
-          <div className="pl-space-xs flex flex-col gap-space-xs">
-            <div className="flex items-start justify-between gap-space-xs">
-              <div className="flex items-center gap-space-xs flex-wrap">
-                <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
-                  #MN-2024-0138
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm flex items-center gap-0.5 font-bold">
-                  <span className="material-symbols-outlined text-[14px]">pending</span> รออะไหล่
-                </span>
-              </div>
-              <span className="font-label-sm text-label-sm text-on-surface-variant">บันทึกเมื่อวาน</span>
-            </div>
-
-            <h2 className="font-headline-sm text-headline-sm text-on-surface leading-tight mt-0.5 font-bold">
-              ชุดลูกรอกสลิงโรงเก็บฟางและหญ้าแห้ง
-            </h2>
-            <div className="flex items-center gap-space-xs text-on-surface-variant font-body-sm text-body-sm">
-              <span className="material-symbols-outlined text-[18px] text-primary">warehouse</span>
-              <span className="font-semibold text-on-surface">โรงฟางอาคาร 4 ทิศตะวันตก</span>
-            </div>
-
-            {/* Parts Tracking Box */}
-            <div className="p-3 rounded-xl bg-secondary-fixed/40 text-on-secondary-fixed-variant flex items-start gap-space-sm mt-1 border border-secondary-fixed">
-              <span className="material-symbols-outlined text-[24px] text-secondary shrink-0 mt-0.5">
-                local_shipping
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="font-label-md text-label-md font-semibold text-on-secondary-fixed">
-                  สั่งเบิก: ตลับลูกปืนเหล็กกล้า SKF 6204 & ลวดสลิง 8 มม.
+                  <span className="text-[11px] text-on-surface-variant flex items-center gap-1 shrink-0">
+                    <Clock className="w-3.5 h-3.5" />
+                    {new Date(ticket.createdAt).toLocaleDateString('th-TH', {
+                      day: 'numeric',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </span>
                 </div>
-                <div className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
-                  สถานะ: จัดส่งจากศูนย์กระจายสินค้าราชบุรี • กำหนดส่งถึงฟาร์ม <strong>พรุ่งนี้ 10:00 น.</strong>
+
+                {/* Title & Location */}
+                <div className="pl-1.5">
+                  <h2 className="font-bold text-sm sm:text-base text-on-surface leading-tight">
+                    {ticket.title}
+                  </h2>
+                  <div className="flex items-center gap-1.5 text-on-surface-variant text-xs mt-1">
+                    <span className="material-symbols-outlined text-[16px] text-primary">pin_drop</span>
+                    <span className="font-semibold text-on-surface">{ticket.location}</span>
+                  </div>
+                  {ticket.description && (
+                    <p className="text-xs text-on-surface-variant bg-surface-container-low p-2.5 rounded-xl mt-2">
+                      {ticket.description}
+                    </p>
+                  )}
                 </div>
-              </div>
-            </div>
 
-            {/* Parts Action */}
-            <div className="mt-space-xs pt-1 border-t border-slate-100">
-              <button
-                onClick={() => alert('เปิดคลังอะไหล่: ตลับลูกปืน SKF 6204 เหลือสำรอง 0 ชิ้นในสโตร์ฟาร์ม (รอของส่งพรุ่งนี้), อะไหล่เทียบเท่า 6204-2RS เหลือ 1 ชิ้นในช็อปเกษตร')}
-                className="w-full min-h-[48px] px-3 rounded-lg bg-surface-container text-primary font-label-md text-label-md flex items-center justify-center gap-2 active:scale-98 transition-transform font-semibold cursor-pointer"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-[20px]">manage_search</span>
-                <span>เช็คสต็อกอะไหล่สำรองในฟาร์ม (Live Inventory)</span>
-              </button>
-            </div>
-          </div>
-        </article>
+                {/* Requester Info */}
+                <div className="pl-1.5 flex items-center justify-between text-xs text-on-surface-variant pt-1 border-t border-slate-100 flex-wrap gap-2">
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-500">ผู้แจ้ง:</span>
+                    <strong className="text-on-surface">{ticket.requesterName}</strong>
+                    {ticket.requesterPhone && (
+                      <a href={`tel:${ticket.requesterPhone}`} className="text-primary font-bold ml-1 hover:underline">
+                        ({ticket.requesterPhone})
+                      </a>
+                    )}
+                  </div>
 
+                  {ticket.technicianName && (
+                    <div className="text-[11px] text-primary font-semibold">
+                      ช่าง: {ticket.technicianName}
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="pl-1.5 grid grid-cols-2 gap-2 pt-1">
+                  {isPending ? (
+                    <button
+                      type="button"
+                      disabled={acceptingId === ticket.id}
+                      onClick={() => handleAcceptWork(ticket)}
+                      className="col-span-2 py-3 bg-primary hover:bg-primary-container text-white rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>{acceptingId === ticket.id ? 'กำลังบันทึก...' : 'แตะเพื่อรับงาน (Accept Work)'}</span>
+                    </button>
+                  ) : isInProgress ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onOpenPartsModal(ticket)}
+                        className="py-2.5 bg-surface-container hover:bg-surface-container-high text-primary rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Package className="w-4 h-4" />
+                        <span>เบิกอะไหล่ / บันทึกผล</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCompleteWork(ticket)}
+                        className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer active:scale-98"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>ส่งตรวจรับงาน</span>
+                      </button>
+                    </>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={() => onSelectTicket(ticket)}
+                    className="col-span-2 py-2 bg-surface-container-low hover:bg-surface-container text-on-surface rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>ดูรายละเอียดใบงานแบบเต็ม</span>
+                  </button>
+                </div>
+
+              </article>
+            );
+          })
+        )}
       </div>
 
-      {/* 6. Farm Map Quick Location Spotlight */}
-      <section className="px-margin pt-space-lg pb-space-sm">
-        <div className="p-space-md rounded-xl bg-surface-container-low shadow-sm border border-slate-200/40">
-          <div className="flex items-center justify-between mb-space-xs">
-            <div className="flex items-center gap-space-xs">
-              <span className="material-symbols-outlined text-primary text-[22px]">map</span>
-              <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold">
-                แผนที่พิกัดงานซ่อมในฟาร์ม
-              </h3>
-            </div>
-            <span className="font-label-sm text-label-sm text-primary font-semibold">3 จุดรอดำเนินการ</span>
-          </div>
+      {/* 5. Floating Bottom Help Actions */}
+      <aside className="fixed bottom-24 right-4 z-40 flex items-center gap-2">
+        <button
+          onClick={onOpenSOSModal}
+          className="h-11 px-3.5 rounded-full bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg active:scale-95 transition-all cursor-pointer"
+          type="button"
+        >
+          <AlertCircle className="w-4 h-4" />
+          <span>SOS ฉุกเฉิน</span>
+        </button>
 
-          <div
-            className="w-full h-44 rounded-xl bg-cover bg-center relative overflow-hidden shadow-inner flex flex-col justify-between p-3"
-            style={{
-              backgroundImage:
-                "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDZU-ne5ehqWpSGs8mW9y2uRvE-fVEVC-1YsKhjjlK09kl11dfP7UsQU-qBaMfDw7tGVNdj4SIWMgEjfuafhUhG9PqQ7nGx6SQdoi4PatuZy_Vmxtf32hFOmaQZWt1Xx2Dx7Sd5Pit8pwuODeqdIrqpFDsVCmAXKplGIrbQsj7XkszaBNS1yzCqPf57a_AEfMId-10TrPM4cXR3rC8QZpIOKfKckjpsXhWDxnuZ1IBrCtnzLpGKVxOsdQ')"
-            }}
-          >
-            <div className="flex justify-between items-start">
-              <span className="px-2.5 py-1 rounded-full bg-primary/90 text-on-primary font-label-sm text-label-sm backdrop-blur-sm shadow-sm flex items-center gap-1 font-semibold">
-                <span className="w-2 h-2 rounded-full bg-tertiary-fixed animate-pulse"></span> โซนเปิดบริการท่องเที่ยว
-              </span>
-              <button
-                onClick={onOpenFarmMap}
-                className="w-8 h-8 rounded-full bg-surface-container-lowest text-on-surface shadow-md flex items-center justify-center cursor-pointer"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-[18px]">my_location</span>
-              </button>
-            </div>
-
-            <div className="bg-surface/90 backdrop-blur-md p-2.5 rounded-lg shadow-sm flex items-center justify-between">
-              <div className="min-w-0">
-                <p className="font-label-md text-label-md text-on-surface font-semibold truncate">
-                  ตำแหน่งปัจจุบัน: ช็อปช่างกลางฟาร์ม
-                </p>
-                <p className="font-body-sm text-body-sm text-on-surface-variant truncate">
-                  ระยะห่างถึงงานด่วนแอร์เบเกอรี่: 120 เมตร (เดิน 2 นาที)
-                </p>
-              </div>
-              <button
-                onClick={onOpenFarmMap}
-                className="shrink-0 ml-2 px-3 py-1.5 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm flex items-center gap-1 shadow-sm cursor-pointer font-bold"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-[16px]">navigation</span>
-                <span>นำทาง</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 7. Sticky Floating Emergency Bar */}
-      <aside className="sticky bottom-24 inset-x-0 px-margin mt-space-sm z-30 pointer-events-none">
-        <div className="pointer-events-auto bg-surface/95 backdrop-blur-md p-2 rounded-2xl shadow-xl flex items-center gap-space-xs max-w-lg mx-auto border border-slate-200/50">
-          <button
-            onClick={onOpenSOSModal}
-            className="flex-1 min-h-[50px] px-3 rounded-xl bg-error text-on-error font-label-lg text-label-lg flex items-center justify-center gap-2 active:scale-95 transition-all shadow-md cursor-pointer font-bold"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[22px]">warning</span>
-            <span>แจ้งเหตุฉุกเฉิน (SOS)</span>
-          </button>
-          <button
-            onClick={() => window.open('tel:032909000')}
-            aria-label="โทรติดต่อศูนย์ซ่อมบำรุงฟาร์ม"
-            className="w-[50px] h-[50px] rounded-xl bg-surface-container-highest text-primary flex items-center justify-center active:scale-95 transition-all shadow-sm shrink-0 cursor-pointer"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[24px]">call</span>
-          </button>
-          <button
-            onClick={onOpenFarmMap}
-            aria-label="เปิดแผนที่โซนฟาร์ม"
-            className="w-[50px] h-[50px] rounded-xl bg-primary-container text-on-primary flex items-center justify-center active:scale-95 transition-all shadow-sm shrink-0 cursor-pointer"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[24px]">near_me</span>
-          </button>
-        </div>
+        <button
+          onClick={onOpenFarmMap}
+          className="w-11 h-11 rounded-full bg-primary hover:bg-primary-container text-white flex items-center justify-center shadow-lg active:scale-95 transition-all cursor-pointer"
+          type="button"
+          title="เปิดแผนที่โซนฟาร์ม"
+        >
+          <span className="material-symbols-outlined text-[20px]">near_me</span>
+        </button>
       </aside>
 
       {/* Confirmation Dialog */}

@@ -195,6 +195,13 @@ export const App: React.FC = () => {
         currentTab={currentTab}
         userRole={userRole}
         onSwitchRole={handleToggleRole}
+        onSelectRole={(role) => {
+          if (role === 'technician') {
+            if (userRole !== 'technician') handleSwitchToTechnician();
+          } else {
+            handleSwitchToRequester();
+          }
+        }}
         urgentCount={urgentCount}
         onOpenNotifications={() => {
           if (userRole === 'technician') setCurrentTab('all-requests');
@@ -204,7 +211,7 @@ export const App: React.FC = () => {
       />
 
       {/* 2. Main Content Container */}
-      <main className={`flex-1 w-full pt-20 flex flex-col ${userRole === 'technician' ? 'pb-28' : 'pb-10'}`}>
+      <main className={`flex-1 w-full pt-28 md:pt-20 flex flex-col ${userRole === 'technician' ? 'pb-28' : 'pb-10'}`}>
         {isLoading ? (
           <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] gap-3 text-primary">
             <span className="material-symbols-outlined text-[48px] animate-spin">sync</span>

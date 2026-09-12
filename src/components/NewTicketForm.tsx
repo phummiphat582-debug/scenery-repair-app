@@ -49,14 +49,72 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
     { key: 'HQ', name: 'สำนักงานส่วนกลาง', icon: 'apartment', dept: 'ไอที & ระบบสื่อสาร' }
   ];
 
-  // Category list
+  // 8 Standardized Farm Maintenance Work Formats
   const categories = [
-    { key: 'electric', title: 'ไฟฟ้า/แสงสว่าง', sub: 'ไฟดับ ปลั๊กไหม้', icon: 'bolt', dept: 'ไฟฟ้า & แอร์' },
-    { key: 'plumbing', title: 'ประปา/สุขาภิบาล', sub: 'ท่อแตก น้ำไม่ไหล', icon: 'water_drop', dept: 'ประปา & สุขาภิบาล' },
-    { key: 'hvac', title: 'แอร์/ความเย็น', sub: 'ตู้แช่ เครื่องปรับ', icon: 'ac_unit', dept: 'ไฟฟ้า & แอร์' },
-    { key: 'structural', title: 'โครงสร้าง/ไม้', sub: 'ประตู รั้ว หลังคา', icon: 'carpenter', dept: 'ซ่อมบำรุงอาคาร & สี' },
-    { key: 'farm', title: 'เครื่องจักรฟาร์ม', sub: 'เครื่องบด ปั๊มแปลง', icon: 'agriculture', dept: 'ฟาร์มสัตว์ & กิจกรรม' },
-    { key: 'it', title: 'IT & ระบบเน็ต', sub: 'POS กล้อง Wi-Fi', icon: 'router', dept: 'ไอที & ระบบสื่อสาร' }
+    { 
+      key: 'electric', 
+      title: 'ระบบไฟฟ้า & แสงสว่าง', 
+      sub: 'ไฟดับ ปลั๊กไหม้ สปอตไลท์ เบรกเกอร์', 
+      icon: 'bolt', 
+      dept: 'ไฟฟ้า & แอร์',
+      tags: ['ไฟดับทั้งโซน', 'เบรกเกอร์ทริป', 'ปลั๊กไฟช็อต/ไหม้', 'หลอดไฟขาด']
+    },
+    { 
+      key: 'hvac', 
+      title: 'ระบบแอร์ & เครื่องเย็น', 
+      sub: 'แอร์ไม่เย็น น้ำแอร์หยด ตู้แช่เสีย', 
+      icon: 'ac_unit', 
+      dept: 'ไฟฟ้า & แอร์',
+      tags: ['แอร์ไม่เย็น/มีแต่ลม', 'น้ำแอร์หยดนอง', 'ตู้แช่วัตถุดิบไม่เย็น', 'คอมเพรสเซอร์เสียงดัง']
+    },
+    { 
+      key: 'plumbing', 
+      title: 'ระบบประปา & สุขาภิบาล', 
+      sub: 'ท่อแตก น้ำไม่ไหล ปั๊มน้ำ ชักโครกตัน', 
+      icon: 'water_drop', 
+      dept: 'ประปา & สุขาภิบาล',
+      tags: ['ท่อประปาแตกน้ำรั่ว', 'น้ำไม่ไหล/ไหลค่อย', 'ปั๊มน้ำไม่ตัด', 'ชักโครก/ท่อตัน']
+    },
+    { 
+      key: 'farm_machinery', 
+      title: 'เครื่องจักร & ยานพาหนะ', 
+      sub: 'รถแทรกเตอร์ รถกอล์ฟ เครื่องตัดหญ้า', 
+      icon: 'agriculture', 
+      dept: 'ฟาร์มสัตว์ & กิจกรรม',
+      tags: ['สตาร์ทไม่ติด', 'เครื่องยนต์ดับ', 'ระบบไฮดรอลิกรั่ว', 'ยางแบน/โซ่หลุด']
+    },
+    { 
+      key: 'structural', 
+      title: 'งานอาคาร โครงสร้าง & สี', 
+      sub: 'ประตู หน้าต่าง หลังคารั่ว รั้วคอกแกะ', 
+      icon: 'carpenter', 
+      dept: 'ซ่อมบำรุงอาคาร & สี',
+      tags: ['หลังคารั่วซึม', 'ประตูลูกบิดเสีย', 'รั้วคอกสัตว์ชำรุด', 'พื้น/ทางเดินชำรุด']
+    },
+    { 
+      key: 'it_system', 
+      title: 'ไอที POS & กล้องวงจรปิด', 
+      sub: 'เครื่อง POS ปริ้นเตอร์บิล Wi-Fi กล้อง', 
+      icon: 'router', 
+      dept: 'ไอที & ระบบสื่อสาร',
+      tags: ['เครื่อง POS ดับ', 'ปริ้นเตอร์ใบเสร็จไม่ออก', 'อินเทอร์เน็ต Wi-Fi หลุด', 'กล้อง CCTV ใช้งานไม่ได้']
+    },
+    { 
+      key: 'landscaping', 
+      title: 'งานสวน & ภูมิทัศน์ฟาร์ม', 
+      sub: 'สปริงเกอร์ ทางเดินหญ้า กิ่งไม้ล้ม', 
+      icon: 'yard', 
+      dept: 'ภูมิทัศน์ & สวนดอกไม้',
+      tags: ['ระบบสปริงเกอร์รั่ว', 'กิ่งไม้หักขวางทาง', 'ระบบระบายน้ำแปลงหญ้า', 'ดินสไลด์ทรุด']
+    },
+    { 
+      key: 'general', 
+      title: 'งานทั่วไป & เบ็ดเตล็ด', 
+      sub: 'โต๊ะเก้าอี้ชำรุด ขนย้าย ป้ายบอกทาง', 
+      icon: 'handyman', 
+      dept: 'คาเฟ่ & F&B',
+      tags: ['โต๊ะเก้าอี้ชำรุด', 'ขอแรงช่วยขนย้าย', 'ป้ายบอกทางชำรุด', 'อุปกรณ์บริการแขกเสีย']
+    }
   ];
 
   const handleZoneSelect = (z: typeof zones[0]) => {
@@ -384,52 +442,62 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
           </div>
         </section>
 
-        {/* Maintenance Category Selection */}
-        <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm border border-slate-200/40">
+        {/* Maintenance Category Selection - รูปแบบงานซ่อมบำรุง */}
+        <section className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm flex flex-col gap-space-sm border border-slate-200">
           <div className="flex items-center justify-between">
-            <label className="font-label-lg text-label-lg text-on-surface flex items-center gap-1.5 font-bold">
-              <span className="material-symbols-outlined text-primary text-[20px]">category</span>
-              ประเภทความเสียหาย <span className="text-error font-bold">*</span>
-            </label>
-            <span className="font-label-sm text-label-sm text-on-surface-variant">เลือก 1 หมวด</span>
+            <div>
+              <label className="font-label-lg text-label-lg text-on-surface flex items-center gap-1.5 font-bold">
+                <span className="material-symbols-outlined text-primary text-[20px]">category</span>
+                รูปแบบงานซ่อมบำรุง <span className="text-error font-bold">*</span>
+              </label>
+              <p className="text-[11px] text-on-surface-variant mt-0.5">
+                เลือกรูปแบบงานที่ตรงกับปัญหา เพื่อจ่ายงานให้ช่างเฉพาะทางได้รวดเร็ว
+              </p>
+            </div>
+            <span className="font-label-sm text-xs px-2.5 py-0.5 rounded-full bg-primary-fixed/50 text-primary font-bold">
+              8 หมวดหลัก
+            </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
             {categories.map(cat => {
               const isSelected = selectedCategory === cat.key;
               return (
                 <button
                   key={cat.key}
-                  className={`cat-btn min-h-[56px] p-3 rounded-xl text-left flex items-center gap-2.5 active:scale-98 transition-all cursor-pointer ${
+                  className={`cat-btn p-3 rounded-2xl text-left flex items-start gap-2.5 active:scale-98 transition-all cursor-pointer border ${
                     isSelected
-                      ? 'bg-primary-container text-on-primary shadow-sm font-bold'
-                      : 'bg-surface-container-low text-on-surface hover:bg-surface-container'
+                      ? 'bg-primary-fixed/30 border-primary shadow-xs ring-1 ring-primary'
+                      : 'bg-surface-container-low border-slate-200/80 hover:bg-surface-container hover:border-slate-300'
                   }`}
                   onClick={() => handleCategorySelect(cat)}
                   type="button"
                 >
                   <div
-                    className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
                       isSelected
-                        ? 'bg-primary text-tertiary-fixed'
+                        ? 'bg-primary text-white shadow-xs'
                         : 'bg-surface-container-high text-on-surface-variant'
                     }`}
                   >
                     <span className="material-symbols-outlined text-[20px]">{cat.icon}</span>
                   </div>
-                  <div className="flex flex-col min-w-0">
-                    <span
-                      className={`font-label-md text-label-md truncate ${
-                        isSelected ? 'text-on-primary font-bold' : 'text-on-surface font-semibold'
-                      }`}
-                    >
-                      {cat.title}
-                    </span>
-                    <span
-                      className={`font-label-sm text-[10px] truncate ${
-                        isSelected ? 'text-on-primary-container' : 'text-on-surface-variant'
-                      }`}
-                    >
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span
+                        className={`font-bold text-xs sm:text-sm truncate ${
+                          isSelected ? 'text-primary' : 'text-on-surface'
+                        }`}
+                      >
+                        {cat.title}
+                      </span>
+                      {isSelected && (
+                        <span className="material-symbols-outlined text-primary text-[16px] shrink-0">
+                          check_circle
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-normal text-[11px] text-on-surface-variant line-clamp-2 mt-0.5 leading-relaxed">
                       {cat.sub}
                     </span>
                   </div>
@@ -440,7 +508,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
         </section>
 
         {/* Problem Description & Text Area */}
-        <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm border border-slate-200/40">
+        <section className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm flex flex-col gap-space-sm border border-slate-200">
           <div className="flex items-center justify-between">
             <label className="font-label-lg text-label-lg text-on-surface flex items-center gap-1.5 font-bold">
               <span className="material-symbols-outlined text-primary text-[20px]">notes</span>
@@ -453,7 +521,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
 
           <div className="relative">
             <textarea
-              className="w-full p-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none resize-none leading-relaxed border border-slate-200/50"
+              className="w-full p-3 rounded-xl bg-surface-container-low text-on-surface font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none resize-none leading-relaxed border border-slate-200"
               placeholder="โปรดระบุลักษณะอาการ เช่น เสียงดัง กลิ่นไหม้ รั่วซึม หรือรหัสข้อผิดพลาดบนจอ..."
               required
               rows={3}
@@ -462,20 +530,22 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             />
           </div>
 
-          {/* Quick Issue Tags */}
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            <span className="font-label-sm text-[11px] text-on-surface-variant self-center mr-1">แท็กด่วน:</span>
-            {[
+          {/* Dynamic Quick Issue Tags based on Selected Category */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="font-label-sm text-[11px] text-on-surface-variant self-center mr-1 font-semibold">
+              แท็กอาการพบบ่อย:
+            </span>
+            {(categories.find(c => c.key === selectedCategory)?.tags || [
               'น้ำหยดนองพื้น',
               'เสียงดังผิดปกติ',
-              'กระทบวัตถุดิบสด',
-              'ไฟดับ/ช็อต'
-            ].map(tag => (
+              'ไฟดับ/ช็อต',
+              'ชำรุดเสียหาย'
+            ]).map(tag => (
               <button
                 key={tag}
                 type="button"
                 onClick={() => appendTag(tag)}
-                className="px-2.5 py-1 rounded-full bg-surface-container text-on-surface-variant font-label-sm text-[11px] active:scale-95 transition-transform hover:bg-surface-container-high cursor-pointer"
+                className="px-2.5 py-1 rounded-full bg-surface-container-high hover:bg-primary-fixed text-on-surface font-label-sm text-[11px] font-medium active:scale-95 transition-all cursor-pointer shadow-2xs"
               >
                 + {tag}
               </button>
