@@ -23,6 +23,9 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [currentTechName, setCurrentTechName] = useState(ticket.technicianName || 'ช่างอนุรักษ์ ยอดช่าง');
+  const [currentTechPhone, setCurrentTechPhone] = useState(
+    ticket.technicianPhone || technicians.find(t => t.name === (ticket.technicianName || ''))?.phone || ''
+  );
 
   const isEmergency = ticket.priority === 'critical' || ticket.priority === 'high';
 
@@ -50,9 +53,14 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     onClose();
   };
 
-  const handleAssignTech = async (newTech: string) => {
+  const handleAssignTech = async (newTech: string, newPhone?: string) => {
     setCurrentTechName(newTech);
-    await onUpdateTicket(ticket.id, { technicianName: newTech, status: 'in_progress' });
+    if (newPhone !== undefined) setCurrentTechPhone(newPhone);
+    await onUpdateTicket(ticket.id, { 
+      technicianName: newTech, 
+      technicianPhone: newPhone || currentTechPhone,
+      status: 'in_progress' 
+    });
   };
 
   return (
@@ -268,8 +276,24 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   </span>
                 </div>
                 <span className="font-body-sm text-body-sm text-on-surface-variant truncate">
-                  ช่างเทคนิคอาวุโส • ทีมระบบทำความเย็นและไฟ
+                  ช่างเทคนิค • {ticket.department || 'ทีมซ่อมบำรุง'}
                 </span>
+                {currentTechPhone ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <a
+                      href={`tel:${currentTechPhone}`}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-fixed text-on-primary-fixed font-bold text-xs rounded-full hover:bg-primary hover:text-on-primary transition-colors"
+                      title="กดโทรออกทันที"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">call</span>
+                      {currentTechPhone} (โทรออก)
+                    </a>
+                  </div>
+                ) : (
+                  <span className="text-[11px] text-slate-400 mt-0.5">
+                    (ยังไม่ได้กำหนดเบอร์โทร - กดเปลี่ยน/เพิ่มช่างเพื่อระบุ)
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -420,6 +444,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
         onClose={() => setIsAssignModalOpen(false)}
         technicians={technicians}
         currentTechnicianName={currentTechName}
+        currentTechnicianPhone={currentTechPhone}
         onAssign={handleAssignTech}
       />
     </div>

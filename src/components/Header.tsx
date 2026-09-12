@@ -1,8 +1,10 @@
 import React from 'react';
-import { NavTab } from '../types';
+import { NavTab, UserRole } from '../types';
 
 interface HeaderProps {
   currentTab: NavTab;
+  userRole?: UserRole;
+  onSwitchRole?: () => void;
   onOpenNotifications?: () => void;
   urgentCount?: number;
   subtitle?: string;
@@ -12,6 +14,8 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   currentTab,
+  userRole = 'technician',
+  onSwitchRole,
   onOpenNotifications,
   urgentCount = 3,
   subtitle,
@@ -20,6 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const getSubtext = () => {
     if (subtitle) return subtitle;
+    if (userRole === 'requester') return 'หน้าผู้แจ้งซ่อม (Requester Portal)';
     switch (currentTab) {
       case 'dashboard':
         return 'Dashboard Overview';
@@ -66,37 +71,70 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="font-headline-sm text-headline-sm text-primary tracking-tight truncate leading-tight uppercase font-bold">
                 SCENERY FARM
               </span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm shrink-0 font-semibold">
-                ช่าง/หัวหน้า
+              
+              {/* Role Indicator Pill */}
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full font-label-sm text-[11px] shrink-0 font-bold ${
+                userRole === 'requester'
+                  ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                  : 'bg-secondary-fixed text-on-secondary-fixed'
+              }`}>
+                {userRole === 'requester' ? '👤 ผู้แจ้งซ่อม' : '🛠️ ช่าง/หัวหน้า'}
               </span>
             </div>
             <span className="font-label-sm text-label-sm text-on-surface-variant truncate">
-              ระบบแจ้งซ่อมบำรุง • {getSubtext()}
+              {getSubtext()}
             </span>
           </div>
         </div>
 
-        {/* Right Side Icons */}
-        <div className="flex items-center gap-space-xs shrink-0">
-          <button
-            onClick={onOpenNotifications}
-            aria-label="การแจ้งเตือน"
-            className="relative w-11 h-11 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[24px]">notifications</span>
-            {urgentCount > 0 && (
-              <span className="absolute top-2 right-2 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-error text-on-error font-label-sm text-[10px] ring-2 ring-surface font-bold">
-                {urgentCount}
+        {/* Right Side Icons & Role Switcher */}
+        <div className="flex items-center gap-2 shrink-0">
+          
+          {/* Quick Role Switcher Button */}
+          {onSwitchRole && (
+            <button
+              onClick={onSwitchRole}
+              type="button"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                userRole === 'requester'
+                  ? 'bg-primary text-white hover:bg-primary-container'
+                  : 'bg-surface-container-high hover:bg-surface-variant text-on-surface'
+              }`}
+              title={userRole === 'requester' ? 'เข้าสู่ระบบช่าง/หลังบ้าน' : 'สลับไปหน้าผู้แจ้ง'}
+            >
+              <span className="material-symbols-outlined text-[16px]">
+                {userRole === 'requester' ? 'lock' : 'person'}
               </span>
-            )}
-          </button>
+              <span className="hidden sm:inline">
+                {userRole === 'requester' ? 'เข้าสู่ระบบช่าง' : 'หน้าผู้แจ้ง'}
+              </span>
+            </button>
+          )}
+
+          {/* Notifications (only active in technician role) */}
+          {userRole === 'technician' && (
+            <button
+              onClick={onOpenNotifications}
+              aria-label="การแจ้งเตือน"
+              className="relative w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
+              type="button"
+            >
+              <span className="material-symbols-outlined text-[22px]">notifications</span>
+              {urgentCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-error text-on-error font-label-sm text-[10px] ring-2 ring-surface font-bold">
+                  {urgentCount}
+                </span>
+              )}
+            </button>
+          )}
 
           <div 
             className="w-9 h-9 rounded-full bg-primary flex items-center justify-center shrink-0 shadow-sm cursor-pointer"
-            title="คุณสมชาย (หัวหน้าฝ่ายซ่อมบำรุง)"
+            title={userRole === 'requester' ? 'ผู้ใช้งานทั่วไป / แผนกในฟาร์ม' : 'คุณสมชาย (หัวหน้าฝ่ายซ่อมบำรุง)'}
           >
-            <span className="material-symbols-outlined text-on-primary text-[18px]">person</span>
+            <span className="material-symbols-outlined text-on-primary text-[18px]">
+              {userRole === 'requester' ? 'person_outline' : 'engineering'}
+            </span>
           </div>
         </div>
 

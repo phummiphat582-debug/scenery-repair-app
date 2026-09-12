@@ -6,6 +6,8 @@ import { TechnicianTasksView } from './components/TechnicianTasksView';
 import { NewTicketForm } from './components/NewTicketForm';
 import { AllRequestsView } from './components/AllRequestsView';
 import { SettingsView } from './components/SettingsView';
+import { RequesterPortalView } from './components/RequesterPortalView';
+import { RoleLoginModal } from './components/RoleLoginModal';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { MigrationModal } from './components/MigrationModal';
 import { TechnicianRosterModal } from './components/TechnicianRosterModal';
@@ -15,11 +17,20 @@ import { PartsModal } from './components/PartsModal';
 import { QRScannerModal } from './components/QRScannerModal';
 import { Toast } from './components/Toast';
 import { ticketService } from './services/ticketService';
-import { Ticket, Department, Technician, NavTab } from './types';
+import { Ticket, Department, Technician, NavTab, UserRole } from './types';
 import confetti from 'canvas-confetti';
 
 export const App: React.FC = () => {
-  // Navigation
+  // User Role: 'requester' (ผู้แจ้ง) | 'technician' (ช่าง / หลังบ้าน)
+  const [userRole, setUserRole] = useState<UserRole>(() => {
+    const saved = localStorage.getItem('scenery_user_role');
+    return (saved === 'requester' || saved === 'technician') ? saved : 'requester';
+  });
+
+  // Modal for entering technician backend
+  const [isRoleLoginOpen, setIsRoleLoginOpen] = useState(false);
+
+  // Navigation (only relevant in technician role)
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
 
   // Core Data
@@ -72,6 +83,32 @@ export const App: React.FC = () => {
     loadData();
   }, []);
 
+  // Save userRole preference
+  const handleSwitchToTechnician = () => {
+    setIsRoleLoginOpen(true);
+  };
+
+  const handleRoleLoginSuccess = () => {
+    setIsRoleLoginOpen(false);
+    setUserRole('technician');
+    localStorage.setItem('scenery_user_role', 'technician');
+    showToast('เข้าสู่ระบบหลังบ้าน / ทีมช่าง เรียบร้อย 🛠️', 'success');
+  };
+
+  const handleSwitchToRequester = () => {
+    setUserRole('requester');
+    localStorage.setItem('scenery_user_role', 'requester');
+    showToast('สลับไปยังหน้าผู้แจ้งซ่อม เรียบร้อย 👤', 'info');
+  };
+
+  const handleToggleRole = () => {
+    if (userRole === 'requester') {
+      handleSwitchToTechnician();
+    } else {
+      handleSwitchToRequester();
+    }
+  };
+
   // Urgent count
   const urgentCount = useMemo(() => {
     return tickets.filter(
@@ -103,12 +140,13 @@ export const App: React.FC = () => {
   const handleCreateTicket = async (ticketData: any) => {
     const created = await ticketService.createTicket(ticketData);
     confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
-    showToast(`ส่งใบแจ้งซ่อม ${created.requestId} สำเร็จ!`);
+    showToast(`ส่งใบแจ้งซ่อม #${created.requestId} สำเร็จ!`);
     await loadData();
-    // After 1.5s, optionally switch to dashboard
-    setTimeout(() => {
-      setCurrentTab('dashboard');
-    }, 1200);
+    if (userRole === 'technician') {
+      setTimeout(() => {
+        setCurrentTab('dashboard');
+      }, 1200);
+    }
   };
 
   // Handle quick assign
@@ -126,12 +164,13 @@ export const App: React.FC = () => {
   // Handle QR code scan result
   const handleQRScanResult = (code: string) => {
     showToast(`สแกน QR Code สำเร็จ: ${code}`, 'info');
-    // Find if any ticket has this machine code or location
     const matched = tickets.find(t => t.machineCode === code || t.location.includes(code));
     if (matched) {
       handleSelectTicket(matched);
     } else {
-      setCurrentTab('new-request');
+      if (userRole === 'technician') {
+        setCurrentTab('new-request');
+      }
     }
   };
 
@@ -141,14 +180,18 @@ export const App: React.FC = () => {
       {/* 1. Header (Fixed top) */}
       <Header
         currentTab={currentTab}
+        userRole={userRole}
+        onSwitchRole={handleToggleRole}
         urgentCount={urgentCount}
-        onOpenNotifications={() => setCurrentTab('all-requests')}
+        onOpenNotifications={() => {
+          if (userRole === 'technician') setCurrentTab('all-requests');
+        }}
         onBack={() => setCurrentTab('dashboard')}
-        showBack={currentTab !== 'dashboard'}
+        showBack={userRole === 'technician' && currentTab !== 'dashboard'}
       />
 
-      {/* 2. Main Content Container (pt-20 for header, pb-28 for bottom nav) */}
-      <main className="flex-1 w-full pt-20 pb-28 flex flex-col">
+      {/* 2. Main Content Container */}
+      <main className={`flex-1 w-full pt-20 flex flex-col ${userRole === 'technician' ? 'pb-28' : 'pb-10'}`}>
         {isLoading ? (
           <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] gap-3 text-primary">
             <span className="material-symbols-outlined text-[48px] animate-spin">sync</span>
@@ -156,72 +199,98 @@ export const App: React.FC = () => {
           </div>
         ) : (
           <>
-            {currentTab === 'dashboard' && (
-              <DashboardOverview
+            {/* ROLE 1: REQUESTER (1 Clean Page dedicated for general staff) */}
+            {userRole === 'requester' && (
+              <RequesterPortalView
                 tickets={tickets}
                 departments={departments}
                 technicians={technicians}
+                onSubmitTicket={handleCreateTicket}
                 onSelectTicket={handleSelectTicket}
-                onQuickAssign={handleQuickAssign}
                 onOpenQRScanner={() => setIsQRScannerModalOpen(true)}
-                onOpenFarmMap={() => setIsFarmMapModalOpen(true)}
-                onRefresh={loadData}
+                onSwitchToTechnician={handleSwitchToTechnician}
               />
             )}
 
-            {currentTab === 'technician' && (
-              <TechnicianTasksView
-                tickets={tickets}
-                technicians={technicians}
-                onSelectTicket={handleSelectTicket}
-                onUpdateTicketStatus={handleUpdateTicket}
-                onOpenFarmMap={() => setIsFarmMapModalOpen(true)}
-                onOpenSOSModal={() => setIsSOSModalOpen(true)}
-                onOpenPartsModal={handleOpenPartsModal}
-              />
-            )}
+            {/* ROLE 2: TECHNICIAN & SUPERVISOR (Backend Views) */}
+            {userRole === 'technician' && (
+              <>
+                {currentTab === 'dashboard' && (
+                  <DashboardOverview
+                    tickets={tickets}
+                    departments={departments}
+                    technicians={technicians}
+                    onSelectTicket={handleSelectTicket}
+                    onQuickAssign={handleQuickAssign}
+                    onOpenQRScanner={() => setIsQRScannerModalOpen(true)}
+                    onOpenFarmMap={() => setIsFarmMapModalOpen(true)}
+                    onRefresh={loadData}
+                  />
+                )}
 
-            {currentTab === 'new-request' && (
-              <NewTicketForm
-                departments={departments}
-                onSubmit={handleCreateTicket}
-                onCancel={() => setCurrentTab('dashboard')}
-                onOpenQRScanner={() => setIsQRScannerModalOpen(true)}
-              />
-            )}
+                {currentTab === 'technician' && (
+                  <TechnicianTasksView
+                    tickets={tickets}
+                    technicians={technicians}
+                    onSelectTicket={handleSelectTicket}
+                    onUpdateTicketStatus={handleUpdateTicket}
+                    onOpenFarmMap={() => setIsFarmMapModalOpen(true)}
+                    onOpenSOSModal={() => setIsSOSModalOpen(true)}
+                    onOpenPartsModal={handleOpenPartsModal}
+                  />
+                )}
 
-            {currentTab === 'all-requests' && (
-              <AllRequestsView
-                tickets={tickets}
-                departments={departments}
-                onSelectTicket={handleSelectTicket}
-                onQuickAccept={(ticket) => {
-                  handleUpdateTicket(ticket.id, {
-                    status: 'in_progress',
-                    technicianName: technicians[0]?.name || 'ช่างอนุรักษ์ ยอดช่าง'
-                  });
-                }}
-              />
-            )}
+                {currentTab === 'new-request' && (
+                  <NewTicketForm
+                    departments={departments}
+                    onSubmit={handleCreateTicket}
+                    onCancel={() => setCurrentTab('dashboard')}
+                    onOpenQRScanner={() => setIsQRScannerModalOpen(true)}
+                  />
+                )}
 
-            {currentTab === 'settings' && (
-              <SettingsView
-                onOpenMigration={() => setIsMigrationModalOpen(true)}
-                onOpenRoster={() => setIsRosterModalOpen(true)}
-              />
+                {currentTab === 'all-requests' && (
+                  <AllRequestsView
+                    tickets={tickets}
+                    departments={departments}
+                    onSelectTicket={handleSelectTicket}
+                    onQuickAccept={(ticket) => {
+                      handleUpdateTicket(ticket.id, {
+                        status: 'in_progress',
+                        technicianName: technicians[0]?.name || 'ช่างอนุรักษ์ ยอดช่าง'
+                      });
+                    }}
+                  />
+                )}
+
+                {currentTab === 'settings' && (
+                  <SettingsView
+                    onOpenMigration={() => setIsMigrationModalOpen(true)}
+                    onOpenRoster={() => setIsRosterModalOpen(true)}
+                  />
+                )}
+              </>
             )}
           </>
         )}
       </main>
 
-      {/* 3. Bottom Navigation Bar (Fixed bottom) */}
-      <Navigation
-        currentTab={currentTab}
-        onSelectTab={setCurrentTab}
-        technicianPendingCount={1}
-      />
+      {/* 3. Bottom Navigation Bar (Shown ONLY in Technician / Backend mode) */}
+      {userRole === 'technician' && (
+        <Navigation
+          currentTab={currentTab}
+          onSelectTab={setCurrentTab}
+          technicianPendingCount={urgentCount}
+        />
+      )}
 
       {/* 4. Modals & Dialogs */}
+      <RoleLoginModal
+        isOpen={isRoleLoginOpen}
+        onClose={() => setIsRoleLoginOpen(false)}
+        onSuccess={handleRoleLoginSuccess}
+      />
+
       <TaskDetailsModal
         isOpen={isDetailModalOpen}
         onClose={() => {

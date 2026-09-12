@@ -154,6 +154,14 @@ class TicketService {
       } else {
         ticket.waitingDurationText = 'เพิ่งแจ้งเมื่อสักครู่';
       }
+
+      // Auto-resolve technician phone number if missing
+      if (ticket.technicianName && !ticket.technicianPhone) {
+        const match = this.technicians.find(t => t.name.toLowerCase() === ticket.technicianName?.toLowerCase());
+        if (match?.phone) {
+          ticket.technicianPhone = match.phone;
+        }
+      }
     });
 
     // 1. Filter by Department
@@ -263,8 +271,12 @@ class TicketService {
       updatedAt: new Date().toISOString()
     };
 
-    if (updates.status === 'completed' && !updated.completedAt) {
-      updated.completedAt = new Date().toISOString();
+    // Auto-fill technicianPhone from known technician list if not explicitly provided
+    if (updated.technicianName && !updated.technicianPhone) {
+      const matchedTech = this.technicians.find(t => t.name.toLowerCase() === updated.technicianName?.toLowerCase());
+      if (matchedTech?.phone) {
+        updated.technicianPhone = matchedTech.phone;
+      }
     }
 
     this.tickets[idx] = updated;
@@ -275,6 +287,7 @@ class TicketService {
         await supabase.from('repair_tickets').update({
           status: updated.status,
           technician_name: updated.technicianName,
+          technician_phone: updated.technicianPhone,
           repair_result: updated.repairResult,
           remark: updated.remark,
           result_image_url: updated.resultImageUrl,
@@ -381,6 +394,27 @@ class TicketService {
       });
     }
     this.saveToLocalStorage();
+    return [...this.technicians];
+  }
+
+  public async updateTechnician(idOrName: string, updates: Partial<Technician>): Promise<Technician[]> {
+    const item = this.technicians.find(t => t.id === idOrName || t.name === idOrName);
+    if (item) {
+      Object.assign(item, updates);
+      if (isSupabaseConfigured && supabase) {
+        try {
+          await supabase.from('technicians').update({
+            name: item.name,
+            role: item.role,
+            phone: item.phone,
+            status: item.status
+          }).or(`id.eq.${item.id},name.eq.${item.name}`);
+        } catch (e) {
+          console.warn('Supabase update technician failed:', e);
+        }
+      }
+      this.saveToLocalStorage();
+    }
     return [...this.technicians];
   }
 }
