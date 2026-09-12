@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Ticket, Technician } from '../types';
+import { ConfirmModal } from './ConfirmModal';
 
 interface TechnicianTasksViewProps {
   tickets: Ticket[];
@@ -24,53 +25,84 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
   const [selectedZone, setSelectedZone] = useState('all');
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
-  // Active technician (defaults to Anurak / first tech)
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    confirmVariant?: 'primary' | 'danger' | 'warning' | 'success';
+    onConfirm: () => void;
+  } | null>(null);
+
+  // Active technician (defaults to first tech)
   const currentTech = technicians[0] || {
     id: 't-1',
-    name: 'ช่างอนุรักษ์ ยอดช่าง',
-    role: 'ช่างระบบไฟและเครื่องกล • สายซ่อมบำรุง A',
+    name: 'ช่างสมชาย (หัวหน้าช่าง)',
+    role: 'หัวหน้าฝ่ายซ่อมบำรุง',
     code: 'T-042',
-    phone: '084-427-0787'
+    phone: '081-234-5678'
   };
 
-  const handleAcceptWork = async (ticket: Ticket) => {
-    setAcceptingId(ticket.id);
-    try {
-      await onUpdateTicketStatus(ticket.id, {
-        status: 'in_progress',
-        technicianName: currentTech.name,
-        technicianPhone: currentTech.phone || '084-427-0787',
-        remark: 'ช่างกดรับงานแล้ว กำลังเข้าตรวจสอบหน้างาน'
-      });
-      alert(`ช่างอนุรักษ์ ยืนยันรับงาน #${ticket.requestId} เรียบร้อยแล้ว (สถานะ: กำลังดำเนินการ)`);
-    } finally {
-      setAcceptingId(null);
-    }
+  const handleAcceptWork = (ticket: Ticket) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'ยืนยันการรับงานซ่อม',
+      message: `คุณต้องการรับงาน #${ticket.requestId} ("${ticket.title}") เข้าสู่สถานะกำลังดำเนินการ ใช่หรือไม่?`,
+      confirmText: 'ยืนยันรับงาน',
+      cancelText: 'ยกเลิก',
+      confirmVariant: 'primary',
+      onConfirm: async () => {
+        setAcceptingId(ticket.id);
+        setConfirmConfig(null);
+        try {
+          await onUpdateTicketStatus(ticket.id, {
+            status: 'in_progress',
+            technicianName: currentTech.name,
+            technicianPhone: currentTech.phone || '081-234-5678',
+            remark: 'ช่างกดรับงานแล้ว กำลังเข้าตรวจสอบหน้างาน'
+          });
+        } finally {
+          setAcceptingId(null);
+        }
+      }
+    });
   };
 
-  const handleCompleteWork = async (ticket: Ticket) => {
-    const ok = window.confirm(`ยืนยันส่งตรวจรับงานซ่อม #${ticket.requestId} สำหรับการตรวจสอบโดยผู้จัดการใช่หรือไม่?`);
-    if (ok) {
-      await onUpdateTicketStatus(ticket.id, {
-        status: 'waiting_inspect',
-        repairResult: ticket.repairResult || 'ดำเนินการแก้ไขเสร็จสิ้น ทดสอบการใช้งานปกติ'
-      });
-      alert(`ส่งงานซ่อม #${ticket.requestId} เรียบร้อย ระบบแจ้งเตือนไปยังผู้ตรวจรับแล้ว`);
-    }
+  const handleCompleteWork = (ticket: Ticket) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'ยืนยันส่งตรวจรับงานซ่อม',
+      message: `ยืนยันว่าการซ่อมใบงาน #${ticket.requestId} เสร็จสิ้นแล้ว และส่งมอบให้ผู้ตรวจรับ ใช่หรือไม่?`,
+      confirmText: 'ส่งตรวจรับงาน',
+      cancelText: 'ยกเลิก',
+      confirmVariant: 'success',
+      onConfirm: async () => {
+        setConfirmConfig(null);
+        await onUpdateTicketStatus(ticket.id, {
+          status: 'waiting_inspect',
+          repairResult: ticket.repairResult || 'ดำเนินการแก้ไขเสร็จสิ้น ทดสอบการใช้งานปกติ'
+        });
+      }
+    });
   };
 
-  const handleDeclineWork = async (ticket: Ticket) => {
-    const reason = window.prompt(
-      'กรุณาระบุเหตุผลที่ติดภารกิจอื่น (เช่น ติดซ่อมแอร์เร่งด่วน, ไม่มีเครื่องมือเฉพาะทาง):',
-      'กำลังติดซ่อมแอร์ห้องเย็นเร่งด่วน'
-    );
-    if (reason) {
-      await onUpdateTicketStatus(ticket.id, {
-        status: 'pending',
-        remark: `ช่างขอส่งต่องาน: ${reason}`
-      });
-      alert(`แจ้งปฏิเสธงาน #${ticket.requestId} เรียบร้อย ระบบส่งต่องานเข้าคิวหัวหน้างาน`);
-    }
+  const handleDeclineWork = (ticket: Ticket) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'ยืนยันการส่งต่องาน',
+      message: `คุณต้องการส่งต่องานซ่อม #${ticket.requestId} กลับเข้าคิวส่วนกลางเพื่อให้ช่างท่านอื่นรับงาน ใช่หรือไม่?`,
+      confirmText: 'ส่งต่องาน',
+      cancelText: 'ยกเลิก',
+      confirmVariant: 'warning',
+      onConfirm: async () => {
+        setConfirmConfig(null);
+        await onUpdateTicketStatus(ticket.id, {
+          status: 'pending',
+          remark: 'ช่างส่งต่องานกลับเข้าคิวส่วนกลาง'
+        });
+      }
+    });
   };
 
   return (
@@ -537,6 +569,20 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
           </button>
         </div>
       </aside>
+
+      {/* Confirmation Dialog */}
+      {confirmConfig && (
+        <ConfirmModal
+          isOpen={confirmConfig.isOpen}
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmText={confirmConfig.confirmText}
+          cancelText={confirmConfig.cancelText}
+          confirmVariant={confirmConfig.confirmVariant}
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(null)}
+        />
+      )}
 
     </div>
   );

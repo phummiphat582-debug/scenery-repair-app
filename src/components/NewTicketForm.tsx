@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Department, Priority, Ticket } from '../types';
+import { ConfirmModal } from './ConfirmModal';
 
 interface NewTicketFormProps {
   departments: Department[];
@@ -14,41 +15,30 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
   onCancel,
   onOpenQRScanner
 }) => {
-  // Form States
+  // Form States - Clean slate without dummy text
   const [step, setStep] = useState<number>(2);
-  const [requesterName, setRequesterName] = useState('คุณสมหญิง ใจบริการ');
-  const [requesterPhone, setRequesterPhone] = useState('081-234-5678');
+  const [requesterName, setRequesterName] = useState('');
+  const [requesterPhone, setRequesterPhone] = useState('');
   const [department, setDepartment] = useState('คาเฟ่ & F&B');
   const [isRequesterDrawerOpen, setIsRequesterDrawerOpen] = useState(false);
 
   const [selectedZone, setSelectedZone] = useState('C');
-  const [specificLocation, setSpecificLocation] = useState('ครัวร้อน คาเฟ่หลัก (Main Kitchen)');
-  const [machineCode, setMachineCode] = useState('FRIDGE-CK-04 (OVEN-02 Adjacent)');
+  const [specificLocation, setSpecificLocation] = useState('');
+  const [machineCode, setMachineCode] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('hvac');
 
-  const [problemDetail, setProblemDetail] = useState(
-    'ตู้แช่วัตถุดิบเสียงคอมเพรสเซอร์ดังผิดปกติ และความเย็นเริ่มตกลง มีน้ำหยดใต้ฐานเครื่อง'
-  );
-  const [priority, setPriority] = useState<Priority>('critical');
+  const [problemDetail, setProblemDetail] = useState('');
+  const [priority, setPriority] = useState<Priority>('normal');
 
-  const [photos, setPhotos] = useState<Array<{ url: string; time: string; label: string }>>([
-    {
-      url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCduJY-xx2X8JRd0E2yAONXgkIrFVYfegzNS2HC8T8si9CgNMXp14Cb1aJoWulNF_UnRj5FKZa4fz1noh-EJInDx48E3L-LcH07_xvku-0cuzmLXkf_TWWRMYKIL_5FpLNUgmLalT3ENIWXbyXIU2cFI-5eh3GvHfH0kH2QVjQbTsp6izii5SDDvCIZcfZbrWIxQaqPztk8cg33QIY7On9tM8SGlXH9-GqtrW1pncpiqQ0H8s9M0FDt3g',
-      time: '09:42',
-      label: 'จุดน้ำหยด'
-    },
-    {
-      url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuATiSc159kkzCOm4oWxq4Zf0P4156lDRdD1lME7leV39-MDkYdAk0cgA7EJ2t28qpsa5tM9a-kGoGA5zy6nyBRMkjYSbgY9tn2wWwgIPPFeszHToLx62_a53rVQRqiPZUKt5jNgjvzEa3bnva6Iv7MeuUCEqu8YTs7KsHpzWPS7bnl_vHylYfREwseECMnjgs87UIXf8mSfx-8zZ2CtBmIhtVfaAHDZk7tzSDyLW5nZxVG3cK1nqV2fzQ',
-      time: '09:43',
-      label: 'ป้ายซีเรียล'
-    }
-  ]);
+  const [photos, setPhotos] = useState<Array<{ url: string; time: string; label: string }>>([]);
 
   const [allowPowerCut, setAllowPowerCut] = useState(true);
   const [allowNotification, setAllowNotification] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [submittedRequestId, setSubmittedRequestId] = useState('');
+  const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState<any>(null);
 
   // Zone list
   const zones = [
@@ -107,34 +97,42 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
     setPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!problemDetail.trim()) {
       alert('กรุณากรอกรายละเอียดอาการผิดปกติ');
       return;
     }
 
+    const zoneObj = zones.find(z => z.key === selectedZone);
+    const catObj = categories.find(c => c.key === selectedCategory);
+    const locText = specificLocation.trim() || zoneObj?.name || 'พื้นที่ฟาร์ม';
+
+    const payload = {
+      title: `${catObj?.title || 'งานซ่อม'}: ${locText}`,
+      department: department || zoneObj?.dept || 'คาเฟ่ & F&B',
+      location: `${zoneObj?.name || selectedZone} - ${locText}`,
+      description: problemDetail.trim(),
+      requesterName: requesterName.trim() || 'พนักงานฟาร์ม (ไม่ระบุชื่อ)',
+      requesterPhone: requesterPhone.trim() || '081-234-5678',
+      priority,
+      status: 'pending',
+      requestImageUrl: photos[0]?.url || '-',
+      zone: zoneObj?.name,
+      machineCode: machineCode.trim() || undefined,
+      category: catObj?.title
+    };
+
+    setPendingPayload(payload);
+    setShowConfirmSubmit(true);
+  };
+
+  const handleConfirmSubmit = async () => {
+    if (!pendingPayload) return;
+    setShowConfirmSubmit(false);
     setIsSubmitting(true);
     try {
-      const zoneObj = zones.find(z => z.key === selectedZone);
-      const catObj = categories.find(c => c.key === selectedCategory);
-
-      const payload = {
-        title: `${catObj?.title || 'งานซ่อม'}: ${specificLocation}`,
-        department: department || zoneObj?.dept || 'คาเฟ่ & F&B',
-        location: `${zoneObj?.name || selectedZone} - ${specificLocation}`,
-        description: problemDetail.trim(),
-        requesterName: requesterName.trim(),
-        requesterPhone: requesterPhone.trim(),
-        priority,
-        status: 'pending',
-        requestImageUrl: photos[0]?.url || '-',
-        zone: zoneObj?.name,
-        machineCode: machineCode.trim() || undefined,
-        category: catObj?.title
-      };
-
-      await onSubmit(payload);
+      await onSubmit(pendingPayload);
       const generatedId = `REQ-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
       setSubmittedRequestId(generatedId);
       setShowSuccessToast(true);
@@ -146,6 +144,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
       alert('เกิดข้อผิดพลาดในการส่งข้อมูล: ' + err.message);
     } finally {
       setIsSubmitting(false);
+      setPendingPayload(null);
     }
   };
 
@@ -770,6 +769,19 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             </button>
           </div>
         </div>
+      )}
+      {/* Confirmation Modal */}
+      {showConfirmSubmit && pendingPayload && (
+        <ConfirmModal
+          isOpen={showConfirmSubmit}
+          title="ยืนยันการส่งใบแจ้งซ่อม"
+          message={`คุณต้องการส่งแจ้งซ่อม "${pendingPayload.title}" แผนก "${pendingPayload.department}" ใช่หรือไม่?`}
+          confirmText="ยืนยันส่งข้อมูล"
+          cancelText="ตรวจสอบอีกครั้ง"
+          confirmVariant="primary"
+          onConfirm={handleConfirmSubmit}
+          onCancel={() => setShowConfirmSubmit(false)}
+        />
       )}
     </div>
   );

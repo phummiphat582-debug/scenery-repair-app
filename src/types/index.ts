@@ -29,6 +29,8 @@ export interface Technician {
   departmentId?: string;
   code?: string;
   avatarUrl?: string;
+  isOnDutyToday?: boolean;
+  dutyNote?: string;
 }
 
 export interface PartItem {
@@ -81,6 +83,6 @@ export interface Ticket {
 }
 
 export type NavTab = 'dashboard' | 'technician' | 'new-request' | 'all-requests' | 'settings';
-export type ViewMode = 'queue' | 'department_board' | 'dashboard';
+export type ViewMode = 'table' | 'queue' | 'department_board' | 'dashboard';
 export type SortOrder = 'fifo' | 'lifo' | 'priority';
 export type UserRole = 'requester' | 'technician';

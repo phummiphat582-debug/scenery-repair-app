@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Ticket, Technician } from '../types';
 import { AssignTechnicianModal } from './AssignTechnicianModal';
+import { ConfirmModal } from './ConfirmModal';
 
 interface TaskDetailsModalProps {
   ticket: Ticket | null;
@@ -27,6 +28,16 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     ticket.technicianPhone || technicians.find(t => t.name === (ticket.technicianName || ''))?.phone || ''
   );
 
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    confirmVariant?: 'primary' | 'danger' | 'warning' | 'success';
+    onConfirm: () => void;
+  } | null>(null);
+
   const isEmergency = ticket.priority === 'critical' || ticket.priority === 'high';
 
   // Step mapping
@@ -47,19 +58,40 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   else if (ticket.status === 'waiting_inspect') currentStepIndex = 5;
   else if (ticket.status === 'completed') currentStepIndex = 6;
 
-  const handleStatusChange = async (newStatus: any, alertText: string) => {
-    await onUpdateTicket(ticket.id, { status: newStatus });
-    alert(alertText);
-    onClose();
+  const handleStatusChange = (newStatus: any, alertText: string) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'ยืนยันการเปลี่ยนสถานะใบงาน',
+      message: `คุณต้องการบันทึกสถานะงานเป็น "${alertText}" ใช่หรือไม่?`,
+      confirmText: 'ยืนยันเปลี่ยนสถานะ',
+      cancelText: 'ยกเลิก',
+      confirmVariant: newStatus === 'cancelled' ? 'danger' : 'primary',
+      onConfirm: async () => {
+        await onUpdateTicket(ticket.id, { status: newStatus });
+        setConfirmConfig(null);
+        onClose();
+      }
+    });
   };
 
-  const handleAssignTech = async (newTech: string, newPhone?: string) => {
-    setCurrentTechName(newTech);
-    if (newPhone !== undefined) setCurrentTechPhone(newPhone);
-    await onUpdateTicket(ticket.id, { 
-      technicianName: newTech, 
-      technicianPhone: newPhone || currentTechPhone,
-      status: 'in_progress' 
+  const handleAssignTech = (newTech: string, newPhone?: string) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'ยืนยันการมอบหมายช่าง',
+      message: `ยืนยันการมอบหมายงานซ่อมให้ "${newTech}" ${newPhone ? `(เบอร์โทร: ${newPhone})` : ''} ใช่หรือไม่?`,
+      confirmText: 'ยืนยันมอบหมาย',
+      cancelText: 'ยกเลิก',
+      confirmVariant: 'primary',
+      onConfirm: async () => {
+        setCurrentTechName(newTech);
+        if (newPhone !== undefined) setCurrentTechPhone(newPhone);
+        await onUpdateTicket(ticket.id, { 
+          technicianName: newTech, 
+          technicianPhone: newPhone || currentTechPhone,
+          status: 'in_progress' 
+        });
+        setConfirmConfig(null);
+      }
     });
   };
 
@@ -423,10 +455,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
             </button>
 
             <button
-              onClick={() => {
-                const conf = window.confirm('ยืนยันยกเลิกใบงานซ่อมนี้ใช่หรือไม่?');
-                if (conf) handleStatusChange('cancelled', 'ยกเลิกใบงานเรียบร้อย');
-              }}
+              onClick={() => handleStatusChange('cancelled', 'ยกเลิกใบงานซ่อมนี้')}
               className="w-full h-11 rounded-xl bg-surface-container hover:bg-surface-container-high text-error font-label-md text-label-md flex items-center justify-center gap-1.5 transition-colors cursor-pointer font-semibold"
               type="button"
             >
@@ -447,6 +476,20 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
         currentTechnicianPhone={currentTechPhone}
         onAssign={handleAssignTech}
       />
+
+      {/* Confirmation Modal */}
+      {confirmConfig && (
+        <ConfirmModal
+          isOpen={confirmConfig.isOpen}
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          confirmText={confirmConfig.confirmText}
+          cancelText={confirmConfig.cancelText}
+          confirmVariant={confirmConfig.confirmVariant}
+          onConfirm={confirmConfig.onConfirm}
+          onCancel={() => setConfirmConfig(null)}
+        />
+      )}
     </div>
   );
 };

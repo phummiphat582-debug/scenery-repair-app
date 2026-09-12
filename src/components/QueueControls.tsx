@@ -56,32 +56,45 @@ export const QueueControls: React.FC<QueueControlsProps> = ({
 
           <div className="flex items-center gap-2 self-end sm:self-auto w-full sm:w-auto justify-between sm:justify-end">
             
-            {/* View Mode Toggle: Queue (List) vs Board (Department Kanban) */}
+            {/* View Mode Toggle: Table vs Cards vs Board */}
             <div className="inline-flex p-1 bg-slate-200/80 rounded-xl">
+              <button
+                onClick={() => onViewModeChange('table')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  viewMode === 'table'
+                    ? 'bg-white text-primary font-bold shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="มุมมองตารางคิวงาน (ดูง่ายเข้าใจง่าย)"
+              >
+                <span className="material-symbols-outlined text-[15px]">table_rows</span>
+                <span>ตารางคิวงาน</span>
+              </button>
+
               <button
                 onClick={() => onViewModeChange('queue')}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   viewMode === 'queue'
-                    ? 'bg-white text-teal-800 shadow-xs'
+                    ? 'bg-white text-primary font-bold shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
-                title="มุมมองคิวงาน FIFO"
+                title="มุมมองการ์ดคิวงาน"
               >
                 <Clock className="w-3.5 h-3.5" />
-                <span>คิวงาน (FIFO)</span>
+                <span>การ์ดคิวงาน</span>
               </button>
 
               <button
                 onClick={() => onViewModeChange('department_board')}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   viewMode === 'department_board'
-                    ? 'bg-white text-teal-800 shadow-xs'
+                    ? 'bg-white text-primary font-bold shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
                 title="มุมมองบอร์ดแยกแผนก"
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
-                <span>บอร์ดแยกแผนก</span>
+                <span>บอร์ดแผนก</span>
               </button>
             </div>
 

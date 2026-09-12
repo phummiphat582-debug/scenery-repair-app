@@ -5,6 +5,7 @@ import { QueueControls } from './QueueControls';
 import { TicketList } from './TicketList';
 import { DepartmentBoard } from './DepartmentBoard';
 import { UrgentAlertBanner } from './UrgentAlertBanner';
+import { QueueTableView } from './QueueTableView';
 
 interface AllRequestsViewProps {
   tickets: Ticket[];
@@ -24,7 +25,7 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
   const [onlyUrgent, setOnlyUrgent] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortOrder, setSortOrder] = useState<SortOrder>('fifo');
-  const [viewMode, setViewMode] = useState<ViewMode>('queue');
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
 
   // Urgent tickets for banner
   const urgentTickets = useMemo(() => {
@@ -141,8 +142,15 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
         onToggleUrgent={() => setOnlyUrgent(!onlyUrgent)}
       />
 
-      {/* 4. List or Board View */}
-      {viewMode === 'queue' ? (
+      {/* 4. Table, Cards or Board View */}
+      {viewMode === 'table' ? (
+        <QueueTableView
+          tickets={filteredTickets}
+          departments={departments}
+          onSelectTicket={onSelectTicket}
+          onQuickAccept={onQuickAccept}
+        />
+      ) : viewMode === 'queue' ? (
         <TicketList
           tickets={filteredTickets}
           departments={departments}

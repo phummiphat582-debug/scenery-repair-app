@@ -17,8 +17,15 @@ class TicketService {
 
   private initLocalData() {
     try {
-      const savedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS);
-      this.tickets = savedTickets ? JSON.parse(savedTickets) : INITIAL_TICKETS;
+      const demoCleared = localStorage.getItem('scenery_demo_v4_cleared');
+      if (demoCleared !== 'true') {
+        localStorage.removeItem(LOCAL_STORAGE_TICKETS);
+        this.tickets = [];
+        localStorage.setItem('scenery_demo_v4_cleared', 'true');
+      } else {
+        const savedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS);
+        this.tickets = savedTickets ? JSON.parse(savedTickets) : [];
+      }
 
       const savedDepts = localStorage.getItem(LOCAL_STORAGE_DEPTS);
       this.departments = savedDepts ? JSON.parse(savedDepts) : INITIAL_DEPARTMENTS;
@@ -26,15 +33,24 @@ class TicketService {
       const savedTechs = localStorage.getItem(LOCAL_STORAGE_TECHS);
       this.technicians = savedTechs ? JSON.parse(savedTechs) : INITIAL_TECHNICIANS;
 
-      // Merge new initial technicians if missing
-      const existingTechNames = new Set(this.technicians.map(t => t.name));
+      // Merge initial technicians if missing and ensure isOnDutyToday is initialized
+      const techMap = new Map(this.technicians.map(t => [t.name, t]));
       INITIAL_TECHNICIANS.forEach(initTech => {
-        if (!existingTechNames.has(initTech.name)) {
-          this.technicians.push(initTech);
+        if (!techMap.has(initTech.name)) {
+          this.technicians.push({ ...initTech });
+        } else {
+          const current = techMap.get(initTech.name)!;
+          if (current.isOnDutyToday === undefined) {
+            current.isOnDutyToday = initTech.isOnDutyToday ?? true;
+          }
+          if (!current.phone && initTech.phone) {
+            current.phone = initTech.phone;
+          }
         }
       });
+      this.saveToLocalStorage();
     } catch (e) {
-      this.tickets = INITIAL_TICKETS;
+      this.tickets = [];
       this.departments = INITIAL_DEPARTMENTS;
       this.technicians = INITIAL_TECHNICIANS;
     }
@@ -416,6 +432,39 @@ class TicketService {
       this.saveToLocalStorage();
     }
     return [...this.technicians];
+  }
+
+  public async setTechnicianDuty(idOrName: string, isOnDuty: boolean): Promise<Technician[]> {
+    const item = this.technicians.find(t => t.id === idOrName || t.name === idOrName);
+    if (item) {
+      item.isOnDutyToday = isOnDuty;
+      this.saveToLocalStorage();
+    }
+    return [...this.technicians];
+  }
+
+  public async bulkSetDuty(dutyMap: Record<string, boolean>): Promise<Technician[]> {
+    this.technicians.forEach(t => {
+      if (dutyMap[t.id] !== undefined) {
+        t.isOnDutyToday = dutyMap[t.id];
+      } else if (dutyMap[t.name] !== undefined) {
+        t.isOnDutyToday = dutyMap[t.name];
+      }
+    });
+    this.saveToLocalStorage();
+    return [...this.technicians];
+  }
+
+  public async clearAllTickets(): Promise<void> {
+    this.tickets = [];
+    this.saveToLocalStorage();
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('repair_tickets').delete().neq('id', 'keep_none');
+      } catch (e) {
+        console.warn('Supabase clear failed:', e);
+      }
+    }
   }
 }
 

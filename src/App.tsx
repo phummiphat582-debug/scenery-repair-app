@@ -8,6 +8,8 @@ import { AllRequestsView } from './components/AllRequestsView';
 import { SettingsView } from './components/SettingsView';
 import { RequesterPortalView } from './components/RequesterPortalView';
 import { RoleLoginModal } from './components/RoleLoginModal';
+import { DailyDutyModal } from './components/DailyDutyModal';
+import { ConfirmModal } from './components/ConfirmModal';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { MigrationModal } from './components/MigrationModal';
 import { TechnicianRosterModal } from './components/TechnicianRosterModal';
@@ -44,6 +46,7 @@ export const App: React.FC = () => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   // Other Modals
+  const [isDailyDutyModalOpen, setIsDailyDutyModalOpen] = useState(false);
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
   const [isFarmMapModalOpen, setIsFarmMapModalOpen] = useState(false);
@@ -51,6 +54,9 @@ export const App: React.FC = () => {
   const [isPartsModalOpen, setIsPartsModalOpen] = useState(false);
   const [partsModalTicket, setPartsModalTicket] = useState<Ticket | null>(null);
   const [isQRScannerModalOpen, setIsQRScannerModalOpen] = useState(false);
+
+  // Confirmation Modal for Quick Accept
+  const [quickAcceptTicket, setQuickAcceptTicket] = useState<Ticket | null>(null);
 
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -144,7 +150,7 @@ export const App: React.FC = () => {
     await loadData();
     if (userRole === 'technician') {
       setTimeout(() => {
-        setCurrentTab('dashboard');
+        setCurrentTab('all-requests');
       }, 1200);
     }
   };
@@ -159,6 +165,13 @@ export const App: React.FC = () => {
   const handleOpenPartsModal = (ticket?: Ticket) => {
     setPartsModalTicket(ticket || selectedTicket || tickets[0]);
     setIsPartsModalOpen(true);
+  };
+
+  // Handle clear all tickets (Clean Slate)
+  const handleClearAllTickets = async () => {
+    await ticketService.clearAllTickets();
+    await loadData();
+    showToast('ล้างรายการแจ้งซ่อมทั้งหมดเรียบร้อยแล้ว (ระบบเริ่มต้นแบบคลีน)', 'info');
   };
 
   // Handle QR code scan result
@@ -209,6 +222,7 @@ export const App: React.FC = () => {
                 onSelectTicket={handleSelectTicket}
                 onOpenQRScanner={() => setIsQRScannerModalOpen(true)}
                 onSwitchToTechnician={handleSwitchToTechnician}
+                onDataChanged={loadData}
               />
             )}
 
@@ -255,10 +269,7 @@ export const App: React.FC = () => {
                     departments={departments}
                     onSelectTicket={handleSelectTicket}
                     onQuickAccept={(ticket) => {
-                      handleUpdateTicket(ticket.id, {
-                        status: 'in_progress',
-                        technicianName: technicians[0]?.name || 'ช่างอนุรักษ์ ยอดช่าง'
-                      });
+                      setQuickAcceptTicket(ticket);
                     }}
                   />
                 )}
@@ -267,6 +278,8 @@ export const App: React.FC = () => {
                   <SettingsView
                     onOpenMigration={() => setIsMigrationModalOpen(true)}
                     onOpenRoster={() => setIsRosterModalOpen(true)}
+                    onOpenDailyDuty={() => setIsDailyDutyModalOpen(true)}
+                    onClearAllTickets={handleClearAllTickets}
                   />
                 )}
               </>
@@ -289,6 +302,13 @@ export const App: React.FC = () => {
         isOpen={isRoleLoginOpen}
         onClose={() => setIsRoleLoginOpen(false)}
         onSuccess={handleRoleLoginSuccess}
+      />
+
+      <DailyDutyModal
+        isOpen={isDailyDutyModalOpen}
+        onClose={() => setIsDailyDutyModalOpen(false)}
+        technicians={technicians}
+        onDutyChanged={loadData}
       />
 
       <TaskDetailsModal
@@ -338,6 +358,29 @@ export const App: React.FC = () => {
         onClose={() => setIsQRScannerModalOpen(false)}
         onScanResult={handleQRScanResult}
       />
+
+      {/* Quick Accept Confirmation Modal */}
+      {quickAcceptTicket && (
+        <ConfirmModal
+          isOpen={!!quickAcceptTicket}
+          title="ยืนยันการรับงานซ่อม"
+          message={`คุณต้องการรับงาน #${quickAcceptTicket.requestId} ("${quickAcceptTicket.title}") เข้าสู่สถานะกำลังดำเนินการ ใช่หรือไม่?`}
+          confirmText="ยืนยันรับงาน"
+          cancelText="ยกเลิก"
+          confirmVariant="primary"
+          onConfirm={async () => {
+            const activeTech = technicians.find(t => t.isOnDutyToday)?.name || technicians[0]?.name || 'ช่างสมชาย (หัวหน้าช่าง)';
+            const activePhone = technicians.find(t => t.isOnDutyToday)?.phone || technicians[0]?.phone || '081-234-5678';
+            await handleUpdateTicket(quickAcceptTicket.id, {
+              status: 'in_progress',
+              technicianName: activeTech,
+              technicianPhone: activePhone
+            });
+            setQuickAcceptTicket(null);
+          }}
+          onCancel={() => setQuickAcceptTicket(null)}
+        />
+      )}
 
       {/* Toast Notification */}
       {toast && (

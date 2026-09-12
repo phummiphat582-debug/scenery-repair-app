@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { Ticket, Department, Technician } from '../types';
 import { NewTicketForm } from './NewTicketForm';
-import { Phone, Search, Wrench, Clock, CheckCircle2, AlertCircle, AlertTriangle, ChevronRight, User, MapPin, Plus, ListFilter, Shield } from 'lucide-react';
+import { DailyDutyModal } from './DailyDutyModal';
+import { ConfirmModal } from './ConfirmModal';
+import { Phone, Search, Wrench, Clock, CheckCircle2, ChevronRight, User, MapPin, Plus, Shield, CalendarCheck, AlertTriangle } from 'lucide-react';
 
 interface RequesterPortalViewProps {
   tickets: Ticket[];
@@ -11,6 +13,7 @@ interface RequesterPortalViewProps {
   onSelectTicket?: (ticket: Ticket) => void;
   onOpenQRScanner?: () => void;
   onSwitchToTechnician: () => void;
+  onDataChanged?: () => void;
 }
 
 export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
@@ -20,12 +23,21 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
   onSubmitTicket,
   onSelectTicket,
   onOpenQRScanner,
-  onSwitchToTechnician
+  onSwitchToTechnician,
+  onDataChanged
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'create' | 'track'>('create');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [selectedTicketForDetail, setSelectedTicketForDetail] = useState<Ticket | null>(null);
+  const [isDutyModalOpen, setIsDutyModalOpen] = useState(false);
+
+  // Call confirmation modal
+  const [callConfirmTech, setCallConfirmTech] = useState<{ name: string; phone: string } | null>(null);
+
+  // Technicians on duty today
+  const onDutyTechs = useMemo(() => {
+    return technicians.filter(t => t.isOnDutyToday !== false && t.status === 'active');
+  }, [technicians]);
 
   // Filter tickets for tracking
   const filteredTickets = useMemo(() => {
@@ -73,6 +85,18 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
     return '081-234-5678'; // Default farm maintenance hotline
   };
 
+  const handleCallClick = (e: React.MouseEvent, name: string, phone: string) => {
+    e.preventDefault();
+    setCallConfirmTech({ name, phone });
+  };
+
+  const executeCall = () => {
+    if (callConfirmTech?.phone) {
+      window.location.href = `tel:${callConfirmTech.phone}`;
+    }
+    setCallConfirmTech(null);
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-4 space-y-5 animate-in fade-in duration-200">
       
@@ -91,7 +115,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
               ระบบแจ้งซ่อมบำรุง The Scenery Vintage Farm
             </h1>
             <p className="text-xs sm:text-sm text-primary-fixed mt-1 max-w-xl">
-              แจ้งปัญหาอุปกรณ์ เครื่องจักร อาคารสถานที่ หรือติดตามสถานะงานซ่อมและโทรติดต่อช่างได้ตลอดเวลา
+              แจ้งปัญหาอุปกรณ์ เครื่องจักร อาคารสถานที่ ดูช่างที่มาทำงานวันนี้ และโทรติดต่อช่างได้โดยตรง
             </p>
           </div>
 
@@ -106,7 +130,86 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
         </div>
       </div>
 
-      {/* 2. Top Segmented Tabs: [📝 แจ้งซ่อมใหม่] vs [📋 ติดตามงานของฉัน] */}
+      {/* 2. On-Duty Technicians Today (ช่างที่มาทำงานวันนี้) */}
+      <div className="bg-surface-container-lowest p-4 sm:p-5 rounded-3xl border border-slate-200/90 shadow-xs space-y-3.5">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-base shadow-xs">
+              👷‍♂️
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-sm sm:text-base text-on-surface">
+                  ทีมช่างที่เข้าเวร / มาปฏิบัติงานวันนี้
+                </h2>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-extrabold border border-emerald-300">
+                  🟢 {onDutyTechs.length} ท่าน
+                </span>
+              </div>
+              <p className="text-[11px] text-on-surface-variant">
+                พร้อมแก้ไขปัญหาหน้างาน สามารถกดปุ่มโทรติดต่อหาช่างแต่ละท่านได้ทันที
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsDutyModalOpen(true)}
+            className="px-3 py-1.5 bg-surface-container hover:bg-surface-container-high text-primary rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+            title="สำหรับช่างเช็คชื่อเข้าเวรหรืออัปเดตเบอร์โทร"
+          >
+            <CalendarCheck className="w-3.5 h-3.5 text-primary" />
+            <span>ช่างอัปเดตเวรวันนี้</span>
+          </button>
+        </div>
+
+        {/* Technicians Grid */}
+        {onDutyTechs.length === 0 ? (
+          <div className="p-6 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-500">
+            ยังไม่มีช่างลงชื่อเข้าเวรวันนี้ — ช่างสามารถกดปุ่ม "ช่างอัปเดตเวรวันนี้" ด้านบนเพื่อเช็คชื่อ
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {onDutyTechs.map(tech => (
+              <div
+                key={tech.id}
+                className="p-3 bg-surface-container-low rounded-2xl border border-emerald-200/80 flex items-center justify-between gap-2.5 hover:shadow-xs transition-shadow"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                    {tech.name.slice(4, 5) || tech.name.slice(0, 1) || 'ช'}
+                  </span>
+                  <div className="min-w-0">
+                    <span className="font-bold text-xs sm:text-sm text-on-surface truncate block">
+                      {tech.name}
+                    </span>
+                    <span className="text-[11px] text-on-surface-variant truncate block">
+                      {tech.role}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Call Button with Confirmation */}
+                {tech.phone ? (
+                  <button
+                    type="button"
+                    onClick={(e) => handleCallClick(e, tech.name, tech.phone!)}
+                    className="px-3 py-1.5 bg-primary hover:bg-primary-container text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 shrink-0 shadow-xs active:scale-95 cursor-pointer"
+                    title={`โทรหา ${tech.name} (${tech.phone})`}
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>โทร</span>
+                  </button>
+                ) : (
+                  <span className="text-[10px] text-slate-400 shrink-0">(ไม่มีเบอร์)</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 3. Top Segmented Tabs: [📝 แจ้งซ่อมใหม่] vs [📋 ติดตามงานของฉัน] */}
       <div className="flex bg-surface-container-low p-1.5 rounded-2xl border border-slate-200 shadow-xs">
         <button
           type="button"
@@ -140,7 +243,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
         </button>
       </div>
 
-      {/* 3. Sub-Tab 1: Create New Ticket Form */}
+      {/* 4. Sub-Tab 1: Create New Ticket Form */}
       {activeSubTab === 'create' && (
         <div className="bg-surface-container-lowest rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
           <NewTicketForm
@@ -155,7 +258,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
         </div>
       )}
 
-      {/* 4. Sub-Tab 2: Track Tickets List */}
+      {/* 5. Sub-Tab 2: Track Tickets List */}
       {activeSubTab === 'track' && (
         <div className="space-y-4">
           
@@ -199,11 +302,14 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
           {filteredTickets.length === 0 ? (
             <div className="p-12 text-center bg-surface-container-lowest rounded-3xl border border-dashed border-slate-200 text-on-surface-variant flex flex-col items-center gap-3">
               <Clock className="w-10 h-10 text-slate-300" />
-              <span className="text-sm font-semibold">ไม่พบรายการแจ้งซ่อมที่ตรงกับเงื่อนไข</span>
+              <span className="text-sm font-semibold">ยังไม่มีประวัติการแจ้งซ่อมในระบบ</span>
+              <p className="text-xs text-slate-400 max-w-sm">
+                เมื่อท่านส่งใบแจ้งซ่อม รายการจะแสดงสถานะและชื่อช่างผู้รับผิดชอบตรงนี้
+              </p>
               <button
                 type="button"
                 onClick={() => setActiveSubTab('create')}
-                className="mt-2 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary-container cursor-pointer"
+                className="mt-2 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary-container cursor-pointer shadow-xs"
               >
                 + แจ้งซ่อมงานใหม่
               </button>
@@ -289,15 +395,16 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                         </div>
                       </div>
 
-                      {/* Direct Phone Call Button */}
-                      <a
-                        href={`tel:${techPhone}`}
+                      {/* Direct Phone Call Button with Confirmation */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleCallClick(e, ticket.technicianName || 'ศูนย์ซ่อมส่วนกลาง', techPhone)}
                         className="self-start sm:self-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-primary hover:bg-primary-container text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer active:scale-95"
                         title="กดเพื่อโทรออกทันที"
                       >
                         <Phone className="w-3.5 h-3.5" />
                         <span>โทรหาช่าง: {techPhone}</span>
-                      </a>
+                      </button>
                     </div>
 
                     {/* Repair Remarks / Progress */}
@@ -318,6 +425,30 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
           )}
 
         </div>
+      )}
+
+      {/* Daily Duty Attendance Modal */}
+      <DailyDutyModal
+        isOpen={isDutyModalOpen}
+        onClose={() => setIsDutyModalOpen(false)}
+        technicians={technicians}
+        onDutyChanged={() => {
+          if (onDataChanged) onDataChanged();
+        }}
+      />
+
+      {/* Phone Call Confirmation Modal */}
+      {callConfirmTech && (
+        <ConfirmModal
+          isOpen={!!callConfirmTech}
+          title="ยืนยันการโทรออก"
+          message={`คุณต้องการโทรติดต่อ "${callConfirmTech.name}" ที่หมายเลข ${callConfirmTech.phone} ใช่หรือไม่?`}
+          confirmText="โทรออกทันที"
+          cancelText="ยกเลิก"
+          confirmVariant="primary"
+          onConfirm={executeCall}
+          onCancel={() => setCallConfirmTech(null)}
+        />
       )}
 
     </div>
