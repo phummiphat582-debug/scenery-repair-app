@@ -85,8 +85,27 @@ export const App: React.FC = () => {
     }
   };
 
+  const loadDataSilently = async () => {
+    try {
+      const [depts, techs, tix] = await Promise.all([
+        ticketService.getDepartments(),
+        ticketService.getTechnicians(),
+        ticketService.getTickets({ statusFilter: 'all', sortOrder: 'fifo' })
+      ]);
+      setDepartments(depts);
+      setTechnicians(techs);
+      setTickets(tix);
+    } catch (err) {
+      console.warn('Real-time background sync error:', err);
+    }
+  };
+
   useEffect(() => {
     loadData();
+    const unsubscribe = ticketService.subscribe(() => {
+      loadDataSilently();
+    });
+    return () => unsubscribe();
   }, []);
 
   // Save userRole preference

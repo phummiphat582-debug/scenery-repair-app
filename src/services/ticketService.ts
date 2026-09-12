@@ -1,31 +1,35 @@
 import { Ticket, Department, Technician, SortOrder } from '../types';
-import { INITIAL_TICKETS, INITIAL_DEPARTMENTS, INITIAL_TECHNICIANS } from '../data/mockData';
+import { INITIAL_DEPARTMENTS, INITIAL_TECHNICIANS } from '../data/mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
-const LOCAL_STORAGE_TICKETS = 'scenery_repair_v3_tickets';
-const LOCAL_STORAGE_DEPTS = 'scenery_repair_v3_departments';
-const LOCAL_STORAGE_TECHS = 'scenery_repair_v3_technicians';
+const LOCAL_STORAGE_TICKETS = 'scenery_repair_v5_tickets';
+const LOCAL_STORAGE_DEPTS = 'scenery_repair_v5_departments';
+const LOCAL_STORAGE_TECHS = 'scenery_repair_v5_technicians';
 
 class TicketService {
   private tickets: Ticket[] = [];
   private departments: Department[] = [];
   private technicians: Technician[] = [];
+  private listeners: Set<() => void> = new Set();
+  private eventSource: EventSource | null = null;
+  private pollInterval: any = null;
+  private isInitialSyncDone = false;
 
   constructor() {
     this.initLocalData();
+    this.startRealtime();
   }
 
   private initLocalData() {
     try {
-      const demoCleared = localStorage.getItem('scenery_demo_v4_cleared');
-      if (demoCleared !== 'true') {
-        localStorage.removeItem(LOCAL_STORAGE_TICKETS);
-        this.tickets = [];
-        localStorage.setItem('scenery_demo_v4_cleared', 'true');
-      } else {
-        const savedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS);
-        this.tickets = savedTickets ? JSON.parse(savedTickets) : [];
-      }
+      // Clear legacy storage keys with demo data
+      ['scenery_repair_tickets', 'scenery_repair_v2_tickets', 'scenery_repair_v3_tickets', 'scenery_repair_v4_tickets'].forEach(key => {
+        localStorage.removeItem(key);
+      });
+
+      // Strictly empty tickets by default — ZERO DEMO TICKETS
+      const savedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS);
+      this.tickets = savedTickets ? JSON.parse(savedTickets) : [];
 
       const savedDepts = localStorage.getItem(LOCAL_STORAGE_DEPTS);
       this.departments = savedDepts ? JSON.parse(savedDepts) : INITIAL_DEPARTMENTS;
@@ -33,22 +37,16 @@ class TicketService {
       const savedTechs = localStorage.getItem(LOCAL_STORAGE_TECHS);
       this.technicians = savedTechs ? JSON.parse(savedTechs) : INITIAL_TECHNICIANS;
 
-      // Merge initial technicians if missing and ensure isOnDutyToday is initialized
+      // Merge initial technicians if missing photo or phone
       const techMap = new Map(this.technicians.map(t => [t.name, t]));
       INITIAL_TECHNICIANS.forEach(initTech => {
         if (!techMap.has(initTech.name)) {
           this.technicians.push({ ...initTech });
         } else {
           const current = techMap.get(initTech.name)!;
-          if (current.isOnDutyToday === undefined) {
-            current.isOnDutyToday = initTech.isOnDutyToday ?? true;
-          }
-          if (!current.phone && initTech.phone) {
-            current.phone = initTech.phone;
-          }
-          if (!current.avatarUrl && initTech.avatarUrl) {
-            current.avatarUrl = initTech.avatarUrl;
-          }
+          if (current.isOnDutyToday === undefined) current.isOnDutyToday = initTech.isOnDutyToday ?? true;
+          if (!current.phone && initTech.phone) current.phone = initTech.phone;
+          if (!current.avatarUrl && initTech.avatarUrl) current.avatarUrl = initTech.avatarUrl;
         }
       });
       this.saveToLocalStorage();
@@ -69,47 +67,272 @@ class TicketService {
     }
   }
 
-  public async getDepartments(): Promise<Department[]> {
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const { data, error } = await supabase.from('departments').select('*');
-        if (!error && data && data.length > 0) {
-          return data.map((d: any) => ({
-            id: d.id,
-            name: d.name,
-            code: d.code,
-            icon: d.icon || '📌',
-            color: d.color || '#0f766e',
-            description: d.description || ''
-          }));
+  /**
+   * Real-Time Synchronization Engine (Cross-device SSE + Polling Fallback)
+   */
+  private startRealtime() {
+    if (typeof window === 'undefined') return;
+
+    // 1. Trigger initial fetch from server
+    this.syncFromServer();
+
+    // 2. Connect Server-Sent Events for instant cross-device push
+    this.connectSSE();
+
+    // 3. Fallback poll every 3.5 seconds (in case mobile sleeps or network switches)
+    if (!this.pollInterval) {
+      this.pollInterval = setInterval(() => {
+        this.syncFromServer();
+      }, 3500);
+    }
+  }
+
+  private connectSSE() {
+    if (typeof window === 'undefined' || this.eventSource) return;
+
+    try {
+      this.eventSource = new EventSource('/api/realtime');
+
+      this.eventSource.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (
+            data.type === 'TICKET_CREATED' ||
+            data.type === 'TICKET_UPDATED' ||
+            data.type === 'TICKET_DELETED' ||
+            data.type === 'ALL_TICKETS_CLEARED' ||
+            data.type === 'TECHNICIANS_UPDATED' ||
+            data.type === 'SYNC_REQUIRED'
+          ) {
+            this.syncFromServer();
+          }
+        } catch {}
+      };
+
+      this.eventSource.onerror = () => {
+        if (this.eventSource) {
+          this.eventSource.close();
+          this.eventSource = null;
         }
-      } catch (e) {
-        console.warn('Supabase fetch departments failed, using fallback:', e);
+        // Auto-reconnect after 3 seconds
+        setTimeout(() => this.connectSSE(), 3000);
+      };
+    } catch (e) {
+      console.warn('[TicketService] SSE connection failed, using fallback polling:', e);
+    }
+  }
+
+  public subscribe(callback: () => void): () => void {
+    this.listeners.add(callback);
+    return () => this.listeners.delete(callback);
+  }
+
+  private notify() {
+    this.listeners.forEach(fn => {
+      try { fn(); } catch (e) { console.error(e); }
+    });
+  }
+
+  /**
+   * Fetch latest state from central server (cross-device sync)
+   */
+  public async syncFromServer(): Promise<void> {
+    try {
+      const [ticketsRes, techsRes, deptsRes] = await Promise.allSettled([
+        fetch('/api/tickets', { cache: 'no-store' }),
+        fetch('/api/technicians', { cache: 'no-store' }),
+        fetch('/api/departments', { cache: 'no-store' })
+      ]);
+
+      let changed = false;
+
+      if (ticketsRes.status === 'fulfilled' && ticketsRes.value.ok) {
+        const serverTickets: Ticket[] = await ticketsRes.value.json();
+        if (Array.isArray(serverTickets)) {
+          if (JSON.stringify(serverTickets) !== JSON.stringify(this.tickets)) {
+            this.tickets = serverTickets;
+            changed = true;
+          }
+        }
       }
+
+      if (techsRes.status === 'fulfilled' && techsRes.value.ok) {
+        const serverTechs: Technician[] = await techsRes.value.json();
+        if (Array.isArray(serverTechs) && serverTechs.length > 0) {
+          if (JSON.stringify(serverTechs) !== JSON.stringify(this.technicians)) {
+            this.technicians = serverTechs;
+            changed = true;
+          }
+        }
+      }
+
+      if (deptsRes.status === 'fulfilled' && deptsRes.value.ok) {
+        const serverDepts: Department[] = await deptsRes.value.json();
+        if (Array.isArray(serverDepts) && serverDepts.length > 0) {
+          if (JSON.stringify(serverDepts) !== JSON.stringify(this.departments)) {
+            this.departments = serverDepts;
+            changed = true;
+          }
+        }
+      }
+
+      if (changed || !this.isInitialSyncDone) {
+        this.isInitialSyncDone = true;
+        this.saveToLocalStorage();
+        this.notify();
+      }
+    } catch (e) {
+      // Offline mode - keep local storage
+    }
+  }
+
+  /**
+   * Departments
+   */
+  public async getDepartments(): Promise<Department[]> {
+    if (!this.isInitialSyncDone) {
+      await this.syncFromServer();
     }
     return [...this.departments];
   }
 
+  /**
+   * Technicians
+   */
   public async getTechnicians(): Promise<Technician[]> {
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const { data, error } = await supabase.from('technicians').select('*');
-        if (!error && data && data.length > 0) {
-          return data.map((t: any) => ({
-            id: t.id,
-            name: t.name,
-            role: t.role || 'ช่างซ่อมบำรุง',
-            status: t.status || 'active',
-            phone: t.phone || ''
-          }));
-        }
-      } catch (e) {
-        console.warn('Supabase fetch technicians failed, using fallback:', e);
-      }
+    if (!this.isInitialSyncDone) {
+      await this.syncFromServer();
     }
     return [...this.technicians];
   }
 
+  public getTechniciansSync(): Technician[] {
+    return [...this.technicians];
+  }
+
+  public async addTechnician(tech: { name: string; role?: string; phone?: string; avatarUrl?: string }): Promise<Technician[]> {
+    try {
+      const res = await fetch('/api/technicians', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tech)
+      });
+      if (res.ok) {
+        const updatedTechs = await res.json();
+        if (Array.isArray(updatedTechs)) {
+          this.technicians = updatedTechs;
+          this.saveToLocalStorage();
+          this.notify();
+          return [...this.technicians];
+        }
+      }
+    } catch (e) {
+      console.warn('[TicketService] API addTechnician error, updating local:', e);
+    }
+
+    const newTech: Technician = {
+      id: 'tech-' + Date.now(),
+      name: tech.name.trim(),
+      role: tech.role?.trim() || 'ช่างซ่อมบำรุง',
+      status: 'active',
+      phone: tech.phone?.trim() || '',
+      avatarUrl: tech.avatarUrl || '',
+      isOnDutyToday: true
+    };
+    this.technicians.push(newTech);
+    this.saveToLocalStorage();
+    this.notify();
+    return [...this.technicians];
+  }
+
+  public async updateTechnician(idOrName: string, updates: Partial<Technician>): Promise<Technician[]> {
+    const item = this.technicians.find(t => t.id === idOrName || t.name === idOrName);
+    const targetId = item ? item.id : idOrName;
+
+    try {
+      const res = await fetch(`/api/technicians/${encodeURIComponent(targetId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        if (item) Object.assign(item, updated);
+        this.saveToLocalStorage();
+        this.notify();
+        return [...this.technicians];
+      }
+    } catch (e) {
+      console.warn('[TicketService] API updateTechnician error, updating local:', e);
+    }
+
+    if (item) {
+      Object.assign(item, updates);
+      this.saveToLocalStorage();
+      this.notify();
+    }
+    return [...this.technicians];
+  }
+
+  public async deleteTechnician(idOrName: string): Promise<Technician[]> {
+    const item = this.technicians.find(t => t.id === idOrName || t.name === idOrName);
+    const targetId = item ? item.id : idOrName;
+
+    try {
+      await fetch(`/api/technicians/${encodeURIComponent(targetId)}`, { method: 'DELETE' });
+    } catch (e) {}
+
+    this.technicians = this.technicians.filter(t => t.id !== idOrName && t.name !== idOrName);
+    this.saveToLocalStorage();
+    this.notify();
+    return [...this.technicians];
+  }
+
+  public async setTechnicianStatus(name: string, status: 'active' | 'inactive'): Promise<Technician[]> {
+    return this.updateTechnician(name, { status });
+  }
+
+  public async setTechnicianDuty(idOrName: string, isOnDuty: boolean): Promise<Technician[]> {
+    const item = this.technicians.find(t => t.id === idOrName || t.name === idOrName);
+    const id = item ? item.id : idOrName;
+
+    try {
+      await fetch('/api/technicians/duty', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [id]: isOnDuty })
+      });
+    } catch (e) {}
+
+    if (item) {
+      item.isOnDutyToday = isOnDuty;
+      this.saveToLocalStorage();
+      this.notify();
+    }
+    return [...this.technicians];
+  }
+
+  public async bulkSetDuty(dutyMap: Record<string, boolean>): Promise<Technician[]> {
+    try {
+      await fetch('/api/technicians/duty', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dutyMap)
+      });
+    } catch (e) {}
+
+    this.technicians.forEach(t => {
+      if (dutyMap[t.id] !== undefined) t.isOnDutyToday = dutyMap[t.id];
+      else if (dutyMap[t.name] !== undefined) t.isOnDutyToday = dutyMap[t.name];
+    });
+    this.saveToLocalStorage();
+    this.notify();
+    return [...this.technicians];
+  }
+
+  /**
+   * Tickets
+   */
   public async getTickets(options?: {
     department?: string;
     statusFilter?: string;
@@ -118,42 +341,11 @@ class TicketService {
     onlyUrgent?: boolean;
     searchQuery?: string;
   }): Promise<Ticket[]> {
-    let list: Ticket[] = [];
-
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const { data, error } = await supabase.from('repair_tickets').select('*');
-        if (!error && data && data.length > 0) {
-          list = data.map((r: any) => ({
-            id: r.id,
-            requestId: r.request_id,
-            title: r.title,
-            description: r.description || '',
-            department: r.department,
-            location: r.location,
-            requesterName: r.requester_name,
-            requesterPhone: r.requester_phone || '',
-            priority: r.priority || 'normal',
-            status: r.status || 'pending',
-            technicianName: r.technician_name || '',
-            repairResult: r.repair_result || '',
-            remark: r.remark || '',
-            requestImageUrl: r.request_image_url || '',
-            resultImageUrl: r.result_image_url || '',
-            createdAt: r.created_at,
-            updatedAt: r.updated_at,
-            completedAt: r.completed_at
-          }));
-        }
-      } catch (e) {
-        console.warn('Supabase fetch tickets failed, using fallback:', e);
-      }
+    if (!this.isInitialSyncDone) {
+      await this.syncFromServer();
     }
 
-    if (!list.length) {
-      list = [...this.tickets];
-    }
-
+    let list: Ticket[] = [...this.tickets];
     const now = Date.now();
 
     // Compute UI fields: ageDays, waitingDurationText, isOverdue
@@ -241,10 +433,28 @@ class TicketService {
   }
 
   public async createTicket(ticket: Omit<Ticket, 'id' | 'requestId' | 'createdAt' | 'updatedAt'>): Promise<Ticket> {
-    const count = this.tickets.length + 1;
-    const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '');
-    const newId = 'REP-' + yearMonth + '-' + String(count).padStart(3, '0');
+    try {
+      const res = await fetch('/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ticket)
+      });
+      if (res.ok) {
+        const created: Ticket = await res.json();
+        this.tickets.unshift(created);
+        this.saveToLocalStorage();
+        this.notify();
+        return created;
+      }
+    } catch (e) {
+      console.warn('[TicketService] API create failed, using local:', e);
+    }
+
+    // Fallback if server unreachable
     const nowIso = new Date().toISOString();
+    const count = this.tickets.length + 1;
+    const yearMonth = nowIso.slice(0, 7).replace('-', '');
+    const newId = 'REP-' + yearMonth + '-' + String(count).padStart(3, '0');
 
     const created: Ticket = {
       ...ticket,
@@ -254,224 +464,93 @@ class TicketService {
       updatedAt: nowIso
     };
 
-    if (isSupabaseConfigured && supabase) {
-      try {
-        await supabase.from('repair_tickets').insert([{
-          request_id: created.requestId,
-          title: created.title,
-          description: created.description,
-          department: created.department,
-          location: created.location,
-          requester_name: created.requesterName,
-          requester_phone: created.requesterPhone,
-          priority: created.priority,
-          status: created.status,
-          technician_name: created.technicianName,
-          remark: created.remark,
-          request_image_url: created.requestImageUrl
-        }]);
-      } catch (e) {
-        console.warn('Supabase create failed, persisted locally:', e);
-      }
-    }
-
     this.tickets.unshift(created);
     this.saveToLocalStorage();
+    this.notify();
     return created;
   }
 
-  public async updateTicket(id: string, updates: Partial<Ticket>): Promise<Ticket> {
-    const idx = this.tickets.findIndex(t => t.id === id || t.requestId === id);
-    if (idx === -1) throw new Error('ไม่พบรายการงาน');
-
-    const updated: Ticket = {
-      ...this.tickets[idx],
-      ...updates,
-      updatedAt: new Date().toISOString()
-    };
-
-    // Auto-fill technicianPhone from known technician list if not explicitly provided
-    if (updated.technicianName && !updated.technicianPhone) {
-      const matchedTech = this.technicians.find(t => t.name.toLowerCase() === updated.technicianName?.toLowerCase());
-      if (matchedTech?.phone) {
-        updated.technicianPhone = matchedTech.phone;
-      }
-    }
-
-    this.tickets[idx] = updated;
-    this.saveToLocalStorage();
-
-    if (isSupabaseConfigured && supabase) {
-      try {
-        await supabase.from('repair_tickets').update({
-          status: updated.status,
-          technician_name: updated.technicianName,
-          technician_phone: updated.technicianPhone,
-          repair_result: updated.repairResult,
-          remark: updated.remark,
-          result_image_url: updated.resultImageUrl,
-          priority: updated.priority,
-          completed_at: updated.completedAt
-        }).eq('request_id', updated.requestId);
-      } catch (e) {
-        console.warn('Supabase update failed:', e);
-      }
-    }
-
-    return updated;
-  }
-
-  public async importTickets(incomingTickets: Ticket[], overwrite: boolean = false): Promise<number> {
-    if (overwrite) {
-      this.tickets = incomingTickets;
-    } else {
-      const existingIds = new Set(this.tickets.map(t => t.requestId));
-      const newOnes = incomingTickets.filter(t => !existingIds.has(t.requestId));
-      this.tickets = [...newOnes, ...this.tickets];
-    }
-    this.saveToLocalStorage();
-    return this.tickets.length;
-  }
-
-  public async resetToDemo(): Promise<void> {
-    this.tickets = [...INITIAL_TICKETS];
-    this.departments = [...INITIAL_DEPARTMENTS];
-    this.technicians = [...INITIAL_TECHNICIANS];
-    this.saveToLocalStorage();
-  }
-
-  public async addTechnician(tech: { name: string; role?: string; phone?: string; avatarUrl?: string }): Promise<Technician[]> {
-    const trimmedName = tech.name.trim();
-    if (!trimmedName) return [...this.technicians];
-
-    const existing = this.technicians.find(t => t.name.toLowerCase() === trimmedName.toLowerCase());
-    if (existing) {
-      existing.status = 'active';
-      if (tech.role) existing.role = tech.role.trim();
-      if (tech.phone) existing.phone = tech.phone.trim();
-      if (tech.avatarUrl) existing.avatarUrl = tech.avatarUrl;
-    } else {
-      const newTech: Technician = {
-        id: 'tech-' + Date.now(),
-        name: trimmedName,
-        role: tech.role?.trim() || 'ช่างซ่อมบำรุง',
-        status: 'active',
-        phone: tech.phone?.trim() || '',
-        avatarUrl: tech.avatarUrl || '',
-        isOnDutyToday: true
-      };
-      this.technicians.push(newTech);
-
-      if (isSupabaseConfigured && supabase) {
-        try {
-          await supabase.from('technicians').insert([{
-            name: newTech.name,
-            role: newTech.role,
-            status: newTech.status,
-            phone: newTech.phone,
-            avatar_url: newTech.avatarUrl
-          }]);
-        } catch (e) {
-          console.warn('Supabase add technician failed:', e);
-        }
-      }
-    }
-
-    this.saveToLocalStorage();
-    return [...this.technicians];
-  }
-
-  public async deleteTechnician(idOrName: string): Promise<Technician[]> {
-    const target = this.technicians.find(t => t.id === idOrName || t.name === idOrName);
-    this.technicians = this.technicians.filter(t => t.id !== idOrName && t.name !== idOrName);
-    this.saveToLocalStorage();
-
-    if (isSupabaseConfigured && supabase && target) {
-      try {
-        await supabase.from('technicians').delete().or(`id.eq.${target.id},name.eq.${target.name}`);
-      } catch (e) {
-        console.warn('Supabase delete technician failed:', e);
-      }
-    }
-
-    return [...this.technicians];
-  }
-
-  public async setTechnicianStatus(name: string, status: 'active' | 'inactive'): Promise<Technician[]> {
-    const item = this.technicians.find(t => t.name === name);
-    if (item) {
-      item.status = status;
-      if (isSupabaseConfigured && supabase) {
-        try {
-          await supabase.from('technicians').update({ status }).eq('name', name);
-        } catch (e) {
-          console.warn('Supabase update technician status failed:', e);
-        }
-      }
-    } else {
-      this.technicians.push({
-        id: 'tech-' + Date.now(),
-        name,
-        role: 'ช่างซ่อมบำรุง',
-        status
+  public async updateTicket(id: string, updates: Partial<Ticket>): Promise<Ticket | null> {
+    try {
+      const res = await fetch(`/api/tickets/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
       });
-    }
-    this.saveToLocalStorage();
-    return [...this.technicians];
-  }
-
-  public async updateTechnician(idOrName: string, updates: Partial<Technician>): Promise<Technician[]> {
-    const item = this.technicians.find(t => t.id === idOrName || t.name === idOrName);
-    if (item) {
-      Object.assign(item, updates);
-      if (isSupabaseConfigured && supabase) {
-        try {
-          await supabase.from('technicians').update({
-            name: item.name,
-            role: item.role,
-            phone: item.phone,
-            status: item.status
-          }).or(`id.eq.${item.id},name.eq.${item.name}`);
-        } catch (e) {
-          console.warn('Supabase update technician failed:', e);
+      if (res.ok) {
+        const updated: Ticket = await res.json();
+        const idx = this.tickets.findIndex(t => t.id === id || t.requestId === id);
+        if (idx !== -1) {
+          this.tickets[idx] = updated;
         }
+        this.saveToLocalStorage();
+        this.notify();
+        return updated;
       }
-      this.saveToLocalStorage();
+    } catch (e) {
+      console.warn('[TicketService] API update failed, using local:', e);
     }
-    return [...this.technicians];
-  }
 
-  public async setTechnicianDuty(idOrName: string, isOnDuty: boolean): Promise<Technician[]> {
-    const item = this.technicians.find(t => t.id === idOrName || t.name === idOrName);
-    if (item) {
-      item.isOnDutyToday = isOnDuty;
-      this.saveToLocalStorage();
+    const item = this.tickets.find(t => t.id === id || t.requestId === id);
+    if (!item) return null;
+
+    Object.assign(item, updates, { updatedAt: new Date().toISOString() });
+    if (updates.status === 'completed' && !item.completedAt) {
+      item.completedAt = new Date().toISOString();
     }
-    return [...this.technicians];
-  }
 
-  public async bulkSetDuty(dutyMap: Record<string, boolean>): Promise<Technician[]> {
-    this.technicians.forEach(t => {
-      if (dutyMap[t.id] !== undefined) {
-        t.isOnDutyToday = dutyMap[t.id];
-      } else if (dutyMap[t.name] !== undefined) {
-        t.isOnDutyToday = dutyMap[t.name];
-      }
-    });
     this.saveToLocalStorage();
-    return [...this.technicians];
+    this.notify();
+    return item;
+  }
+
+  public async deleteTicket(id: string): Promise<void> {
+    try {
+      await fetch(`/api/tickets/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    } catch (e) {}
+
+    this.tickets = this.tickets.filter(t => t.id !== id && t.requestId !== id);
+    this.saveToLocalStorage();
+    this.notify();
   }
 
   public async clearAllTickets(): Promise<void> {
+    try {
+      await fetch('/api/tickets/clear-all', { method: 'POST' });
+    } catch (e) {}
+
     this.tickets = [];
     this.saveToLocalStorage();
-    if (isSupabaseConfigured && supabase) {
-      try {
-        await supabase.from('repair_tickets').delete().neq('id', 'keep_none');
-      } catch (e) {
-        console.warn('Supabase clear failed:', e);
-      }
+    this.notify();
+  }
+
+  public async importTickets(imported: Ticket[], overwrite: boolean = false): Promise<void> {
+    if (overwrite) {
+      this.tickets = [...imported];
+    } else {
+      this.tickets = [...imported, ...this.tickets];
     }
+    this.saveToLocalStorage();
+    this.notify();
+
+    for (const t of imported) {
+      try {
+        await fetch('/api/tickets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(t)
+        });
+      } catch {}
+    }
+  }
+
+  public async resetToDemo(): Promise<void> {
+    this.tickets = [];
+    this.saveToLocalStorage();
+    this.notify();
+    try {
+      await fetch('/api/tickets/clear-all', { method: 'POST' });
+    } catch {}
   }
 }
 
