@@ -7,7 +7,7 @@
 ## 🌐 ลิงก์ระบบพร้อมใช้งานทันที (Live Links)
 
 - **🌍 ลิงก์ระบบบน Cloudflare (ใช้งานได้ทันทีจากมือถือ/คอมพิวเตอร์):**  
-  👉 **[https://facilities-counseling-cigarettes-needs.trycloudflare.com](https://facilities-counseling-cigarettes-needs.trycloudflare.com)**
+  👉 **[https://namely-totally-mac-bullet.trycloudflare.com](https://namely-totally-mac-bullet.trycloudflare.com)**
 - **💻 ลิงก์สำหรับเปิดทดสอบในเครื่อง (Local Preview):**  
   👉 **[http://localhost:5174](http://localhost:5174)**
 - **🐙 ซอร์สโค้ดบน GitHub (Repository):**  

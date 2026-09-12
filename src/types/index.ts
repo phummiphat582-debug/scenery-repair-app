@@ -1,10 +1,11 @@
 export type Priority = 'critical' | 'high' | 'normal' | 'low';
 
 export type TicketStatus = 
-  | 'pending'        // รอดำเนินการ
-  | 'assigned'       // รับงานแล้ว
+  | 'pending'        // รอดำเนินการ / รอตรวจสอบ
+  | 'assigned'       // มอบหมายแล้ว / งานใหม่รอรับ
   | 'in_progress'    // กำลังดำเนินการ
   | 'waiting_parts'  // รออะไหล่
+  | 'waiting_inspect'// รอตรวจรับ
   | 'completed'      // เสร็จสิ้น
   | 'cancelled';     // ยกเลิก
 
@@ -26,6 +27,17 @@ export interface Technician {
   status: 'active' | 'inactive';
   phone?: string;
   departmentId?: string;
+  code?: string;
+  avatarUrl?: string;
+}
+
+export interface PartItem {
+  id?: string;
+  name: string;
+  code: string;
+  quantity: number;
+  cost: number;
+  status?: string;
 }
 
 export interface Ticket {
@@ -40,6 +52,7 @@ export interface Ticket {
   priority: Priority;
   status: TicketStatus;
   technicianName?: string;
+  technicianPhone?: string;
   repairResult?: string;
   remark?: string;
   requestImageUrl?: string;
@@ -48,6 +61,18 @@ export interface Ticket {
   updatedAt: string;
   completedAt?: string;
   
+  // Rich details from design system
+  zone?: string;
+  machineCode?: string;
+  category?: string;
+  parts?: PartItem[];
+  laborCost?: number;
+  totalCost?: number;
+  progressPercent?: number;
+  diagnosticReason?: string;
+  actionSteps?: string;
+  extraPhotos?: string[];
+
   // Computed fields for UI
   queueNumber?: number;
   ageDays?: number;
@@ -55,5 +80,6 @@ export interface Ticket {
   isOverdue?: boolean;
 }
 
+export type NavTab = 'dashboard' | 'technician' | 'new-request' | 'all-requests' | 'settings';
 export type ViewMode = 'queue' | 'department_board' | 'dashboard';
 export type SortOrder = 'fifo' | 'lifo' | 'priority';
