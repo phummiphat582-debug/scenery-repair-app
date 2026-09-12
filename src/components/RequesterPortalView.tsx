@@ -186,9 +186,17 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                 className="p-3 bg-surface-container-low rounded-2xl border border-emerald-200/80 flex items-center justify-between gap-2.5 hover:shadow-xs transition-shadow"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
-                    {tech.name.slice(4, 5) || tech.name.slice(0, 1) || 'ช'}
-                  </span>
+                  {tech.avatarUrl ? (
+                    <img 
+                      src={tech.avatarUrl} 
+                      alt={tech.name} 
+                      className="w-11 h-11 rounded-2xl object-cover border-2 border-emerald-500 ring-2 ring-emerald-100 shrink-0 shadow-xs" 
+                    />
+                  ) : (
+                    <span className="w-11 h-11 rounded-2xl bg-primary text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs">
+                      {tech.name.slice(4, 5) || tech.name.slice(0, 1) || 'ช'}
+                    </span>
+                  )}
                   <div className="min-w-0">
                     <span className="font-bold text-xs sm:text-sm text-on-surface truncate block">
                       {tech.name}
@@ -344,6 +352,9 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                 const sBadge = statusLabel(ticket.status);
                 const techPhone = getTechPhone(ticket);
                 const isAssigned = !!ticket.technicianName;
+                const assignedTech = isAssigned
+                  ? technicians.find(t => t.name.toLowerCase() === ticket.technicianName?.toLowerCase())
+                  : null;
                 const queueNum = ticket.queueNumber || (idx + 1);
 
                 return (
@@ -412,11 +423,19 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                     {/* Technician Contact Box */}
                     <div className="p-3 bg-surface-container-low rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-slate-200/60">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
-                          isAssigned ? 'bg-primary text-white shadow-xs' : 'bg-slate-200 text-slate-500'
-                        }`}>
-                          <Wrench className="w-4 h-4" />
-                        </div>
+                        {assignedTech?.avatarUrl ? (
+                          <img 
+                            src={assignedTech.avatarUrl} 
+                            alt={ticket.technicianName || ''} 
+                            className="w-10 h-10 rounded-xl object-cover border-2 border-primary/40 shrink-0 shadow-xs" 
+                          />
+                        ) : (
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
+                            isAssigned ? 'bg-primary text-white shadow-xs' : 'bg-slate-200 text-slate-500'
+                          }`}>
+                            <Wrench className="w-4 h-4" />
+                          </div>
+                        )}
                         <div className="min-w-0">
                           <div className="text-xs font-bold text-on-surface truncate">
                             {isAssigned ? (

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Ticket, Department } from '../types';
+import { Ticket, Department, Technician } from '../types';
 import { Phone, CheckCircle2, Clock, Wrench, AlertTriangle, ChevronRight, Eye } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 
 interface QueueTableViewProps {
   tickets: Ticket[];
   departments: Department[];
+  technicians?: Technician[];
   onSelectTicket: (ticket: Ticket) => void;
   onQuickAccept?: (ticket: Ticket) => void;
 }
@@ -13,6 +14,7 @@ interface QueueTableViewProps {
 export const QueueTableView: React.FC<QueueTableViewProps> = ({
   tickets,
   departments,
+  technicians,
   onSelectTicket,
   onQuickAccept
 }) => {
@@ -173,23 +175,42 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
                     {/* ช่างผู้รับผิดชอบ & เบอร์โทร */}
                     <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
                       {ticket.technicianName ? (
-                        <div className="flex flex-col gap-1">
-                          <span className="font-bold text-on-surface text-xs">
-                            {ticket.technicianName}
-                          </span>
-                          {ticket.technicianPhone ? (
-                            <button
-                              type="button"
-                              onClick={() => setCallConfirmTech({ name: ticket.technicianName!, phone: ticket.technicianPhone! })}
-                              className="inline-flex items-center gap-1 text-[11px] font-bold text-primary bg-primary-fixed/40 px-2 py-0.5 rounded-full hover:bg-primary hover:text-white transition-colors w-fit cursor-pointer active:scale-95"
-                              title="กดโทรออกหาช่าง"
-                            >
-                              <Phone className="w-3 h-3" />
-                              <span>{ticket.technicianPhone}</span>
-                            </button>
-                          ) : (
-                            <span className="text-[10px] text-slate-400">(ยังไม่มีเบอร์)</span>
-                          )}
+                        <div className="flex items-center gap-2.5">
+                          {(() => {
+                            const tech = technicians?.find(t => t.name.toLowerCase() === ticket.technicianName?.toLowerCase());
+                            if (tech?.avatarUrl) {
+                              return (
+                                <img 
+                                  src={tech.avatarUrl} 
+                                  alt={tech.name} 
+                                  className="w-8 h-8 rounded-full object-cover border border-primary/30 shrink-0 shadow-xs" 
+                                />
+                              );
+                            }
+                            return (
+                              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                                {ticket.technicianName.slice(4, 5) || ticket.technicianName.slice(0, 1) || 'ช'}
+                              </div>
+                            );
+                          })()}
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-bold text-on-surface text-xs truncate">
+                              {ticket.technicianName}
+                            </span>
+                            {ticket.technicianPhone ? (
+                              <button
+                                type="button"
+                                onClick={() => setCallConfirmTech({ name: ticket.technicianName!, phone: ticket.technicianPhone! })}
+                                className="inline-flex items-center gap-1 text-[10px] font-bold text-primary bg-primary-fixed/40 px-2 py-0.5 rounded-full hover:bg-primary hover:text-white transition-colors w-fit cursor-pointer active:scale-95 mt-0.5"
+                                title="กดโทรออกหาช่าง"
+                              >
+                                <Phone className="w-2.5 h-2.5" />
+                                <span>{ticket.technicianPhone}</span>
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-slate-400">(ยังไม่มีเบอร์)</span>
+                            )}
+                          </div>
                         </div>
                       ) : (
                         <span className="text-amber-700 font-semibold text-[11px]">

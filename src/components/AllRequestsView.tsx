@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Ticket, Department, ViewMode, SortOrder } from '../types';
+import { Ticket, Department, ViewMode, SortOrder, Technician } from '../types';
 import { DepartmentTabs } from './DepartmentTabs';
 import { QueueControls } from './QueueControls';
 import { TicketList } from './TicketList';
@@ -10,6 +10,7 @@ import { QueueTableView } from './QueueTableView';
 interface AllRequestsViewProps {
   tickets: Ticket[];
   departments: Department[];
+  technicians?: Technician[];
   onSelectTicket: (ticket: Ticket) => void;
   onQuickAccept: (ticket: Ticket) => void;
 }
@@ -17,6 +18,7 @@ interface AllRequestsViewProps {
 export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
   tickets,
   departments,
+  technicians,
   onSelectTicket,
   onQuickAccept
 }) => {
@@ -147,6 +149,7 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
         <QueueTableView
           tickets={filteredTickets}
           departments={departments}
+          technicians={technicians}
           onSelectTicket={onSelectTicket}
           onQuickAccept={onQuickAccept}
         />

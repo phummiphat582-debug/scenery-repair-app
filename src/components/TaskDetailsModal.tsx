@@ -286,48 +286,59 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 เปลี่ยน / เพิ่มช่าง
               </button>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-surface-container-low rounded-lg">
-              <div className="relative shrink-0">
-                <img
-                  alt="ช่างอนุรักษ์"
-                  className="w-12 h-12 rounded-full object-cover shadow-sm ring-2 ring-primary-fixed"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDLYKl-ggYkb2HgUL1HLYNFkaRtJlkseOaqQ1JENyZvv5lzpj-uzl5lx8sZtgjyb3svdUhzAF_0gU14KHe9AAiFfDhP7tWGvQYUBJTHAbVhuyZ6JpUAlKJAL41k_ljJSLPUige-zj8Bx8M7EciKWhR4Bplo-bVi7HxJjmMK94DJa7icM8yj0yreOH-qi81RWmPXXz2N48eDCyLH8mu0M36TX2gfNoGHU65X9dn2spTRCgHFtw7ohRuc5w"
-                />
-                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-primary rounded-full ring-2 ring-surface-container-lowest"></span>
-              </div>
-              <div className="flex flex-col min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-headline-sm text-headline-sm text-on-surface truncate font-bold">
-                    {currentTechName}
-                  </span>
-                  <span
-                    className="material-symbols-outlined text-[16px] text-primary"
-                    style={{ fontVariationSettings: "'FILL' 1" }}
-                  >
-                    verified
-                  </span>
-                </div>
-                <span className="font-body-sm text-body-sm text-on-surface-variant truncate">
-                  ช่างเทคนิค • {ticket.department || 'ทีมซ่อมบำรุง'}
-                </span>
-                {currentTechPhone ? (
-                  <div className="flex items-center gap-2 mt-1">
-                    <a
-                      href={`tel:${currentTechPhone}`}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-fixed text-on-primary-fixed font-bold text-xs rounded-full hover:bg-primary hover:text-on-primary transition-colors"
-                      title="กดโทรออกทันที"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">call</span>
-                      {currentTechPhone} (โทรออก)
-                    </a>
+            {(() => {
+              const matchedTech = technicians.find(t => t.name.toLowerCase() === currentTechName.toLowerCase());
+              return (
+                <div className="flex items-center gap-3 p-3 bg-surface-container-low rounded-lg">
+                  <div className="relative shrink-0">
+                    {matchedTech?.avatarUrl ? (
+                      <img
+                        alt={currentTechName}
+                        className="w-12 h-12 rounded-2xl object-cover shadow-sm ring-2 ring-primary-fixed"
+                        src={matchedTech.avatarUrl}
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center font-bold text-base shadow-sm">
+                        {currentTechName.slice(4, 5) || currentTechName.slice(0, 1) || 'ช'}
+                      </div>
+                    )}
+                    <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 rounded-full ring-2 ring-white"></span>
                   </div>
-                ) : (
-                  <span className="text-[11px] text-slate-400 mt-0.5">
-                    (ยังไม่ได้กำหนดเบอร์โทร - กดเปลี่ยน/เพิ่มช่างเพื่อระบุ)
-                  </span>
-                )}
-              </div>
-            </div>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-headline-sm text-headline-sm text-on-surface truncate font-bold">
+                        {currentTechName}
+                      </span>
+                      <span
+                        className="material-symbols-outlined text-[16px] text-primary"
+                        style={{ fontVariationSettings: "'FILL' 1" }}
+                      >
+                        verified
+                      </span>
+                    </div>
+                    <span className="font-body-sm text-body-sm text-on-surface-variant truncate">
+                      {matchedTech?.role || 'ช่างเทคนิค'} • {ticket.department || 'ทีมซ่อมบำรุง'}
+                    </span>
+                    {currentTechPhone ? (
+                      <div className="flex items-center gap-2 mt-1">
+                        <a
+                          href={`tel:${currentTechPhone}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-fixed text-on-primary-fixed font-bold text-xs rounded-full hover:bg-primary hover:text-on-primary transition-colors"
+                          title="กดโทรออกทันที"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">call</span>
+                          {currentTechPhone} (โทรออก)
+                        </a>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-slate-400 mt-0.5">
+                        (ยังไม่มีเบอร์โทรช่าง)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Section 4: Parts & Cost Management */}

@@ -148,9 +148,17 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
         <div className="rounded-3xl bg-gradient-to-br from-primary via-primary to-primary-container p-space-md text-white shadow-lg border border-primary-fixed/30">
           <div className="flex items-center gap-space-sm">
             <div className="relative shrink-0">
-              <span className="w-14 h-14 rounded-2xl bg-white/20 text-white flex items-center justify-center font-bold text-xl shadow-inner border border-white/20">
-                {currentTech.name.slice(4, 5) || currentTech.name.slice(0, 1) || 'ช'}
-              </span>
+              {currentTech.avatarUrl ? (
+                <img
+                  src={currentTech.avatarUrl}
+                  alt={currentTech.name}
+                  className="w-14 h-14 rounded-2xl object-cover border-2 border-white/40 shadow-inner"
+                />
+              ) : (
+                <span className="w-14 h-14 rounded-2xl bg-white/20 text-white flex items-center justify-center font-bold text-xl shadow-inner border border-white/20">
+                  {currentTech.name.slice(4, 5) || currentTech.name.slice(0, 1) || 'ช'}
+                </span>
+              )}
               <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-400 ring-2 ring-primary"></span>
             </div>
 
@@ -380,8 +388,15 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
                   </div>
 
                   {ticket.technicianName && (
-                    <div className="text-[11px] text-primary font-semibold">
-                      ช่าง: {ticket.technicianName}
+                    <div className="flex items-center gap-1.5 text-[11px] text-primary font-semibold">
+                      {(() => {
+                        const tech = technicians.find(t => t.name.toLowerCase() === ticket.technicianName?.toLowerCase());
+                        if (tech?.avatarUrl) {
+                          return <img src={tech.avatarUrl} alt={tech.name} className="w-4 h-4 rounded-full object-cover border border-primary/30" />;
+                        }
+                        return null;
+                      })()}
+                      <span>ช่าง: {ticket.technicianName}</span>
                     </div>
                   )}
                 </div>

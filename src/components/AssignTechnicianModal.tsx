@@ -34,6 +34,7 @@ export const AssignTechnicianModal: React.FC<AssignTechnicianModalProps> = ({
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState('ช่างไฟฟ้า/แอร์');
   const [newPhone, setNewPhone] = useState('');
+  const [newAvatarUrl, setNewAvatarUrl] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
   const handleSelectTech = (t: Technician) => {
@@ -59,13 +60,15 @@ export const AssignTechnicianModal: React.FC<AssignTechnicianModalProps> = ({
       await ticketService.addTechnician({
         name: newName.trim(),
         role: newRole.trim() || 'ช่างซ่อมบำรุง',
-        phone: newPhone.trim()
+        phone: newPhone.trim(),
+        avatarUrl: newAvatarUrl || ''
       });
       setSelectedName(newName.trim());
       setSelectedPhone(newPhone.trim());
       setShowAddNew(false);
       setNewName('');
       setNewPhone('');
+      setNewAvatarUrl('');
       if (onTechnicianCreated) {
         onTechnicianCreated();
       }
@@ -202,6 +205,41 @@ export const AssignTechnicianModal: React.FC<AssignTechnicianModalProps> = ({
                 className="w-full px-3 py-2 bg-surface-container-lowest border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:border-primary"
               />
             </div>
+
+            {/* Avatar upload */}
+            <div className="flex items-center gap-2.5 bg-surface-container-lowest p-2 rounded-xl border border-outline-variant">
+              {newAvatarUrl ? (
+                <img src={newAvatarUrl} alt="Preview" className="w-10 h-10 rounded-xl object-cover border border-primary shadow-xs" />
+              ) : (
+                <div className="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center text-on-surface-variant">
+                  <span className="material-symbols-outlined text-[20px]">add_a_photo</span>
+                </div>
+              )}
+              <label className="text-xs text-primary font-bold cursor-pointer hover:underline">
+                เลือกรูปถ่ายช่าง (จากกล้อง/ไฟล์)
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        if (ev.target?.result) setNewAvatarUrl(ev.target.result as string);
+                      };
+                      reader.readAsDataURL(f);
+                    }
+                  }}
+                />
+              </label>
+              {newAvatarUrl && (
+                <button type="button" onClick={() => setNewAvatarUrl('')} className="ml-auto text-[11px] text-red-500 font-bold cursor-pointer">
+                  ลบรูป
+                </button>
+              )}
+            </div>
+
             <button
               type="submit"
               disabled={isAdding}
@@ -228,11 +266,21 @@ export const AssignTechnicianModal: React.FC<AssignTechnicianModalProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-headline-sm shrink-0 ${
-                    isAssigned ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface'
-                  }`}>
-                    {t.name.slice(4, 5) || t.name.slice(0, 1) || 'ช'}
-                  </span>
+                  {t.avatarUrl ? (
+                    <img 
+                      src={t.avatarUrl} 
+                      alt={t.name} 
+                      className={`w-10 h-10 rounded-xl object-cover border-2 shrink-0 shadow-xs ${
+                        isAssigned ? 'border-primary ring-2 ring-primary/30' : 'border-slate-200'
+                      }`} 
+                    />
+                  ) : (
+                    <span className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-headline-sm shrink-0 ${
+                      isAssigned ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface'
+                    }`}>
+                      {t.name.slice(4, 5) || t.name.slice(0, 1) || 'ช'}
+                    </span>
+                  )}
                   <div className="flex flex-col min-w-0">
                     <span className="font-label-lg text-label-lg font-bold truncate">{t.name}</span>
                     <div className="flex items-center gap-2 font-body-sm text-body-sm text-on-surface-variant flex-wrap">

@@ -46,6 +46,9 @@ class TicketService {
           if (!current.phone && initTech.phone) {
             current.phone = initTech.phone;
           }
+          if (!current.avatarUrl && initTech.avatarUrl) {
+            current.avatarUrl = initTech.avatarUrl;
+          }
         }
       });
       this.saveToLocalStorage();
@@ -337,7 +340,7 @@ class TicketService {
     this.saveToLocalStorage();
   }
 
-  public async addTechnician(tech: { name: string; role?: string; phone?: string }): Promise<Technician[]> {
+  public async addTechnician(tech: { name: string; role?: string; phone?: string; avatarUrl?: string }): Promise<Technician[]> {
     const trimmedName = tech.name.trim();
     if (!trimmedName) return [...this.technicians];
 
@@ -346,13 +349,16 @@ class TicketService {
       existing.status = 'active';
       if (tech.role) existing.role = tech.role.trim();
       if (tech.phone) existing.phone = tech.phone.trim();
+      if (tech.avatarUrl) existing.avatarUrl = tech.avatarUrl;
     } else {
       const newTech: Technician = {
         id: 'tech-' + Date.now(),
         name: trimmedName,
         role: tech.role?.trim() || 'ช่างซ่อมบำรุง',
         status: 'active',
-        phone: tech.phone?.trim() || ''
+        phone: tech.phone?.trim() || '',
+        avatarUrl: tech.avatarUrl || '',
+        isOnDutyToday: true
       };
       this.technicians.push(newTech);
 
@@ -362,7 +368,8 @@ class TicketService {
             name: newTech.name,
             role: newTech.role,
             status: newTech.status,
-            phone: newTech.phone
+            phone: newTech.phone,
+            avatar_url: newTech.avatarUrl
           }]);
         } catch (e) {
           console.warn('Supabase add technician failed:', e);

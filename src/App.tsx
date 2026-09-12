@@ -274,6 +274,7 @@ export const App: React.FC = () => {
                   <AllRequestsView
                     tickets={tickets}
                     departments={departments}
+                    technicians={technicians}
                     onSelectTicket={handleSelectTicket}
                     onQuickAccept={(ticket) => {
                       setQuickAcceptTicket(ticket);

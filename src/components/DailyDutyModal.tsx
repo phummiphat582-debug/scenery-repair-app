@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Technician } from '../types';
 import { ticketService } from '../services/ticketService';
-import { X, Users, CheckCircle2, Phone, Save, Edit3, ShieldAlert } from 'lucide-react';
+import { X, Users, CheckCircle2, Phone, Save, Edit3, ShieldAlert, Camera } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 
 interface DailyDutyModalProps {
@@ -85,6 +85,18 @@ export const DailyDutyModal: React.FC<DailyDutyModalProps> = ({
     onDutyChanged();
   };
 
+  const handleDirectPhotoUpload = (tech: Technician, file: File) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      if (e.target?.result) {
+        const url = e.target.result as string;
+        await ticketService.updateTechnician(tech.id, { avatarUrl: url });
+        onDutyChanged();
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const onDutyCount = Object.values(dutyMap).filter(Boolean).length;
 
   return (
@@ -158,11 +170,40 @@ export const DailyDutyModal: React.FC<DailyDutyModalProps> = ({
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <span className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
-                      isOnDuty ? 'bg-primary text-white' : 'bg-slate-200 text-slate-500'
-                    }`}>
-                      {tech.name.slice(4, 5) || tech.name.slice(0, 1) || 'ช'}
-                    </span>
+                    <div className="relative group shrink-0">
+                      {tech.avatarUrl ? (
+                        <img 
+                          src={tech.avatarUrl} 
+                          alt={tech.name} 
+                          className={`w-11 h-11 rounded-2xl object-cover border-2 shadow-xs transition-transform group-hover:scale-105 ${
+                            isOnDuty ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-slate-200 opacity-60'
+                          }`} 
+                        />
+                      ) : (
+                        <span className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm shadow-xs ${
+                          isOnDuty ? 'bg-primary text-white' : 'bg-slate-200 text-slate-500'
+                        }`}>
+                          {tech.name.slice(4, 5) || tech.name.slice(0, 1) || 'ช'}
+                        </span>
+                      )}
+                      <label 
+                        htmlFor={`duty-avatar-${tech.id}`}
+                        className="absolute inset-0 bg-slate-900/60 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer text-white shadow-xs"
+                        title="คลิกเพื่อเปลี่ยนรูปถ่ายช่าง"
+                      >
+                        <Camera className="w-4 h-4" />
+                      </label>
+                      <input 
+                        id={`duty-avatar-${tech.id}`}
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleDirectPhotoUpload(tech, file);
+                        }}
+                      />
+                    </div>
                     <div className="min-w-0">
                       <div className="font-bold text-xs sm:text-sm text-on-surface truncate flex items-center gap-1.5">
                         <span>{tech.name}</span>

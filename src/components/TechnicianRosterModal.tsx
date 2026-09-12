@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Users, UserPlus, Trash2, Phone, AlertTriangle, CheckCircle2, Edit3, Save, RotateCcw } from 'lucide-react';
+import { X, Users, UserPlus, Trash2, Phone, AlertTriangle, CheckCircle2, Edit3, Save, RotateCcw, Camera, Upload, Image } from 'lucide-react';
 import { Technician } from '../types';
 import { ticketService } from '../services/ticketService';
 
@@ -28,6 +28,7 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState('ช่างไฟฟ้า/แอร์');
   const [newPhone, setNewPhone] = useState('');
+  const [newAvatarUrl, setNewAvatarUrl] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -36,12 +37,36 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
   const [editName, setEditName] = useState('');
   const [editRole, setEditRole] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editAvatarUrl, setEditAvatarUrl] = useState('');
 
   if (!isOpen) return null;
 
   const showToast = (msg: string) => {
     setNotification(msg);
     setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handlePhotoFile = (file: File, callback: (dataUrl: string) => void) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        callback(e.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDirectPhotoUpload = (tech: Technician, file: File) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      if (e.target?.result) {
+        const url = e.target.result as string;
+        await ticketService.updateTechnician(tech.id, { avatarUrl: url });
+        showToast(`อัปเดตรูปถ่ายของ "${tech.name}" เรียบร้อย 📸`);
+        onRosterChanged();
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -51,12 +76,14 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
     await ticketService.addTechnician({
       name: newName.trim(),
       role: newRole.trim() || 'ช่างซ่อมบำรุง',
-      phone: newPhone.trim()
+      phone: newPhone.trim(),
+      avatarUrl: newAvatarUrl || ''
     });
 
     setNewName('');
     setNewPhone('');
-    showToast(`เพิ่มช่าง "${newName.trim()}" ในระบบเรียบร้อย`);
+    setNewAvatarUrl('');
+    showToast(`เพิ่มช่าง "${newName.trim()}" ในระบบเรียบร้อย 👷‍♂️`);
     onRosterChanged();
   };
 
@@ -65,6 +92,7 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
     setEditName(t.name);
     setEditRole(t.role);
     setEditPhone(t.phone || '');
+    setEditAvatarUrl(t.avatarUrl || '');
   };
 
   const cancelEdit = () => {
@@ -72,6 +100,7 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
     setEditName('');
     setEditRole('');
     setEditPhone('');
+    setEditAvatarUrl('');
   };
 
   const saveEdit = async (t: Technician) => {
@@ -83,11 +112,12 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
     await ticketService.updateTechnician(t.id, {
       name: editName.trim(),
       role: editRole.trim() || 'ช่างซ่อมบำรุง',
-      phone: editPhone.trim()
+      phone: editPhone.trim(),
+      avatarUrl: editAvatarUrl || ''
     });
 
     setEditingId(null);
-    showToast(`บันทึกข้อมูลช่าง "${editName.trim()}" สำเร็จ`);
+    showToast(`บันทึกข้อมูลช่าง "${editName.trim()}" สำเร็จ ✅`);
     onRosterChanged();
   };
 
@@ -209,6 +239,76 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
               />
             </div>
 
+            <div className="flex flex-col sm:flex-row items-center gap-3 bg-white p-3 rounded-xl border border-slate-200">
+              <div className="relative group shrink-0">
+                {newAvatarUrl ? (
+                  <div className="relative">
+                    <img 
+                      src={newAvatarUrl} 
+                      alt="Preview" 
+                      className="w-16 h-16 rounded-2xl object-cover border-2 border-primary shadow-xs" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setNewAvatarUrl('')}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-[10px] shadow-xs cursor-pointer"
+                      title="ลบรูป"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <label 
+                    htmlFor="new-tech-avatar-file"
+                    className="w-16 h-16 rounded-2xl border-2 border-dashed border-slate-300 hover:border-primary bg-slate-50 hover:bg-primary/5 flex flex-col items-center justify-center cursor-pointer transition-colors text-slate-400 hover:text-primary"
+                    title="คลิกเพื่อถ่ายรูปหรือเลือกรูปช่าง"
+                  >
+                    <Camera className="w-5 h-5 mb-0.5" />
+                    <span className="text-[9px] font-medium">เพิ่มรูปถ่าย</span>
+                  </label>
+                )}
+                <input
+                  id="new-tech-avatar-file"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handlePhotoFile(f, setNewAvatarUrl);
+                  }}
+                />
+              </div>
+              <div className="flex-1 w-full space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
+                    <Camera className="w-3.5 h-3.5 text-primary" />
+                    รูปถ่ายประจำตัวช่าง (ถ่ายจากกล้อง หรือเลือกไฟล์)
+                  </span>
+                  {newAvatarUrl && (
+                    <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> ได้รูปแล้ว
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <label 
+                    htmlFor="new-tech-avatar-file"
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5 shrink-0"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-primary" />
+                    <span>ถ่ายรูป / อัปโหลด</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="หรือวางลิงก์รูปภาพ (URL)..."
+                    value={newAvatarUrl}
+                    onChange={(e) => setNewAvatarUrl(e.target.value)}
+                    className="flex-1 p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+            </div>
+
             <button
               type="submit"
               className="w-full py-2.5 bg-primary hover:bg-primary-container text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
@@ -297,6 +397,62 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
                           className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 outline-none focus:border-primary"
                         />
                       </div>
+
+                      {/* Edit photo upload */}
+                      <div className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-slate-200">
+                        <div className="relative shrink-0">
+                          {editAvatarUrl ? (
+                            <div className="relative">
+                              <img 
+                                src={editAvatarUrl} 
+                                alt={editName} 
+                                className="w-12 h-12 rounded-xl object-cover border-2 border-primary shadow-xs" 
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setEditAvatarUrl('')}
+                                className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-[9px] shadow-xs cursor-pointer"
+                                title="ลบรูป"
+                              >
+                                <X className="w-2.5 h-2.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 font-bold text-xs">
+                              {editName.slice(0, 1) || 'ช'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <div className="text-[10px] font-semibold text-slate-600">เปลี่ยนรูปถ่ายช่าง</div>
+                          <div className="flex items-center gap-2">
+                            <label 
+                              htmlFor={`edit-avatar-${t.id}`}
+                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium cursor-pointer transition-colors flex items-center gap-1 shrink-0"
+                            >
+                              <Camera className="w-3.5 h-3.5 text-primary" />
+                              <span>เลือกรูปใหม่</span>
+                            </label>
+                            <input
+                              id={`edit-avatar-${t.id}`}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handlePhotoFile(f, setEditAvatarUrl);
+                              }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="หรือวาง URL รูป..."
+                              value={editAvatarUrl}
+                              onChange={(e) => setEditAvatarUrl(e.target.value)}
+                              className="flex-1 p-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-primary"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   );
                 }
@@ -308,10 +464,39 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
-                          t.status === 'active' ? 'bg-primary text-white shadow-xs' : 'bg-slate-100 text-slate-400 border border-slate-200'
-                        }`}>
-                          {t.name.slice(4, 5) || t.name.slice(0, 1) || 'ช'}
+                        <div className="relative group shrink-0">
+                          {t.avatarUrl ? (
+                            <img 
+                              src={t.avatarUrl} 
+                              alt={t.name} 
+                              className={`w-11 h-11 rounded-2xl object-cover border-2 shadow-xs transition-transform group-hover:scale-105 ${
+                                t.status === 'active' ? 'border-emerald-500 ring-2 ring-emerald-100' : 'border-slate-200 opacity-60'
+                              }`} 
+                            />
+                          ) : (
+                            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm shadow-xs ${
+                              t.status === 'active' ? 'bg-primary text-white' : 'bg-slate-100 text-slate-400 border border-slate-200'
+                            }`}>
+                              {t.name.slice(4, 5) || t.name.slice(0, 1) || 'ช'}
+                            </div>
+                          )}
+                          <label 
+                            htmlFor={`quick-avatar-${t.id}`}
+                            className="absolute inset-0 bg-slate-900/60 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer text-white shadow-xs"
+                            title="คลิกเพื่อเปลี่ยนรูปถ่ายทันที"
+                          >
+                            <Camera className="w-4 h-4" />
+                          </label>
+                          <input 
+                            id={`quick-avatar-${t.id}`}
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleDirectPhotoUpload(t, file);
+                            }}
+                          />
                         </div>
                         <div className="min-w-0">
                           <div className="font-bold text-slate-900 text-xs sm:text-sm truncate flex items-center gap-1.5">
