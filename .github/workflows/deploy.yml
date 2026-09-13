@@ -30,6 +30,9 @@ jobs:
         run: bun install
 
       - name: Build with Vite
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://hrglhnddjbxxmlhbeysm.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'sb_publishable_wGkBqfguJmgMIArQWRVdtA_2Vcsv_Je' }}
         run: bun run build
 
       - name: Upload artifact

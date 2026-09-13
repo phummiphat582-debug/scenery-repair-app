@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS technicians (
     role VARCHAR(100) DEFAULT 'ช่างซ่อมบำรุง',
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
     phone VARCHAR(30),
+    avatar_url TEXT,
+    is_on_duty_today BOOLEAN DEFAULT true,
     department_id UUID REFERENCES departments(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -39,8 +41,9 @@ CREATE TABLE IF NOT EXISTS repair_tickets (
     requester_name VARCHAR(100) NOT NULL,
     requester_phone VARCHAR(50),
     priority VARCHAR(20) DEFAULT 'normal' CHECK (priority IN ('critical', 'high', 'normal', 'low')),
-    status VARCHAR(30) DEFAULT 'pending' CHECK (status IN ('pending', 'assigned', 'in_progress', 'waiting_parts', 'completed', 'cancelled')),
+    status VARCHAR(30) DEFAULT 'pending' CHECK (status IN ('pending', 'assigned', 'in_progress', 'waiting_parts', 'waiting_inspect', 'completed', 'cancelled')),
     technician_name VARCHAR(100),
+    technician_phone VARCHAR(50),
     repair_result TEXT,
     remark TEXT,
     request_image_url TEXT,

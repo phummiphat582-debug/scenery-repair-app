@@ -6,6 +6,67 @@ const LOCAL_STORAGE_TICKETS = 'scenery_repair_v5_tickets';
 const LOCAL_STORAGE_DEPTS = 'scenery_repair_v5_departments';
 const LOCAL_STORAGE_TECHS = 'scenery_repair_v5_technicians';
 
+// Database mapping utilities (PostgreSQL snake_case <-> Frontend camelCase)
+function dbToTicket(row: any): Ticket {
+  return {
+    id: String(row.id),
+    requestId: row.request_id || row.requestId || String(row.id),
+    title: row.title || '',
+    description: row.description || '',
+    department: row.department || '',
+    location: row.location || '',
+    requesterName: row.requester_name || row.requesterName || '',
+    requesterPhone: row.requester_phone || row.requesterPhone || '',
+    priority: row.priority || 'normal',
+    status: row.status || 'pending',
+    technicianName: row.technician_name || row.technicianName || '',
+    technicianPhone: row.technician_phone || row.technicianPhone || '',
+    repairResult: row.repair_result || row.repairResult || '',
+    remark: row.remark || '',
+    requestImageUrl: row.request_image_url || row.requestImageUrl || '',
+    resultImageUrl: row.result_image_url || row.resultImageUrl || '',
+    createdAt: row.created_at || row.createdAt || new Date().toISOString(),
+    updatedAt: row.updated_at || row.updatedAt || new Date().toISOString(),
+    completedAt: row.completed_at || row.completedAt || undefined
+  };
+}
+
+function ticketToDb(t: Partial<Ticket>): any {
+  const row: any = {};
+  if (t.id && !t.id.startsWith('ticket-')) row.id = t.id;
+  if (t.requestId) row.request_id = t.requestId;
+  if (t.title !== undefined) row.title = t.title;
+  if (t.description !== undefined) row.description = t.description;
+  if (t.department !== undefined) row.department = t.department;
+  if (t.location !== undefined) row.location = t.location;
+  if (t.requesterName !== undefined) row.requester_name = t.requesterName;
+  if (t.requesterPhone !== undefined) row.requester_phone = t.requesterPhone;
+  if (t.priority !== undefined) row.priority = t.priority;
+  if (t.status !== undefined) row.status = t.status;
+  if (t.technicianName !== undefined) row.technician_name = t.technicianName;
+  if (t.technicianPhone !== undefined) row.technician_phone = t.technicianPhone;
+  if (t.repairResult !== undefined) row.repair_result = t.repairResult;
+  if (t.remark !== undefined) row.remark = t.remark;
+  if (t.requestImageUrl !== undefined) row.request_image_url = t.requestImageUrl;
+  if (t.resultImageUrl !== undefined) row.result_image_url = t.resultImageUrl;
+  if (t.createdAt) row.created_at = t.createdAt;
+  if (t.updatedAt) row.updated_at = t.updatedAt;
+  if (t.completedAt !== undefined) row.completed_at = t.completedAt;
+  return row;
+}
+
+function dbToTechnician(row: any): Technician {
+  return {
+    id: String(row.id),
+    name: row.name,
+    role: row.role || 'ช่างซ่อมบำรุง',
+    status: row.status || 'active',
+    phone: row.phone || '',
+    avatarUrl: row.avatar_url || row.avatarUrl || '',
+    isOnDutyToday: row.is_on_duty_today ?? row.isOnDutyToday ?? true
+  };
+}
+
 class TicketService {
   private tickets: Ticket[] = [];
   private departments: Department[] = [];
@@ -14,6 +75,7 @@ class TicketService {
   private eventSource: EventSource | null = null;
   private pollInterval: any = null;
   private isInitialSyncDone = false;
+  private supabaseChannel: any = null;
 
   constructor() {
     this.initLocalData();
@@ -68,22 +130,54 @@ class TicketService {
   }
 
   /**
-   * Real-Time Synchronization Engine (Cross-device SSE + Polling Fallback)
+   * Real-Time Synchronization Engine (Supabase Realtime + Cross-device SSE + Polling Fallback)
    */
   private startRealtime() {
     if (typeof window === 'undefined') return;
 
-    // 1. Trigger initial fetch from server
+    // 1. Initial fetch from server / Supabase
     this.syncFromServer();
 
-    // 2. Connect Server-Sent Events for instant cross-device push
+    // 2. Setup Supabase Realtime channel
+    this.setupSupabaseRealtime();
+
+    // 3. Connect Server-Sent Events (SSE) for local server or tunnel
     this.connectSSE();
 
-    // 3. Fallback poll every 3.5 seconds (in case mobile sleeps or network switches)
+    // 4. Fallback poll every 3.5 seconds
     if (!this.pollInterval) {
       this.pollInterval = setInterval(() => {
         this.syncFromServer();
       }, 3500);
+    }
+  }
+
+  private setupSupabaseRealtime() {
+    if (!isSupabaseConfigured || !supabase || this.supabaseChannel) return;
+    try {
+      this.supabaseChannel = supabase
+        .channel('scenery_realtime_channel')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'repair_tickets' },
+          () => {
+            this.syncFromServer();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'technicians' },
+          () => {
+            this.syncFromServer();
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('⚡ [SupabaseRealtime] Connected and listening for database updates');
+          }
+        });
+    } catch (e) {
+      console.warn('[TicketService] Supabase realtime subscription failed:', e);
     }
   }
 
@@ -118,7 +212,7 @@ class TicketService {
         setTimeout(() => this.connectSSE(), 3000);
       };
     } catch (e) {
-      console.warn('[TicketService] SSE connection failed, using fallback polling:', e);
+      // Offline or static host without local backend
     }
   }
 
@@ -134,47 +228,82 @@ class TicketService {
   }
 
   /**
-   * Fetch latest state from central server (cross-device sync)
+   * Fetch latest state from Supabase / central server (cross-device sync)
    */
   public async syncFromServer(): Promise<void> {
     try {
-      const [ticketsRes, techsRes, deptsRes] = await Promise.allSettled([
-        fetch('/api/tickets', { cache: 'no-store' }),
-        fetch('/api/technicians', { cache: 'no-store' }),
-        fetch('/api/departments', { cache: 'no-store' })
-      ]);
-
       let changed = false;
 
-      if (ticketsRes.status === 'fulfilled' && ticketsRes.value.ok) {
-        const serverTickets: Ticket[] = await ticketsRes.value.json();
-        if (Array.isArray(serverTickets)) {
-          if (JSON.stringify(serverTickets) !== JSON.stringify(this.tickets)) {
-            this.tickets = serverTickets;
-            changed = true;
+      // 1. Supabase Sync (if configured & online)
+      if (isSupabaseConfigured && supabase) {
+        try {
+          const { data: supaTickets, error: tErr } = await supabase
+            .from('repair_tickets')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (!tErr && Array.isArray(supaTickets)) {
+            const mapped = supaTickets.map(dbToTicket);
+            if (JSON.stringify(mapped) !== JSON.stringify(this.tickets)) {
+              this.tickets = mapped;
+              changed = true;
+            }
           }
+
+          const { data: supaTechs, error: techErr } = await supabase
+            .from('technicians')
+            .select('*');
+
+          if (!techErr && Array.isArray(supaTechs) && supaTechs.length > 0) {
+            const mappedTechs = supaTechs.map(dbToTechnician);
+            if (JSON.stringify(mappedTechs) !== JSON.stringify(this.technicians)) {
+              this.technicians = mappedTechs;
+              changed = true;
+            }
+          }
+        } catch (supaErr) {
+          // Supabase table may not exist yet or connection error
         }
       }
 
-      if (techsRes.status === 'fulfilled' && techsRes.value.ok) {
-        const serverTechs: Technician[] = await techsRes.value.json();
-        if (Array.isArray(serverTechs) && serverTechs.length > 0) {
-          if (JSON.stringify(serverTechs) !== JSON.stringify(this.technicians)) {
-            this.technicians = serverTechs;
-            changed = true;
-          }
-        }
-      }
+      // 2. Local REST API Sync (when running Vite dev server or local backend tunnel)
+      try {
+        const [ticketsRes, techsRes, deptsRes] = await Promise.allSettled([
+          fetch('/api/tickets', { cache: 'no-store' }),
+          fetch('/api/technicians', { cache: 'no-store' }),
+          fetch('/api/departments', { cache: 'no-store' })
+        ]);
 
-      if (deptsRes.status === 'fulfilled' && deptsRes.value.ok) {
-        const serverDepts: Department[] = await deptsRes.value.json();
-        if (Array.isArray(serverDepts) && serverDepts.length > 0) {
-          if (JSON.stringify(serverDepts) !== JSON.stringify(this.departments)) {
-            this.departments = serverDepts;
-            changed = true;
+        if (ticketsRes.status === 'fulfilled' && ticketsRes.value.ok) {
+          const serverTickets: Ticket[] = await ticketsRes.value.json();
+          if (Array.isArray(serverTickets)) {
+            if (JSON.stringify(serverTickets) !== JSON.stringify(this.tickets)) {
+              this.tickets = serverTickets;
+              changed = true;
+            }
           }
         }
-      }
+
+        if (techsRes.status === 'fulfilled' && techsRes.value.ok) {
+          const serverTechs: Technician[] = await techsRes.value.json();
+          if (Array.isArray(serverTechs) && serverTechs.length > 0) {
+            if (JSON.stringify(serverTechs) !== JSON.stringify(this.technicians)) {
+              this.technicians = serverTechs;
+              changed = true;
+            }
+          }
+        }
+
+        if (deptsRes.status === 'fulfilled' && deptsRes.value.ok) {
+          const serverDepts: Department[] = await deptsRes.value.json();
+          if (Array.isArray(serverDepts) && serverDepts.length > 0) {
+            if (JSON.stringify(serverDepts) !== JSON.stringify(this.departments)) {
+              this.departments = serverDepts;
+              changed = true;
+            }
+          }
+        }
+      } catch {}
 
       if (changed || !this.isInitialSyncDone) {
         this.isInitialSyncDone = true;
@@ -211,6 +340,29 @@ class TicketService {
   }
 
   public async addTechnician(tech: { name: string; role?: string; phone?: string; avatarUrl?: string }): Promise<Technician[]> {
+    const newTech: Technician = {
+      id: 'tech-' + Date.now(),
+      name: tech.name.trim(),
+      role: tech.role?.trim() || 'ช่างซ่อมบำรุง',
+      status: 'active',
+      phone: tech.phone?.trim() || '',
+      avatarUrl: tech.avatarUrl || '',
+      isOnDutyToday: true
+    };
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('technicians').insert([{
+          name: newTech.name,
+          role: newTech.role,
+          status: newTech.status,
+          phone: newTech.phone,
+          avatar_url: newTech.avatarUrl,
+          is_on_duty_today: newTech.isOnDutyToday
+        }]);
+      } catch (e) {}
+    }
+
     try {
       const res = await fetch('/api/technicians', {
         method: 'POST',
@@ -226,19 +378,8 @@ class TicketService {
           return [...this.technicians];
         }
       }
-    } catch (e) {
-      console.warn('[TicketService] API addTechnician error, updating local:', e);
-    }
+    } catch (e) {}
 
-    const newTech: Technician = {
-      id: 'tech-' + Date.now(),
-      name: tech.name.trim(),
-      role: tech.role?.trim() || 'ช่างซ่อมบำรุง',
-      status: 'active',
-      phone: tech.phone?.trim() || '',
-      avatarUrl: tech.avatarUrl || '',
-      isOnDutyToday: true
-    };
     this.technicians.push(newTech);
     this.saveToLocalStorage();
     this.notify();
@@ -248,6 +389,19 @@ class TicketService {
   public async updateTechnician(idOrName: string, updates: Partial<Technician>): Promise<Technician[]> {
     const item = this.technicians.find(t => t.id === idOrName || t.name === idOrName);
     const targetId = item ? item.id : idOrName;
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const row: any = {};
+        if (updates.name) row.name = updates.name;
+        if (updates.role) row.role = updates.role;
+        if (updates.status) row.status = updates.status;
+        if (updates.phone !== undefined) row.phone = updates.phone;
+        if (updates.avatarUrl !== undefined) row.avatar_url = updates.avatarUrl;
+        if (updates.isOnDutyToday !== undefined) row.is_on_duty_today = updates.isOnDutyToday;
+        await supabase.from('technicians').update(row).or(`id.eq.${targetId},name.eq.${targetId}`);
+      } catch (e) {}
+    }
 
     try {
       const res = await fetch(`/api/technicians/${encodeURIComponent(targetId)}`, {
@@ -262,9 +416,7 @@ class TicketService {
         this.notify();
         return [...this.technicians];
       }
-    } catch (e) {
-      console.warn('[TicketService] API updateTechnician error, updating local:', e);
-    }
+    } catch (e) {}
 
     if (item) {
       Object.assign(item, updates);
@@ -277,6 +429,12 @@ class TicketService {
   public async deleteTechnician(idOrName: string): Promise<Technician[]> {
     const item = this.technicians.find(t => t.id === idOrName || t.name === idOrName);
     const targetId = item ? item.id : idOrName;
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('technicians').delete().or(`id.eq.${targetId},name.eq.${targetId}`);
+      } catch (e) {}
+    }
 
     try {
       await fetch(`/api/technicians/${encodeURIComponent(targetId)}`, { method: 'DELETE' });
@@ -296,6 +454,15 @@ class TicketService {
     const item = this.technicians.find(t => t.id === idOrName || t.name === idOrName);
     const id = item ? item.id : idOrName;
 
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase
+          .from('technicians')
+          .update({ is_on_duty_today: isOnDuty })
+          .or(`id.eq.${id},name.eq.${id}`);
+      } catch (e) {}
+    }
+
     try {
       await fetch('/api/technicians/duty', {
         method: 'POST',
@@ -313,6 +480,14 @@ class TicketService {
   }
 
   public async bulkSetDuty(dutyMap: Record<string, boolean>): Promise<Technician[]> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        for (const [key, val] of Object.entries(dutyMap)) {
+          await supabase.from('technicians').update({ is_on_duty_today: val }).or(`id.eq.${key},name.eq.${key}`);
+        }
+      } catch (e) {}
+    }
+
     try {
       await fetch('/api/technicians/duty', {
         method: 'POST',
@@ -433,36 +608,50 @@ class TicketService {
   }
 
   public async createTicket(ticket: Omit<Ticket, 'id' | 'requestId' | 'createdAt' | 'updatedAt'>): Promise<Ticket> {
-    try {
-      const res = await fetch('/api/tickets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ticket)
-      });
-      if (res.ok) {
-        const created: Ticket = await res.json();
-        this.tickets.unshift(created);
-        this.saveToLocalStorage();
-        this.notify();
-        return created;
-      }
-    } catch (e) {
-      console.warn('[TicketService] API create failed, using local:', e);
-    }
-
-    // Fallback if server unreachable
     const nowIso = new Date().toISOString();
     const count = this.tickets.length + 1;
     const yearMonth = nowIso.slice(0, 7).replace('-', '');
     const newId = 'REP-' + yearMonth + '-' + String(count).padStart(3, '0');
 
-    const created: Ticket = {
+    let created: Ticket = {
       ...ticket,
-      id: 'ticket-' + Date.now(),
+      id: 'ticket-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
       requestId: newId,
       createdAt: nowIso,
       updatedAt: nowIso
     };
+
+    // 1. Try Supabase
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const dbRow = ticketToDb(created);
+        const { data, error } = await supabase
+          .from('repair_tickets')
+          .insert([dbRow])
+          .select()
+          .single();
+        if (!error && data) {
+          created = dbToTicket(data);
+        }
+      } catch (e) {
+        console.warn('[TicketService] Supabase insert fallback:', e);
+      }
+    }
+
+    // 2. Try REST API
+    try {
+      const res = await fetch('/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(created)
+      });
+      if (res.ok) {
+        const serverTicket: Ticket = await res.json();
+        created = serverTicket;
+      }
+    } catch (e) {
+      // Offline fallback
+    }
 
     this.tickets.unshift(created);
     this.saveToLocalStorage();
@@ -471,6 +660,20 @@ class TicketService {
   }
 
   public async updateTicket(id: string, updates: Partial<Ticket>): Promise<Ticket | null> {
+    // 1. Try Supabase
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const dbUpdates = ticketToDb(updates);
+        await supabase
+          .from('repair_tickets')
+          .update(dbUpdates)
+          .or(`id.eq.${id},request_id.eq.${id}`);
+      } catch (e) {
+        console.warn('[TicketService] Supabase update fallback:', e);
+      }
+    }
+
+    // 2. Try REST API
     try {
       const res = await fetch(`/api/tickets/${encodeURIComponent(id)}`, {
         method: 'PUT',
@@ -487,9 +690,7 @@ class TicketService {
         this.notify();
         return updated;
       }
-    } catch (e) {
-      console.warn('[TicketService] API update failed, using local:', e);
-    }
+    } catch (e) {}
 
     const item = this.tickets.find(t => t.id === id || t.requestId === id);
     if (!item) return null;
@@ -505,6 +706,15 @@ class TicketService {
   }
 
   public async deleteTicket(id: string): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase
+          .from('repair_tickets')
+          .delete()
+          .or(`id.eq.${id},request_id.eq.${id}`);
+      } catch (e) {}
+    }
+
     try {
       await fetch(`/api/tickets/${encodeURIComponent(id)}`, { method: 'DELETE' });
     } catch (e) {}
@@ -515,6 +725,12 @@ class TicketService {
   }
 
   public async clearAllTickets(): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('repair_tickets').delete().neq('request_id', '');
+      } catch (e) {}
+    }
+
     try {
       await fetch('/api/tickets/clear-all', { method: 'POST' });
     } catch (e) {}
@@ -533,6 +749,13 @@ class TicketService {
     this.saveToLocalStorage();
     this.notify();
 
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const rows = imported.map(ticketToDb);
+        await supabase.from('repair_tickets').upsert(rows, { onConflict: 'request_id' });
+      } catch (e) {}
+    }
+
     for (const t of imported) {
       try {
         await fetch('/api/tickets', {
@@ -548,6 +771,11 @@ class TicketService {
     this.tickets = [];
     this.saveToLocalStorage();
     this.notify();
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('repair_tickets').delete().neq('request_id', '');
+      } catch (e) {}
+    }
     try {
       await fetch('/api/tickets/clear-all', { method: 'POST' });
     } catch {}

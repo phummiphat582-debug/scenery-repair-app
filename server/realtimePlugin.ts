@@ -205,16 +205,22 @@ export function realtimeApiPlugin(): Plugin {
     }
   }
 
-  // Periodic keepalive ping to prevent Cloudflare/NAT disconnects
-  setInterval(() => {
-    for (const client of sseClients) {
-      try {
-        client.write(': keepalive\n\n');
-      } catch {
-        sseClients.delete(client);
+  let keepaliveTimer: any = null;
+  function startKeepalive() {
+    if (keepaliveTimer) return;
+    keepaliveTimer = setInterval(() => {
+      for (const client of sseClients) {
+        try {
+          client.write(': keepalive\n\n');
+        } catch {
+          sseClients.delete(client);
+        }
       }
+    }, 15000);
+    if (keepaliveTimer && typeof keepaliveTimer.unref === 'function') {
+      keepaliveTimer.unref();
     }
-  }, 15000);
+  }
 
   function readBody(req: IncomingMessage): Promise<any> {
     return new Promise((resolve) => {
@@ -447,10 +453,12 @@ export function realtimeApiPlugin(): Plugin {
   return {
     name: 'realtime-api-plugin',
     configureServer(server: ViteDevServer) {
+      startKeepalive();
       server.middlewares.use(handleApi);
       console.log('⚡ [RealtimeServer] Real-time Sync & REST API ready on /api/* (SSE on /api/realtime)');
     },
     configurePreviewServer(server: PreviewServer) {
+      startKeepalive();
       server.middlewares.use(handleApi);
       console.log('⚡ [RealtimeServer] Real-time Sync (Preview) ready on /api/* (SSE on /api/realtime)');
     }
