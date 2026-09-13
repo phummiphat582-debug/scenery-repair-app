@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- SCENERY VINTAGE FARM - COMPLETE DATABASE SETUP & MIGRATION SCRIPT
--- Copy all and paste into: https://supabase.com/dashboard/project/hrglhnddjbxxmlhbeysm/sql/new
+-- Copy all and paste into: https://supabase.com/dashboard/project/rimwhvvashgcaepyavjq/sql/new
 -- ==============================================================================
 
 -- Enable UUID extension
