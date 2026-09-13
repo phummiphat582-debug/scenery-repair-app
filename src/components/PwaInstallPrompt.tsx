@@ -97,7 +97,7 @@ export const PwaInstallPrompt: React.FC = () => {
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-2xl bg-teal-600/30 border border-teal-400/40 flex items-center justify-center p-2 shrink-0">
-                  <img src="./logo.png" alt="Logo" className="w-full h-full object-contain" />
+                  <img src="./app-icon-512.png" alt="โลโก้ Scenery Farm" className="w-full h-full object-contain" />
                 </div>
                 <div>
                   <h4 className="font-bold text-sm text-white flex items-center gap-1.5">
@@ -231,7 +231,7 @@ export const PwaInstallButton: React.FC<{ className?: string }> = ({ className =
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-teal-50 border border-teal-200 p-1 flex items-center justify-center">
-                  <img src="./logo.png" alt="Logo" className="w-full h-full object-contain" />
+                  <img src="./app-icon-512.png" alt="โลโก้ Scenery Farm" className="w-full h-full object-contain" />
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900 text-sm">ติดตั้งแอปแจ้งซ่อม</h4>

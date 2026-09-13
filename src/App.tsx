@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
 import { DashboardOverview } from './components/DashboardOverview';
-import { TechnicianTasksView } from './components/TechnicianTasksView';
 import { NewTicketForm } from './components/NewTicketForm';
 import { AllRequestsView } from './components/AllRequestsView';
 import { SettingsView } from './components/SettingsView';
@@ -269,18 +268,6 @@ export const App: React.FC = () => {
                   />
                 )}
 
-                {currentTab === 'technician' && (
-                  <TechnicianTasksView
-                    tickets={tickets}
-                    technicians={technicians}
-                    onSelectTicket={handleSelectTicket}
-                    onUpdateTicketStatus={handleUpdateTicket}
-                    onOpenFarmMap={() => setIsFarmMapModalOpen(true)}
-                    onOpenSOSModal={() => setIsSOSModalOpen(true)}
-                    onOpenPartsModal={handleOpenPartsModal}
-                  />
-                )}
-
                 {currentTab === 'new-request' && (
                   <NewTicketForm
                     departments={departments}
@@ -321,7 +308,6 @@ export const App: React.FC = () => {
         <Navigation
           currentTab={currentTab}
           onSelectTab={setCurrentTab}
-          technicianPendingCount={urgentCount}
         />
       )}
 

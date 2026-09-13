@@ -82,7 +82,7 @@ export interface Ticket {
   isOverdue?: boolean;
 }
 
-export type NavTab = 'dashboard' | 'technician' | 'new-request' | 'all-requests' | 'settings';
+export type NavTab = 'dashboard' | 'new-request' | 'all-requests' | 'settings';
 export type ViewMode = 'table' | 'queue' | 'department_board' | 'dashboard';
 export type SortOrder = 'fifo' | 'lifo' | 'priority';
 export type UserRole = 'requester' | 'technician';

@@ -1,14 +1,14 @@
-const CACHE_NAME = 'scenery-repair-pwa-v1';
+const CACHE_NAME = 'scenery-repair-pwa-v2';
 
 // Static assets to pre-cache
 const PRECACHE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './logo.png',
-  './pwa-192x192.png',
-  './pwa-512x512.png',
-  './apple-touch-icon.png'
+  './app-icon.svg',
+  './app-icon-192.png',
+  './app-icon-512.png',
+  './app-touch-icon.png'
 ];
 
 self.addEventListener('install', (event) => {

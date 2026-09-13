@@ -31,8 +31,6 @@ export const Header: React.FC<HeaderProps> = ({
     switch (currentTab) {
       case 'dashboard':
         return 'ภาพรวมระบบ & KPIs งานซ่อม';
-      case 'technician':
-        return 'แถบงานช่าง & ดำเนินการ';
       case 'new-request':
         return 'เปิดใบแจ้งซ่อมด่วน';
       case 'all-requests':
@@ -74,7 +72,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="h-8 w-auto object-contain shrink-0"
             src="https://lh3.googleusercontent.com/aida-public/AB6AXuC1IxlT28TMknLBnn_CM8URrQlVmuhAhlT7pP9a1Z0J8ytGp9K-u-1njZpLNCYTgDoAlrDPRfOQkK_wee2w6D--19Ds8SOq3Geg_8uH6h_BhNqSAp6QJruTazwYnsk7aI9TX5TlgwX4_mtvmJTRivWlTB0pd-8ILwqE-sFXt6M7taWEcbwXEC_SfbhtQHlHkG0jRPxDapK2uw-bTp6gXA6am_fEG31V0jpYEKCn103FYAScQr7eEcwAKw"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = '/logo.png';
+              (e.target as HTMLImageElement).src = './app-icon-512.png';
             }}
           />
 

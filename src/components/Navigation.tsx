@@ -4,13 +4,11 @@ import { NavTab } from '../types';
 interface NavigationProps {
   currentTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
-  technicianPendingCount?: number;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
   currentTab,
-  onSelectTab,
-  technicianPendingCount = 1
+  onSelectTab
 }) => {
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-2px_12px_rgba(13,28,46,0.06)] border-t border-slate-200/50">
@@ -33,29 +31,6 @@ export const Navigation: React.FC<NavigationProps> = ({
           <span className="font-label-sm text-label-sm mt-0.5 text-center leading-tight truncate max-w-[64px]">
             ภาพรวม
           </span>
-        </button>
-
-        {/* งานช่าง */}
-        <button
-          onClick={() => onSelectTab('technician')}
-          className={`flex flex-col items-center justify-center min-w-[56px] min-h-[48px] py-1 px-1 transition-all relative cursor-pointer ${
-            currentTab === 'technician'
-              ? 'text-primary-container font-bold scale-105'
-              : 'text-on-surface-variant hover:text-primary'
-          }`}
-        >
-          <span
-            className="material-symbols-outlined text-[24px]"
-            style={{ fontVariationSettings: currentTab === 'technician' ? "'FILL' 1" : "'FILL' 0" }}
-          >
-            build
-          </span>
-          <span className="font-label-sm text-label-sm mt-0.5 text-center leading-tight truncate max-w-[64px]">
-            งานช่าง
-          </span>
-          {technicianPendingCount > 0 && (
-            <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full bg-secondary-container animate-pulse"></span>
-          )}
         </button>
 
         {/* แจ้งซ่อม (Floating center circle button) */}
