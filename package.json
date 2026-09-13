@@ -11,8 +11,10 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@types/pg": "^8.23.1",
     "canvas-confetti": "^1.9.4",
     "lucide-react": "^1.44.0",
+    "pg": "^8.23.0",
     "puppeteer-core": "^25.10.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

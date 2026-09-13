@@ -131,7 +131,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
               className="self-start sm:self-auto px-4 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 border border-white/25 shadow-sm cursor-pointer active:scale-95"
             >
               <Shield className="w-4 h-4 text-secondary-fixed" />
-              <span>หน้าระบบช่างรับงาน (PIN 1234) 🛠️</span>
+              <span>หน้าระบบช่างรับงาน 🛠️</span>
             </button>
             <span className="text-[11px] text-primary-fixed/80">
               *หน้ารับงานของทีมช่างแยกอยู่อีกส่วน

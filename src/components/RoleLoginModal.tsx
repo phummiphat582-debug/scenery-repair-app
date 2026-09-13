@@ -85,7 +85,7 @@ export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
         <div className="p-6 flex flex-col items-center gap-4">
           <div className="flex flex-col items-center gap-1">
             <span className="text-xs font-semibold text-on-surface-variant">
-              กรอกรหัส PIN ช่าง (รหัสเริ่มต้น: <strong className="text-primary font-mono">1234</strong>)
+              กรอกรหัส PIN ช่าง 4 หลักเพื่อเข้าสู่ระบบ
             </span>
             
             {/* PIN Dots */}
@@ -107,7 +107,7 @@ export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
 
             {error && (
               <span className="text-xs text-error font-semibold animate-shake">
-                รหัส PIN ไม่ถูกต้อง (ลองใช้ 1234)
+                รหัส PIN ไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง
               </span>
             )}
           </div>
