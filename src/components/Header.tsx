@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavTab, UserRole } from '../types';
+import { PwaInstallButton } from './PwaInstallPrompt';
 
 interface HeaderProps {
   currentTab: NavTab;
@@ -127,6 +128,7 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Side Icons */}
         <div className="flex items-center gap-2 shrink-0">
+          <PwaInstallButton />
           
           {/* Mobile Switch Button */}
           <button

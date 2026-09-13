@@ -18,6 +18,7 @@ import { SOSModal } from './components/SOSModal';
 import { PartsModal } from './components/PartsModal';
 import { QRScannerModal } from './components/QRScannerModal';
 import { Toast } from './components/Toast';
+import { PwaInstallPrompt } from './components/PwaInstallPrompt';
 import { ticketService } from './services/ticketService';
 import { Ticket, Department, Technician, NavTab, UserRole } from './types';
 import confetti from 'canvas-confetti';
@@ -417,6 +418,9 @@ export const App: React.FC = () => {
           onClose={() => setToast(null)}
         />
       )}
+
+      {/* PWA Installation Floating Banner & Helper */}
+      <PwaInstallPrompt />
 
     </div>
   );
