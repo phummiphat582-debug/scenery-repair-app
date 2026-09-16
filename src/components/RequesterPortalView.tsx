@@ -3,7 +3,7 @@ import { Ticket, Department, Technician } from '../types';
 import { NewTicketForm } from './NewTicketForm';
 import { DailyDutyModal } from './DailyDutyModal';
 import { ConfirmModal } from './ConfirmModal';
-import { Phone, Search, Wrench, Clock, CheckCircle2, ChevronRight, User, MapPin, Plus, Shield, CalendarCheck, AlertTriangle } from 'lucide-react';
+import { Phone, Search, Wrench, Clock, CheckCircle2, ChevronRight, User, MapPin, Plus, Shield, CalendarCheck, AlertTriangle, ListOrdered, ClipboardList } from 'lucide-react';
 
 interface RequesterPortalViewProps {
   tickets: Ticket[];
@@ -26,7 +26,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
   onSwitchToTechnician,
   onDataChanged
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'create' | 'track'>('create');
+  const [activeSubTab, setActiveSubTab] = useState<'create' | 'queue' | 'track'>('create');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('all');
@@ -61,6 +61,48 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       return true;
     });
   }, [tickets, searchQuery, filterStatus, selectedDeptFilter]);
+
+  const departmentQueues = useMemo(() => {
+    const activeTickets = tickets
+      .filter(t => t.status !== 'completed' && t.status !== 'cancelled')
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+    return departments.map(department => ({
+      department,
+      tickets: activeTickets.filter(ticket => ticket.department === department.name)
+    }));
+  }, [tickets, departments]);
+
+  const departmentQueueNumbers = useMemo(() => {
+    const counters = new Map<string, number>();
+    const numbers = new Map<string, number>();
+    [...tickets]
+      .filter(t => t.status !== 'completed' && t.status !== 'cancelled')
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .forEach(ticket => {
+        const next = (counters.get(ticket.department) || 0) + 1;
+        counters.set(ticket.department, next);
+        numbers.set(ticket.id, next);
+      });
+    return numbers;
+  }, [tickets]);
+
+  const statusFlow = [
+    { key: 'pending', label: 'รอรับงาน' },
+    { key: 'assigned', label: 'รับงานแล้ว' },
+    { key: 'in_progress', label: 'กำลังซ่อม' },
+    { key: 'waiting_inspect', label: 'รอตรวจรับ' },
+    { key: 'completed', label: 'เสร็จสิ้น' }
+  ];
+
+  const statusStepIndex = (status: string) => {
+    if (status === 'waiting_parts') return 2;
+    if (status === 'waiting_inspect') return 3;
+    if (status === 'completed') return 4;
+    if (status === 'in_progress') return 2;
+    if (status === 'assigned') return 1;
+    return 0;
+  };
 
   const statusLabel = (status: string) => {
     switch (status) {
@@ -227,8 +269,8 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
         )}
       </div>
 
-      {/* 3. Top Segmented Tabs: [📝 แจ้งซ่อมใหม่] vs [📋 ติดตามงานของฉัน] */}
-      <div className="flex bg-surface-container-low p-1.5 rounded-2xl border border-slate-200 shadow-xs">
+      {/* 3. Top Segmented Tabs: create, department queues, tracking */}
+      <div className="grid grid-cols-3 gap-1.5 bg-surface-container-low p-1.5 rounded-2xl border border-slate-200 shadow-xs">
         <button
           type="button"
           onClick={() => setActiveSubTab('create')}
@@ -239,20 +281,33 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
           }`}
         >
           <Plus className="w-4 h-4" />
-          <span>แจ้งซ่อมด่วน (New Request)</span>
+          <span>แจ้งซ่อม</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('queue')}
+          className={`flex-1 py-3 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            activeSubTab === 'queue'
+              ? 'bg-primary text-white shadow-md'
+              : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+          }`}
+        >
+          <ListOrdered className="w-4 h-4" />
+          <span>คิวแต่ละแผนก</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveSubTab('track')}
-          className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          className={`flex-1 py-3 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
             activeSubTab === 'track'
               ? 'bg-primary text-white shadow-md'
               : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
           }`}
         >
           <Clock className="w-4 h-4" />
-          <span>ติดตามงานของฉัน (My Tickets)</span>
+          <span>ติดตามงาน</span>
           <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
             activeSubTab === 'track' ? 'bg-white text-primary' : 'bg-surface-container-highest text-on-surface'
           }`}>
@@ -268,6 +323,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
             departments={departments}
             onSubmit={async (ticketData) => {
               await onSubmitTicket(ticketData);
+              setSelectedDeptFilter(ticketData.department || 'all');
               setActiveSubTab('track');
             }}
             onCancel={() => setActiveSubTab('track')}
@@ -276,7 +332,85 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
         </div>
       )}
 
-      {/* 5. Sub-Tab 2: Track Tickets List */}
+      {/* 5. Sub-Tab 2: Department Queues */}
+      {activeSubTab === 'queue' && (
+        <div className="space-y-4">
+          <div className="bg-surface-container-lowest rounded-3xl border border-slate-200 p-4 sm:p-5 shadow-xs flex items-start gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-primary-fixed text-primary flex items-center justify-center shrink-0">
+              <ClipboardList className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="font-bold text-base text-on-surface">คิวงานซ่อมแยกตามแผนก</h2>
+              <p className="text-xs text-on-surface-variant mt-1">ดูงานที่กำลังรอรับงานหรือกำลังดำเนินการของแต่ละแผนกได้ทันที</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {departmentQueues.map(({ department, tickets: queueTickets }) => (
+              <div key={department.id} className="bg-surface-container-lowest rounded-3xl border border-slate-200 p-4 shadow-xs">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-9 h-9 rounded-xl flex items-center justify-center text-lg" style={{ backgroundColor: `${department.color}18` }}>
+                      {department.icon}
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-sm truncate">{department.name}</h3>
+                      <p className="text-[11px] text-on-surface-variant">คิวที่กำลังดำเนินการ</p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-primary-fixed text-primary text-xs font-extrabold shrink-0">
+                    {queueTickets.length} งาน
+                  </span>
+                </div>
+
+                {queueTickets.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs text-slate-500">
+                    ยังไม่มีงานค้างในคิวแผนกนี้
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {queueTickets.slice(0, 4).map(ticket => {
+                      const badge = statusLabel(ticket.status);
+                      return (
+                        <button
+                          key={ticket.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedDeptFilter(ticket.department);
+                            setActiveSubTab('track');
+                          }}
+                          className="w-full text-left rounded-2xl bg-surface-container-low hover:bg-surface-container p-3 transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-[11px] font-extrabold text-primary">คิว #{departmentQueueNumbers.get(ticket.id) || '-'}</span>
+                            <span className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${badge.color}`}>{badge.text}</span>
+                          </div>
+                          <p className="font-bold text-xs mt-1 line-clamp-1">{ticket.title}</p>
+                          <p className="text-[11px] text-on-surface-variant mt-0.5 line-clamp-1">{ticket.location}</p>
+                        </button>
+                      );
+                    })}
+                    {queueTickets.length > 4 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDeptFilter(department.name);
+                          setActiveSubTab('track');
+                        }}
+                        className="w-full text-center text-xs text-primary font-bold py-1 cursor-pointer"
+                      >
+                        ดูอีก {queueTickets.length - 4} งานในแผนกนี้ →
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 6. Sub-Tab 3: Track Tickets List */}
       {activeSubTab === 'track' && (
         <div className="space-y-4">
           
@@ -355,7 +489,8 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                 const assignedTech = isAssigned
                   ? technicians.find(t => t.name.toLowerCase() === ticket.technicianName?.toLowerCase())
                   : null;
-                const queueNum = ticket.queueNumber || (idx + 1);
+                const queueNum = departmentQueueNumbers.get(ticket.id) || (idx + 1);
+                const progressIndex = statusStepIndex(ticket.status);
 
                 return (
                   <div
@@ -417,6 +552,29 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                         <span className="font-medium text-primary">{ticket.department}</span>
                         <span>•</span>
                         <span>ผู้แจ้ง: {ticket.requesterName}</span>
+                      </div>
+                    </div>
+
+                    {/* Repair Progress Timeline */}
+                    <div className="rounded-2xl bg-surface-container-low p-3 border border-slate-200/60">
+                      <div className="flex items-center justify-between gap-1">
+                        {statusFlow.map((flow, flowIndex) => (
+                          <React.Fragment key={flow.key}>
+                            <div className="flex flex-col items-center gap-1 min-w-0">
+                              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-extrabold ${
+                                flowIndex <= progressIndex ? 'bg-primary text-white' : 'bg-slate-200 text-slate-500'
+                              }`}>
+                                {flowIndex < progressIndex ? '✓' : flowIndex + 1}
+                              </span>
+                              <span className={`text-[9px] text-center leading-tight ${flowIndex <= progressIndex ? 'text-primary font-bold' : 'text-slate-500'}`}>
+                                {flow.label}
+                              </span>
+                            </div>
+                            {flowIndex < statusFlow.length - 1 && (
+                              <span className={`h-1 flex-1 rounded-full mb-4 ${flowIndex < progressIndex ? 'bg-primary' : 'bg-slate-200'}`} />
+                            )}
+                          </React.Fragment>
+                        ))}
                       </div>
                     </div>
 

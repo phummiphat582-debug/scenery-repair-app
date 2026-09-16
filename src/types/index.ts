@@ -65,7 +65,6 @@ export interface Ticket {
   
   // Rich details from design system
   zone?: string;
-  machineCode?: string;
   category?: string;
   parts?: PartItem[];
   laborCost?: number;

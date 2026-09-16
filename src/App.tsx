@@ -196,7 +196,7 @@ export const App: React.FC = () => {
   // Handle QR code scan result
   const handleQRScanResult = (code: string) => {
     showToast(`สแกน QR Code สำเร็จ: ${code}`, 'info');
-    const matched = tickets.find(t => t.machineCode === code || t.location.includes(code));
+    const matched = tickets.find(t => t.location.includes(code) || t.title.includes(code));
     if (matched) {
       handleSelectTicket(matched);
     } else {

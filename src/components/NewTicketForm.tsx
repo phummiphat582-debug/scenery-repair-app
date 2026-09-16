@@ -16,15 +16,14 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
   onOpenQRScanner
 }) => {
   // Form States - Clean slate without dummy text
-  const [step, setStep] = useState<number>(2);
+  const [step, setStep] = useState<number>(1);
   const [requesterName, setRequesterName] = useState('');
   const [requesterPhone, setRequesterPhone] = useState('');
   const [department, setDepartment] = useState('คาเฟ่ & F&B');
-  const [isRequesterDrawerOpen, setIsRequesterDrawerOpen] = useState(false);
+  const [isRequesterDrawerOpen, setIsRequesterDrawerOpen] = useState(true);
 
   const [selectedZone, setSelectedZone] = useState('C');
   const [specificLocation, setSpecificLocation] = useState('');
-  const [machineCode, setMachineCode] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('hvac');
 
   const [problemDetail, setProblemDetail] = useState('');
@@ -155,12 +154,55 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
     setPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const validateRequester = () => {
+    if (!requesterName.trim()) {
+      alert('กรุณากรอกชื่อผู้แจ้ง');
+      setIsRequesterDrawerOpen(true);
+      return false;
+    }
+    if (!requesterPhone.trim()) {
+      alert('กรุณากรอกเบอร์ติดต่อของผู้แจ้ง');
+      setIsRequesterDrawerOpen(true);
+      return false;
+    }
+    if (!department.trim()) {
+      alert('กรุณาเลือกแผนกของผู้แจ้ง');
+      setIsRequesterDrawerOpen(true);
+      return false;
+    }
+    return true;
+  };
+
+  const validateDetails = () => {
+    if (!specificLocation.trim()) {
+      alert('กรุณาระบุจุด/ห้อง/ตำแหน่งที่เกิดเหตุ');
+      return false;
+    }
     if (!problemDetail.trim()) {
       alert('กรุณากรอกรายละเอียดอาการผิดปกติ');
+      return false;
+    }
+    return true;
+  };
+
+  const goToStep = (targetStep: number) => {
+    if (targetStep <= step) {
+      setStep(targetStep);
       return;
     }
+    if (targetStep >= 2 && !validateRequester()) return;
+    if (targetStep >= 3 && !validateDetails()) return;
+    setStep(Math.min(targetStep, 3));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (step < 3) {
+      goToStep(step + 1);
+      return;
+    }
+
+    if (!validateRequester() || !validateDetails()) return;
 
     const zoneObj = zones.find(z => z.key === selectedZone);
     const catObj = categories.find(c => c.key === selectedCategory);
@@ -177,7 +219,6 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
       status: 'pending',
       requestImageUrl: photos[0]?.url || '-',
       zone: zoneObj?.name,
-      machineCode: machineCode.trim() || undefined,
       category: catObj?.title
     };
 
@@ -249,7 +290,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
 
             {/* Step 1 */}
             <div
-              onClick={() => setStep(1)}
+              onClick={() => goToStep(1)}
               className="relative z-10 flex flex-col items-center gap-1 cursor-pointer"
             >
               <div className="w-7 h-7 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-label-sm text-[12px] shadow-sm">
@@ -260,7 +301,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
 
             {/* Step 2 */}
             <div
-              onClick={() => setStep(2)}
+              onClick={() => goToStep(2)}
               className="relative z-10 flex flex-col items-center gap-1 cursor-pointer"
             >
               <div className="w-7 h-7 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-label-sm text-[12px] ring-4 ring-surface-container-lowest shadow-sm font-bold">
@@ -271,7 +312,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
 
             {/* Step 3 */}
             <div
-              onClick={() => setStep(3)}
+              onClick={() => goToStep(3)}
               className="relative z-10 flex flex-col items-center gap-1 cursor-pointer"
             >
               <div className="w-7 h-7 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center font-label-sm text-[12px]">
@@ -282,6 +323,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
           </div>
         </section>
 
+        {step === 1 && (<>
         {/* Requester Profile Bar */}
         <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/40">
           <div className="flex items-center justify-between">
@@ -323,6 +365,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
                 <input
                   className="h-11 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest border border-slate-200"
                   type="text"
+                  required
                   value={requesterName}
                   onChange={(e) => setRequesterName(e.target.value)}
                 />
@@ -332,6 +375,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
                 <input
                   className="h-11 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest border border-slate-200"
                   type="tel"
+                  required
                   value={requesterPhone}
                   onChange={(e) => setRequesterPhone(e.target.value)}
                 />
@@ -351,7 +395,19 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             </div>
           )}
         </section>
+        <div className="flex justify-end pt-1">
+          <button
+            type="button"
+            onClick={() => goToStep(2)}
+            className="min-h-[48px] px-5 rounded-xl bg-primary text-white font-bold text-sm flex items-center gap-2 shadow-md cursor-pointer active:scale-95"
+          >
+            ถัดไป: รายละเอียด
+            <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
+          </button>
+        </div>
+        </>)}
 
+        {step === 2 && (<>
         {/* Zone Selection */}
         <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm border border-slate-200/40">
           <div className="flex items-center justify-between">
@@ -390,7 +446,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             })}
           </div>
 
-          {/* Specific Location & Machine ID */}
+          {/* Specific Location */}
           <div className="grid grid-cols-1 gap-space-sm mt-1">
             <div className="flex flex-col gap-1">
               <label className="font-label-sm text-label-sm text-on-surface-variant">
@@ -411,34 +467,6 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
               </div>
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="font-label-sm text-label-sm text-on-surface-variant">
-                รหัสเครื่องจักร/ครุภัณฑ์ (ถ้ามี)
-              </label>
-              <div className="relative flex items-center">
-                <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px]">
-                  qr_code_2
-                </span>
-                <input
-                  className="w-full h-12 pl-10 pr-12 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none font-mono text-[14px] border border-slate-200/50"
-                  placeholder="เช่น PUMP-01, AC-VILLA-04"
-                  type="text"
-                  value={machineCode}
-                  onChange={(e) => setMachineCode(e.target.value)}
-                />
-                <button
-                  aria-label="สแกนป้ายคิวอาร์โค้ดเครื่องจักร"
-                  className="absolute right-1 w-10 h-10 flex items-center justify-center rounded-lg bg-primary/10 text-primary active:scale-90 transition-transform cursor-pointer"
-                  onClick={() => {
-                    setMachineCode('COOL-ZONE-C-9921');
-                    alert('สแกน QR Code สำเร็จ: COOL-ZONE-C-9921');
-                  }}
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-[20px]">photo_camera</span>
-                </button>
-              </div>
-            </div>
           </div>
         </section>
 
@@ -781,9 +809,58 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             </span>
           </label>
         </section>
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => setStep(1)}
+            className="min-h-[48px] px-4 rounded-xl bg-surface-container text-primary font-bold text-sm flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+            ผู้แจ้ง
+          </button>
+          <button
+            type="button"
+            onClick={() => goToStep(3)}
+            className="min-h-[48px] px-5 rounded-xl bg-primary text-white font-bold text-sm flex items-center gap-2 shadow-md cursor-pointer active:scale-95"
+          >
+            ตรวจสอบงาน
+            <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
+          </button>
+        </div>
+        </>)}
+
+        {step === 3 && (<>
+        <section className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm border border-slate-200 flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-[24px]">fact_check</span>
+            <div>
+              <h2 className="font-headline-sm text-headline-sm text-primary font-bold">ตรวจสอบและยืนยันงาน</h2>
+              <p className="text-xs text-on-surface-variant">ตรวจข้อมูลให้ถูกต้องก่อนส่งเข้าคิวซ่อม</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+            <div className="rounded-xl bg-surface-container-low p-3"><span className="text-xs text-on-surface-variant block">ผู้แจ้ง</span><strong>{requesterName}</strong><div className="text-xs text-on-surface-variant">{requesterPhone} • {department}</div></div>
+            <div className="rounded-xl bg-surface-container-low p-3"><span className="text-xs text-on-surface-variant block">สถานที่</span><strong>{specificLocation}</strong><div className="text-xs text-on-surface-variant">{zones.find(z => z.key === selectedZone)?.name}</div></div>
+            <div className="rounded-xl bg-surface-container-low p-3 sm:col-span-2"><span className="text-xs text-on-surface-variant block">รายละเอียดอาการ</span><strong className="whitespace-pre-wrap">{problemDetail}</strong></div>
+            <div className="rounded-xl bg-surface-container-low p-3"><span className="text-xs text-on-surface-variant block">ประเภทงาน</span><strong>{categories.find(c => c.key === selectedCategory)?.title}</strong></div>
+            <div className="rounded-xl bg-surface-container-low p-3"><span className="text-xs text-on-surface-variant block">ความเร่งด่วน</span><strong>{priority === 'critical' ? 'ด่วนที่สุด / ฉุกเฉิน' : priority === 'high' ? 'ด่วน' : 'ปกติ'}</strong></div>
+          </div>
+          <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800">
+            <span className="material-symbols-outlined text-[18px]">info</span>
+            เมื่อยืนยัน ระบบจะออกเลขที่ใบแจ้งและจัดคิวให้แผนกที่เลือกทันที
+          </div>
+        </section>
 
         {/* Form Action Footer */}
         <section className="flex flex-col gap-2.5 pt-2">
+          <button
+            type="button"
+            onClick={() => setStep(2)}
+            className="min-h-[48px] w-full rounded-xl bg-surface-container text-primary font-bold text-sm flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+          >
+            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+            กลับไปแก้ไขรายละเอียด
+          </button>
           <button
             id="submitBtn"
             type="submit"
@@ -816,6 +893,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             เมื่อส่งคำขอ ศูนย์ซ่อมบำรุง Scenery Farm จะได้รับงานและจ่ายช่างทันที
           </p>
         </section>
+        </>)}
       </form>
 
       {/* Success Toast Modal */}
