@@ -18,7 +18,9 @@ import { PartsModal } from './components/PartsModal';
 import { QRScannerModal } from './components/QRScannerModal';
 import { Toast } from './components/Toast';
 import { PwaInstallPrompt } from './components/PwaInstallPrompt';
+import { TechnicianPushPrompt } from './components/TechnicianPushPrompt';
 import { ticketService } from './services/ticketService';
+import { oneSignalService } from './services/oneSignalService';
 import { Ticket, Department, Technician, NavTab, UserRole } from './types';
 import confetti from 'canvas-confetti';
 
@@ -117,12 +119,14 @@ export const App: React.FC = () => {
     setIsRoleLoginOpen(false);
     setUserRole('technician');
     localStorage.setItem('scenery_user_role', 'technician');
+    void oneSignalService.setTechnicianRole(true);
     showToast('เข้าสู่ระบบหลังบ้าน / ทีมช่าง เรียบร้อย 🛠️', 'success');
   };
 
   const handleSwitchToRequester = () => {
     setUserRole('requester');
     localStorage.setItem('scenery_user_role', 'requester');
+    void oneSignalService.setTechnicianRole(false);
     showToast('สลับไปยังหน้าผู้แจ้งซ่อม เรียบร้อย 👤', 'info');
   };
 
@@ -164,6 +168,7 @@ export const App: React.FC = () => {
   // Handle create ticket from NewTicketForm
   const handleCreateTicket = async (ticketData: any) => {
     const created = await ticketService.createTicket(ticketData);
+    void oneSignalService.notifyTechnicians(created);
     confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
     showToast(`ส่งใบแจ้งซ่อม #${created.requestId} สำเร็จ!`);
     await loadData();
@@ -238,6 +243,7 @@ export const App: React.FC = () => {
           </div>
         ) : (
           <>
+            {userRole === 'technician' && <TechnicianPushPrompt />}
             {/* ROLE 1: REQUESTER (1 Clean Page dedicated for general staff) */}
             {userRole === 'requester' && (
               <RequesterPortalView

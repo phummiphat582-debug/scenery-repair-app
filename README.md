@@ -99,3 +99,20 @@ bun run dev
    VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
    ```
 5. รีสตาร์ทหรือรีเฟรชหน้าเว็บ ระบบจะเชื่อมต่อกับ Supabase ทันที!
+
+## 🔔 ตั้งค่าแจ้งเตือนงานใหม่ให้ทีมช่างด้วย OneSignal
+
+ระบบรองรับ Web Push สำหรับทีมช่าง โดยผู้ใช้โหมดช่างต้องกด “เปิดแจ้งเตือน” บนอุปกรณ์ของตัวเองก่อน ระบบจะติด tag `scenery_role=technician` และส่งเฉพาะกลุ่มนี้
+
+1. สร้าง Web Push App ใน OneSignal แล้วนำ App ID ไปตั้งเป็น GitHub Actions secret ชื่อ `VITE_ONESIGNAL_APP_ID`
+2. ตรวจสอบว่าไฟล์ `public/onesignal/OneSignalSDKWorker.js` ถูก deploy และตั้ง path ใน OneSignal เป็น `onesignal/`
+3. Deploy Supabase Edge Function:
+   ```bash
+   supabase functions deploy notify-technicians --project-ref rimwhvvashgcaepyavjq
+   ```
+4. ตั้งค่า secrets ให้ Function:
+   ```bash
+   supabase secrets set ONESIGNAL_APP_ID=... ONESIGNAL_REST_API_KEY=... APP_URL=https://phummiphat582-debug.github.io/scenery-repair-app/
+   ```
+
+REST API Key ต้องอยู่ใน Supabase secrets เท่านั้น ห้ามใส่ในไฟล์หน้าเว็บหรือ commit ลง GitHub
