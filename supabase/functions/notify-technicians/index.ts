@@ -15,7 +15,10 @@ Deno.serve(async (request) => {
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   const oneSignalAppId = Deno.env.get('ONESIGNAL_APP_ID');
-  const oneSignalRestApiKey = Deno.env.get('ONESIGNAL_REST_API_KEY');
+  // Accept the canonical secret name, with a compatibility fallback for the
+  // existing secret that was accidentally named with the App ID.
+  const oneSignalRestApiKey = Deno.env.get('ONESIGNAL_REST_API_KEY')
+    || (oneSignalAppId ? Deno.env.get(oneSignalAppId) : undefined);
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
