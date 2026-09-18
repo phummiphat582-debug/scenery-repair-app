@@ -46,9 +46,12 @@ export const oneSignalService = {
 
       window.OneSignalDeferred.push(async (oneSignal) => {
         try {
-          const basePath = new URL('.', document.baseURI).pathname;
-          const workerDirectory = `${basePath.replace(/\/$/, '')}/onesignal/`;
-          const workerPath = `${workerDirectory}OneSignalSDKWorker.js`.replace(/^\//, '');
+          // GitHub Pages hosts this app below an origin subpath. Use absolute
+          // same-origin URLs so the SDK does not resolve the worker twice
+          // relative to the current document URL.
+          const basePath = new URL('.', document.baseURI).pathname.replace(/\/$/, '');
+          const workerDirectory = `${basePath}/onesignal/`;
+          const workerPath = `${workerDirectory}OneSignalSDKWorker.js`;
 
           await oneSignal.init({
             appId,
