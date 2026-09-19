@@ -28,6 +28,10 @@ const isConfigured = appIdPattern.test(appId);
 const TECHNICIAN_TAG = 'scenery_role';
 let oneSignalPromise: Promise<OneSignalInstance | null> | null = null;
 
+const getNotificationPermission = (): NotificationPermission => (
+  typeof Notification === 'undefined' ? 'default' : Notification.permission
+);
+
 export const oneSignalService = {
   isConfigured,
 
@@ -41,6 +45,9 @@ export const oneSignalService = {
       const finish = (instance: OneSignalInstance | null) => {
         if (settled) return;
         settled = true;
+        // Do not permanently cache a failed initialization. On slower mobile
+        // connections the SDK script may finish loading after the first try.
+        if (!instance) oneSignalPromise = null;
         resolve(instance);
       };
 
@@ -72,8 +79,12 @@ export const oneSignalService = {
   },
 
   async enableTechnicianNotifications(): Promise<'enabled' | 'denied' | 'unavailable'> {
+    if (getNotificationPermission() === 'denied') return 'denied';
+
     const oneSignal = await this.getInstance();
-    if (!oneSignal) return 'unavailable';
+    if (!oneSignal) {
+      return getNotificationPermission() === 'denied' ? 'denied' : 'unavailable';
+    }
 
     try {
       await oneSignal.User.addTag(TECHNICIAN_TAG, 'technician');
@@ -81,7 +92,7 @@ export const oneSignalService = {
       return permission ? 'enabled' : 'denied';
     } catch (error) {
       console.warn('[OneSignal] permission request failed:', error);
-      return 'unavailable';
+      return getNotificationPermission() === 'denied' ? 'denied' : 'unavailable';
     }
   },
 
