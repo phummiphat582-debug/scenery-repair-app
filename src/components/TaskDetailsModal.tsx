@@ -23,7 +23,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   if (!isOpen || !ticket) return null;
 
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [currentTechName, setCurrentTechName] = useState(ticket.technicianName || 'ช่างอนุรักษ์ ยอดช่าง');
+  const [currentTechName, setCurrentTechName] = useState(ticket.technicianName || '');
   const [currentTechPhone, setCurrentTechPhone] = useState(
     ticket.technicianPhone || technicians.find(t => t.name === (ticket.technicianName || ''))?.phone || ''
   );
@@ -39,6 +39,9 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   } | null>(null);
 
   const isEmergency = ticket.priority === 'critical' || ticket.priority === 'high';
+  const requestImageUrl = ticket.requestImageUrl && ticket.requestImageUrl !== '-'
+    ? ticket.requestImageUrl
+    : '';
 
   // Step mapping
   const steps = [
@@ -158,15 +161,15 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
           </div>
 
           {/* Horizontal Workflow Stepper */}
-          <div className="py-3 bg-surface-container-low rounded-xl overflow-x-auto no-scrollbar shadow-inner border border-slate-200/40">
-            <div className="flex items-center gap-2 px-gutter min-w-max">
+          <div className="py-4 bg-surface-container-low rounded-xl overflow-x-auto no-scrollbar shadow-inner border border-slate-200/40">
+            <div className="flex items-center gap-2.5 px-gutter min-w-max">
               {steps.map((s, idx) => {
                 const isPassed = idx < currentStepIndex;
                 const isActive = idx === currentStepIndex;
                 return (
                   <React.Fragment key={s.id}>
                     <div
-                      className={`flex items-center gap-1.5 py-1.5 px-3 rounded-full text-label-sm font-label-sm shadow-sm transition-all ${
+                      className={`flex items-center gap-1.5 py-2 px-3.5 rounded-full text-xs sm:text-sm font-semibold shadow-sm transition-all ${
                         isActive
                           ? 'bg-primary text-on-primary font-bold shadow-md'
                           : isPassed
@@ -175,22 +178,22 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                       }`}
                     >
                       {isActive ? (
-                        <span className="material-symbols-outlined text-[16px] animate-spin">autorenew</span>
+                        <span className="material-symbols-outlined text-[18px] animate-spin">autorenew</span>
                       ) : isPassed ? (
                         <span
-                          className="material-symbols-outlined text-[16px] text-primary"
+                          className="material-symbols-outlined text-[18px] text-primary"
                           style={{ fontVariationSettings: "'FILL' 1" }}
                         >
                           check_circle
                         </span>
                       ) : (
-                        <span className="w-2 h-2 rounded-full bg-outline"></span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-outline"></span>
                       )}
                       <span>{s.label}</span>
                     </div>
                     {idx < steps.length - 1 && (
                       <div
-                        className={`w-3 h-0.5 ${isPassed ? 'bg-primary' : 'bg-outline-variant'}`}
+                        className={`w-4 h-0.5 ${isPassed ? 'bg-primary' : 'bg-outline-variant'}`}
                       ></div>
                     )}
                   </React.Fragment>
@@ -234,41 +237,27 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
             <div className="flex items-center justify-between">
               <span className="font-label-lg text-label-lg text-on-surface flex items-center gap-2 font-bold">
                 <span className="material-symbols-outlined text-[20px] text-primary">photo_library</span>
-                ภาพถ่ายจุดเกิดเหตุ (2 รูป)
+                {requestImageUrl ? 'ภาพที่ผู้แจ้งแนบ' : 'ยังไม่มีภาพที่ผู้แจ้งแนบ'}
               </span>
               <span className="font-label-sm text-label-sm text-on-surface-variant">บันทึกตอนแจ้งงาน</span>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            {requestImageUrl ? (
               <div className="relative rounded-lg overflow-hidden bg-surface-container shadow-sm group">
                 <img
-                  alt="น้ำแข็งเกาะวาล์วทำความเย็น"
-                  className="w-full h-36 object-cover transition-transform duration-300 group-hover:scale-105"
-                  src={
-                    ticket.requestImageUrl && ticket.requestImageUrl !== '-'
-                      ? ticket.requestImageUrl
-                      : 'https://lh3.googleusercontent.com/aida-public/AB6AXuAEYiG8Cbg4XUfTwm9t20T-7owpqHpv8_O6FsZcKoX7atFIxMqIVe7eaHQLGqpDoHDVPc6KCvE575MEZBB1ZLQJybn9W4BF462XmrtszbIACSzv6jKECBdu4pDa7RSqi2fek1eNksfsHzTSlNsmzkgJ6zKf99fHAZ4gbxV_F9crwT-XMWeJ562c7hCPu-_AHPr6xIr-Nfcvjm7G-44IEpN56ke5VOTohwpfhQdo0yFaIEya0F2VcCkiog'
-                  }
+                  alt="ภาพที่ผู้แจ้งแนบ"
+                  className="w-full max-h-72 object-contain bg-surface-container transition-transform duration-300 group-hover:scale-105"
+                  src={requestImageUrl}
                 />
                 <div className="absolute bottom-0 inset-x-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
-                  <p className="font-label-sm text-label-sm text-white font-medium truncate">
-                    1. น้ำแข็งเกาะหนาวาล์ว
-                  </p>
+                  <p className="font-label-sm text-label-sm text-white font-medium truncate">ภาพที่แนบมากับใบแจ้งงาน</p>
                 </div>
               </div>
-
-              <div className="relative rounded-lg overflow-hidden bg-surface-container shadow-sm group">
-                <img
-                  alt="รอยต่อท่อส่งน้ำยาแอร์"
-                  className="w-full h-36 object-cover transition-transform duration-300 group-hover:scale-105"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYt9Sr6Fxgn2bgr64TwGr7KobPvE64qoD94ZcGD7aCMOdkNgkQFblZXy3DzW9emEEkWnn8eVw0H-wmZxNljjv3PDxrUEjd7KyMN6-DW33pkih9u9j9P3lHz2ShgqPXYt5yx4aKHBaH_qX2TgRhOZ3edsqjwMfju-Zsr3CVGDYYySw5VUq5YMp15NqQemBnoC925iD_uL-CxUx3q1Vcp0qYSpbAltjyhEGo1znt19w24DVBt6-vBRgJWA"
-                />
-                <div className="absolute bottom-0 inset-x-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
-                  <p className="font-label-sm text-label-sm text-white font-medium truncate">
-                    2. รอยต่อท่อส่งน้ำยา
-                  </p>
-                </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                <span className="material-symbols-outlined text-[32px] text-slate-400">image_not_supported</span>
+                <p className="mt-1 font-semibold">ผู้แจ้งยังไม่ได้แนบรูปภาพ</p>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Section 3: Technician Assignment */}
@@ -299,25 +288,29 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                       />
                     ) : (
                       <div className="w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center font-bold text-base shadow-sm">
-                        {currentTechName.slice(4, 5) || currentTechName.slice(0, 1) || 'ช'}
+                        {currentTechName ? currentTechName.slice(4, 5) || currentTechName.slice(0, 1) : '—'}
                       </div>
                     )}
-                    <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 rounded-full ring-2 ring-white"></span>
+                    {currentTechName && (
+                      <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 rounded-full ring-2 ring-white"></span>
+                    )}
                   </div>
                   <div className="flex flex-col min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-headline-sm text-headline-sm text-on-surface truncate font-bold">
-                        {currentTechName}
+                      <span className={`font-headline-sm text-headline-sm truncate font-bold ${currentTechName ? 'text-on-surface' : 'text-slate-500'}`}>
+                        {currentTechName || 'ยังไม่ได้มอบหมายช่าง'}
                       </span>
-                      <span
-                        className="material-symbols-outlined text-[16px] text-primary"
-                        style={{ fontVariationSettings: "'FILL' 1" }}
-                      >
-                        verified
-                      </span>
+                      {currentTechName && (
+                        <span
+                          className="material-symbols-outlined text-[16px] text-primary"
+                          style={{ fontVariationSettings: "'FILL' 1" }}
+                        >
+                          verified
+                        </span>
+                      )}
                     </div>
                     <span className="font-body-sm text-body-sm text-on-surface-variant truncate">
-                      {matchedTech?.role || 'ช่างเทคนิค'} • {ticket.department || 'ทีมซ่อมบำรุง'}
+                      {currentTechName ? (matchedTech?.role || 'ช่างเทคนิค') : 'เลือกช่างผู้รับผิดชอบเพื่อเริ่มงาน'} • {ticket.department || 'ทีมซ่อมบำรุง'}
                     </span>
                     {currentTechPhone ? (
                       <div className="flex items-center gap-2 mt-1">

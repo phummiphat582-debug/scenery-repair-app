@@ -556,17 +556,17 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                     </div>
 
                     {/* Repair Progress Timeline */}
-                    <div className="rounded-2xl bg-surface-container-low p-3 border border-slate-200/60">
-                      <div className="flex items-center justify-between gap-1">
+                    <div className="rounded-2xl bg-surface-container-low p-4 border border-slate-200/60">
+                      <div className="flex items-center justify-between gap-1.5">
                         {statusFlow.map((flow, flowIndex) => (
                           <React.Fragment key={flow.key}>
                             <div className="flex flex-col items-center gap-1 min-w-0">
-                              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-extrabold ${
+                              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold ${
                                 flowIndex <= progressIndex ? 'bg-primary text-white' : 'bg-slate-200 text-slate-500'
                               }`}>
                                 {flowIndex < progressIndex ? '✓' : flowIndex + 1}
                               </span>
-                              <span className={`text-[9px] text-center leading-tight ${flowIndex <= progressIndex ? 'text-primary font-bold' : 'text-slate-500'}`}>
+                              <span className={`text-[11px] sm:text-xs text-center leading-tight whitespace-nowrap ${flowIndex <= progressIndex ? 'text-primary font-bold' : 'text-slate-500'}`}>
                                 {flow.label}
                               </span>
                             </div>
