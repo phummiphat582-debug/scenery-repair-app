@@ -38,10 +38,10 @@ export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
 
   // Core Data
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [technicians, setTechnicians] = useState<Technician[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [tickets, setTickets] = useState<Ticket[]>(() => ticketService.getCachedData().tickets);
+  const [departments, setDepartments] = useState<Department[]>(() => ticketService.getCachedData().departments);
+  const [technicians, setTechnicians] = useState<Technician[]>(() => ticketService.getCachedData().technicians);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Selected ticket for Detail Modal
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -70,7 +70,6 @@ export const App: React.FC = () => {
 
   // Load initial data
   const loadData = async () => {
-    setIsLoading(true);
     try {
       const [depts, techs, tix] = await Promise.all([
         ticketService.getDepartments(),

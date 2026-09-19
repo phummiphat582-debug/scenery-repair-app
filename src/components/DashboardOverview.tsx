@@ -120,9 +120,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </span>
         </div>
         <div className="flex flex-col">
-          <h1 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-bold">
-            สวัสดี, คุณสมชาย
-          </h1>
           <p className="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
             <span className="material-symbols-outlined text-[16px] text-primary">engineering</span>
             หัวหน้าฝ่ายซ่อมบำรุง • ฟาร์มเดอะซีนเนอรี่ สวนผึ้ง

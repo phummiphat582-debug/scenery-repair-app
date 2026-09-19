@@ -75,6 +75,7 @@ class TicketService {
   private eventSource: EventSource | null = null;
   private pollInterval: any = null;
   private isInitialSyncDone = false;
+  private initialSyncPromise: Promise<void> | null = null;
   private supabaseChannel: any = null;
 
   constructor() {
@@ -136,7 +137,7 @@ class TicketService {
     if (typeof window === 'undefined') return;
 
     // 1. Initial fetch from server / Supabase
-    this.syncFromServer();
+    void this.ensureInitialSync();
 
     // 2. Setup Supabase Realtime channel
     this.setupSupabaseRealtime();
@@ -150,6 +151,16 @@ class TicketService {
         this.syncFromServer();
       }, 3500);
     }
+  }
+
+  private ensureInitialSync(): Promise<void> {
+    if (this.isInitialSyncDone) return Promise.resolve();
+    if (!this.initialSyncPromise) {
+      this.initialSyncPromise = this.syncFromServer().finally(() => {
+        this.initialSyncPromise = null;
+      });
+    }
+    return this.initialSyncPromise;
   }
 
   private setupSupabaseRealtime() {
@@ -319,9 +330,7 @@ class TicketService {
    * Departments
    */
   public async getDepartments(): Promise<Department[]> {
-    if (!this.isInitialSyncDone) {
-      await this.syncFromServer();
-    }
+    await this.ensureInitialSync();
     return [...this.departments];
   }
 
@@ -329,10 +338,20 @@ class TicketService {
    * Technicians
    */
   public async getTechnicians(): Promise<Technician[]> {
-    if (!this.isInitialSyncDone) {
-      await this.syncFromServer();
-    }
+    await this.ensureInitialSync();
     return [...this.technicians];
+  }
+
+  public getCachedData(): {
+    tickets: Ticket[];
+    departments: Department[];
+    technicians: Technician[];
+  } {
+    return {
+      tickets: [...this.tickets],
+      departments: [...this.departments],
+      technicians: [...this.technicians]
+    };
   }
 
   public getTechniciansSync(): Technician[] {
@@ -516,9 +535,7 @@ class TicketService {
     onlyUrgent?: boolean;
     searchQuery?: string;
   }): Promise<Ticket[]> {
-    if (!this.isInitialSyncDone) {
-      await this.syncFromServer();
-    }
+    await this.ensureInitialSync();
 
     let list: Ticket[] = [...this.tickets];
     const now = Date.now();
