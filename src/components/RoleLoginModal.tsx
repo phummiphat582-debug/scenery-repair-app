@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, ShieldCheck, KeyRound, X, Wrench } from 'lucide-react';
+import { Lock, KeyRound, X, Wrench } from 'lucide-react';
 
 interface RoleLoginModalProps {
   isOpen: boolean;
@@ -19,7 +19,7 @@ export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    // Default PIN: 1234 or bypass
+    // PIN สำหรับทีมช่าง
     if (pin === '1234' || pin === '9999' || pin === '0000') {
       setError(false);
       setPin('');
@@ -27,12 +27,6 @@ export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
     } else {
       setError(true);
     }
-  };
-
-  const handleQuickBypass = () => {
-    setError(false);
-    setPin('');
-    onSuccess();
   };
 
   const handleNumClick = (n: string) => {
@@ -144,18 +138,6 @@ export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
               className="h-12 rounded-2xl bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant text-xs font-bold flex items-center justify-center transition-all active:scale-95 cursor-pointer"
             >
               ลบ
-            </button>
-          </div>
-
-          {/* Quick Demo Bypass Button */}
-          <div className="w-full pt-2 flex flex-col gap-2 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={handleQuickBypass}
-              className="w-full py-2.5 bg-primary-fixed/40 hover:bg-primary-fixed text-primary rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>เข้าสู่ระบบทันที (กดคลิกเดียวสำหรับทดสอบ)</span>
             </button>
           </div>
 

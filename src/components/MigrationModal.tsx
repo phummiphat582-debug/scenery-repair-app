@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Database, Download, Upload, RefreshCw, CheckCircle, Copy, FileText, AlertCircle } from 'lucide-react';
+import { X, Database, Download, Upload, RefreshCw, CheckCircle, Copy, FileText } from 'lucide-react';
 import { Ticket } from '../types';
 import { ticketService } from '../services/ticketService';
 import { isSupabaseConfigured } from '../lib/supabase';
@@ -17,7 +17,7 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
   tickets,
   onDataChanged
 }) => {
-  const [activeTab, setActiveTab] = useState<'export' | 'import' | 'supabase' | 'demo'>('export');
+  const [activeTab, setActiveTab] = useState<'export' | 'import' | 'supabase'>('export');
   const [importText, setImportText] = useState('');
   const [importResult, setImportResult] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -113,15 +113,6 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
     }
   };
 
-  // Reset to Demo
-  const handleResetDemo = async () => {
-    if (confirm('ยืนยันรีเซ็ตกลับเป็นข้อมูลตัวอย่างตั้งต้นของ Scenery Farm? (ข้อมูลที่มีการแก้ไขจะถูกแทนที่)')) {
-      await ticketService.resetToDemo();
-      onDataChanged();
-      onClose();
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs overflow-y-auto">
       <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-8">
@@ -165,14 +156,6 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
             }`}
           >
             ☁️ เชื่อมต่อ Supabase
-          </button>
-          <button
-            onClick={() => setActiveTab('demo')}
-            className={`px-3.5 py-2 rounded-t-xl transition-all cursor-pointer ${
-              activeTab === 'demo' ? 'bg-white border-t-2 border-teal-600 text-teal-800' : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            🔄 รีเซ็ตข้อมูลจำลอง
           </button>
         </div>
 
@@ -296,26 +279,6 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
                   <li>ระบบจะเปลี่ยนเป็นโหมดออนไลน์และบันทึกข้อมูลลงฐานข้อมูลคลาวด์แบบ Real-time ทันที!</li>
                 </ol>
               </div>
-            </div>
-          )}
-
-          {/* TAB 4: DEMO RESET */}
-          {activeTab === 'demo' && (
-            <div className="space-y-4">
-              <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-950 leading-relaxed">
-                <h4 className="font-bold mb-1 flex items-center gap-1.5 text-sm">
-                  <AlertCircle className="w-4 h-4 text-rose-600" />
-                  <span>รีเซ็ตข้อมูลตัวอย่าง Scenery Vintage Farm</span>
-                </h4>
-                หากต้องการเริ่มต้นใหม่ด้วยข้อมูลจำลองที่สมบูรณ์ (ครอบคลุมทั้ง 9 แผนก, งานค้างตามคิว FIFO, งานด่วน, และประวัติงานเสร็จสิ้น) สามารถกดปุ่มด้านล่างเพื่อคืนค่าได้
-              </div>
-
-              <button
-                onClick={handleResetDemo}
-                className="w-full py-2.5 bg-rose-700 hover:bg-rose-800 text-white rounded-xl text-xs sm:text-sm font-bold shadow-sm cursor-pointer"
-              >
-                🔄 ยืนยันรีเซ็ตกลับเป็นข้อมูลตัวอย่าง
-              </button>
             </div>
           )}
 

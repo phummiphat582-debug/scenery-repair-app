@@ -59,19 +59,19 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
       <div 
-        className="bg-surface-container-lowest w-full max-w-sm rounded-3xl shadow-2xl border border-slate-200 p-6 flex flex-col items-center text-center gap-4 animate-in zoom-in-95 duration-150"
+        className="bg-surface-container-lowest w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 p-6 sm:p-7 flex flex-col items-center text-center gap-4 animate-in zoom-in-95 duration-150"
         role="dialog"
         aria-modal="true"
       >
-        <div className={`w-14 h-14 rounded-2xl ${vStyles.iconBg} flex items-center justify-center shadow-xs`}>
+        <div className={`w-16 h-16 rounded-2xl ${vStyles.iconBg} flex items-center justify-center shadow-xs`}>
           {vStyles.icon}
         </div>
 
         <div className="space-y-1">
-          <h3 className="text-base sm:text-lg font-bold text-on-surface">
+          <h3 className="text-lg sm:text-xl font-bold text-on-surface">
             {title}
           </h3>
-          <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
+          <p className="text-sm sm:text-base text-on-surface-variant leading-relaxed">
             {message}
           </p>
         </div>
@@ -80,14 +80,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 py-2.5 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            className="flex-1 py-3 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-xl text-sm font-bold transition-colors cursor-pointer"
           >
             {cancelText}
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className={`flex-1 py-2.5 ${vStyles.button} rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95`}
+            className={`flex-1 py-3 ${vStyles.button} rounded-xl text-sm font-bold transition-all shadow-xs cursor-pointer active:scale-95`}
           >
             {confirmText}
           </button>

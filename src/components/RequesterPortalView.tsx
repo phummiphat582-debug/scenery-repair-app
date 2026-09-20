@@ -129,7 +129,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       const found = technicians.find(t => t.name.toLowerCase() === ticket.technicianName?.toLowerCase());
       if (found?.phone) return found.phone;
     }
-    return '081-234-5678'; // Default farm maintenance hotline
+    return '';
   };
 
   const handleCallClick = (e: React.MouseEvent, name: string, phone: string) => {
@@ -556,7 +556,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                     </div>
 
                     {/* Repair Progress Timeline */}
-                    <div className="rounded-2xl bg-surface-container-low p-4 border border-slate-200/60">
+                    <div className="rounded-2xl bg-surface-container-low p-4 border border-slate-200/60 overflow-x-auto overflow-y-hidden overscroll-y-none touch-pan-x" style={{ touchAction: 'pan-x' }}>
                       <div className="flex items-center justify-between gap-1.5">
                         {statusFlow.map((flow, flowIndex) => (
                           <React.Fragment key={flow.key}>
@@ -611,15 +611,19 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                       </div>
 
                       {/* Direct Phone Call Button with Confirmation */}
-                      <button
-                        type="button"
-                        onClick={(e) => handleCallClick(e, ticket.technicianName || 'ศูนย์ซ่อมส่วนกลาง', techPhone)}
-                        className="self-start sm:self-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-primary hover:bg-primary-container text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer active:scale-95"
-                        title="กดเพื่อโทรออกทันที"
-                      >
-                        <Phone className="w-3.5 h-3.5" />
-                        <span>โทรหาช่าง: {techPhone}</span>
-                      </button>
+                      {techPhone ? (
+                        <button
+                          type="button"
+                          onClick={(e) => handleCallClick(e, ticket.technicianName || 'ศูนย์ซ่อมส่วนกลาง', techPhone)}
+                          className="self-start sm:self-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-primary hover:bg-primary-container text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer active:scale-95"
+                          title="กดเพื่อโทรออกทันที"
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                          <span>โทรหาช่าง: {techPhone}</span>
+                        </button>
+                      ) : (
+                        <span className="self-start sm:self-auto text-xs font-semibold text-slate-400">ยังไม่มีเบอร์โทรช่าง</span>
+                      )}
                     </div>
 
                     {/* Repair Remarks / Progress */}

@@ -39,10 +39,10 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
   // Active technician (defaults to first active on-duty tech or first tech)
   const currentTech = useMemo(() => {
     return technicians.find(t => t.isOnDutyToday) || technicians[0] || {
-      id: 't-1',
-      name: 'ช่างสมชาย (หัวหน้าช่าง)',
-      role: 'หัวหน้าฝ่ายซ่อมบำรุง',
-      phone: '081-234-5678'
+      id: 'unassigned',
+      name: 'ยังไม่ระบุช่าง',
+      role: 'ยังไม่มีข้อมูลช่าง',
+      phone: ''
     };
   }, [technicians]);
 
@@ -94,7 +94,7 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
           await onUpdateTicketStatus(ticket.id, {
             status: 'in_progress',
             technicianName: currentTech.name,
-            technicianPhone: currentTech.phone || '081-234-5678',
+            technicianPhone: currentTech.phone || '',
             remark: 'ช่างกดรับงานแล้ว กำลังเข้าตรวจสอบหน้างาน'
           });
         } finally {
@@ -168,7 +168,7 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
                   {currentTech.name}
                 </h1>
                 <span className="font-label-sm text-xs px-2.5 py-0.5 rounded-full bg-white/20 text-white font-semibold">
-                  {currentTech.phone || '081-234-5678'}
+                  {currentTech.phone || 'ยังไม่มีเบอร์โทร'}
                 </span>
               </div>
               <p className="font-body-sm text-body-sm text-primary-fixed truncate mt-0.5">
@@ -312,7 +312,7 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
               ไม่มีงานซ่อมค้างในหน้านี้
             </h3>
             <p className="text-xs text-on-surface-variant max-w-sm">
-              ข้อมูลเดโม่ถูกเคลียร์ออกเรียบร้อยแล้ว เมื่อแผนกต่างๆ แจ้งงานซ่อมเข้ามา รายการงานจะปรากฏที่นี่ทันที
+              เมื่อมีรายการแจ้งซ่อมเข้ามา งานจะปรากฏที่นี่ทันที
             </p>
           </div>
         ) : (

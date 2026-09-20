@@ -10,6 +10,7 @@ interface TaskDetailsModalProps {
   technicians: Technician[];
   onUpdateTicket: (id: string, updates: Partial<Ticket>) => Promise<void>;
   onOpenPartsModal?: (ticket?: Ticket) => void;
+  onDeleteTicket?: (id: string) => Promise<void>;
 }
 
 export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
@@ -18,7 +19,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   onClose,
   technicians,
   onUpdateTicket,
-  onOpenPartsModal
+  onOpenPartsModal,
+  onDeleteTicket
 }) => {
   if (!isOpen || !ticket) return null;
 
@@ -27,6 +29,10 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const [currentTechPhone, setCurrentTechPhone] = useState(
     ticket.technicianPhone || technicians.find(t => t.name === (ticket.technicianName || ''))?.phone || ''
   );
+  const [isDeletePromptOpen, setIsDeletePromptOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
@@ -42,6 +48,31 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const requestImageUrl = ticket.requestImageUrl && ticket.requestImageUrl !== '-'
     ? ticket.requestImageUrl
     : '';
+  const createdAtText = new Date(ticket.createdAt).toLocaleString('th-TH', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  });
+  const statusLabels: Record<string, string> = {
+    pending: 'รอตรวจสอบ', assigned: 'มอบหมายแล้ว', received: 'รับงานแล้ว',
+    in_progress: 'กำลังดำเนินการ', waiting_parts: 'รออะไหล่',
+    waiting_inspect: 'รอตรวจรับ', completed: 'เสร็จสิ้น', cancelled: 'ยกเลิก'
+  };
+
+  const handleDeleteTicket = async () => {
+    if (deletePassword !== '2904') {
+      setDeleteError('รหัสผ่านไม่ถูกต้อง');
+      return;
+    }
+    if (!onDeleteTicket) return;
+    setIsDeleting(true);
+    try {
+      await onDeleteTicket(ticket.id);
+    } finally {
+      setIsDeleting(false);
+      setDeletePassword('');
+      setDeleteError('');
+      setIsDeletePromptOpen(false);
+    }
+  };
 
   // Step mapping
   const steps = [
@@ -132,7 +163,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   #{ticket.requestId}
                 </span>
                 <span className="font-body-sm text-body-sm text-on-surface-variant truncate">
-                  24 ต.ค. 2024 • 08:15 น.
+                  {createdAtText}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
@@ -144,7 +175,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 )}
                 <span className="inline-flex items-center gap-1 bg-primary-container text-on-primary px-2.5 py-1 rounded-full font-label-sm text-label-sm font-semibold">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary-fixed"></span>
-                  กำลังดำเนินการ
+                  {statusLabels[ticket.status] || ticket.status}
                 </span>
               </div>
             </div>
@@ -161,7 +192,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
           </div>
 
           {/* Horizontal Workflow Stepper */}
-          <div className="py-4 bg-surface-container-low rounded-xl overflow-x-auto no-scrollbar shadow-inner border border-slate-200/40">
+          <div className="py-4 bg-surface-container-low rounded-xl overflow-x-auto overflow-y-hidden overscroll-y-none touch-pan-x no-scrollbar shadow-inner border border-slate-200/40" style={{ touchAction: 'pan-x' }}>
             <div className="flex items-center gap-2.5 px-gutter min-w-max">
               {steps.map((s, idx) => {
                 const isPassed = idx < currentStepIndex;
@@ -209,13 +240,13 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 <span className="material-symbols-outlined text-[20px] text-primary">person_pin</span>
                 ข้อมูลผู้แจ้งซ่อม
               </span>
-              <a
+              {ticket.requesterPhone ? <a
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-container text-on-surface rounded-full font-label-sm text-label-sm active:bg-surface-variant cursor-pointer font-semibold"
-                href={`tel:${ticket.requesterPhone || '0899876543'}`}
+                href={`tel:${ticket.requesterPhone}`}
               >
                 <span className="material-symbols-outlined text-[16px] text-primary">call</span>
                 โทรด่วน
-              </a>
+              </a> : <span className="text-xs text-slate-400">ไม่ได้ระบุเบอร์โทร</span>}
             </div>
             <div className="flex items-center gap-3 pt-1">
               <div className="w-12 h-12 rounded-full bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed font-bold text-headline-sm shrink-0 shadow-inner">
@@ -223,10 +254,10 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="font-headline-sm text-headline-sm text-on-surface truncate leading-tight font-bold">
-                  {ticket.requesterName || 'คุณนงนุช รักษ์ดี'}
+                  {ticket.requesterName || 'ไม่ระบุชื่อผู้แจ้ง'}
                 </span>
                 <span className="font-body-sm text-body-sm text-on-surface-variant">
-                  {ticket.department} • โทร {ticket.requesterPhone || '089-987-6543'}
+                  {ticket.department} • โทร {ticket.requesterPhone || 'ไม่ได้ระบุเบอร์โทร'}
                 </span>
               </div>
             </div>
@@ -343,39 +374,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   รายการอะไหล่และอุปกรณ์ที่ใช้
                 </span>
               </div>
-              <span className="font-label-sm text-label-sm px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed font-semibold">
-                Stock Synced
-              </span>
             </div>
 
-            <div className="flex flex-col gap-2.5 pt-1">
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-surface-container-low">
-                <div className="flex flex-col min-w-0 pr-2">
-                  <span className="font-label-md text-label-md text-on-surface truncate font-semibold">
-                    Expansion Valve Danfoss R404A
-                  </span>
-                  <span className="font-body-sm text-body-sm text-on-surface-variant">
-                    รหัสพัสดุ: DF-VLV-404
-                  </span>
-                </div>
-                <span className="px-2.5 py-1 bg-surface-container-high text-on-surface text-xs font-bold rounded-lg shrink-0">
-                  จำนวน 1 ชิ้น
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-surface-container-low">
-                <div className="flex flex-col min-w-0 pr-2">
-                  <span className="font-label-md text-label-md text-on-surface truncate font-semibold">
-                    น้ำยาแอร์ R404A (กระบอก 3 kg)
-                  </span>
-                  <span className="font-body-sm text-body-sm text-on-surface-variant">
-                    รหัสพัสดุ: GAS-R404-03
-                  </span>
-                </div>
-                <span className="px-2.5 py-1 bg-surface-container-high text-on-surface text-xs font-bold rounded-lg shrink-0">
-                  จำนวน 1 ถัง
-                </span>
-              </div>
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+              <span className="material-symbols-outlined text-[30px] text-slate-400">inventory_2</span>
+              <p className="mt-1 font-semibold">ยังไม่มีรายการอะไหล่ที่บันทึก</p>
             </div>
 
             <button
@@ -403,7 +406,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 สาเหตุข้อบกพร่องที่พบ
               </label>
               <div className="p-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md">
-                {ticket.description || 'วาล์วควบคุมแรงดันเสื่อมสภาพ ทำให้น้ำยาแอร์อุดตันและระบบตัดการทำงานอัตโนมัติเพื่อป้องกันคอมเพรสเซอร์เสียหาย'}
+                {ticket.description || 'ยังไม่มีรายละเอียดอาการที่บันทึก'}
               </div>
             </div>
 
@@ -412,7 +415,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 ขั้นตอนดำเนินการแก้ไข
               </label>
               <div className="p-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md">
-                {ticket.repairResult || 'เปลี่ยน Expansion Valve ใหม่ แวคคั่มระบบกำจัดความชื้น และเติมน้ำยาแอร์เพิ่ม 2.5 kg ทำการเดินเครื่องทดสอบความเย็นเสถียรที่ 4 องศาเซลเซียส เรียบร้อย'}
+                {ticket.repairResult || 'ยังไม่มีบันทึกขั้นตอนการแก้ไข'}
               </div>
             </div>
           </div>
@@ -445,6 +448,17 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               <span className="material-symbols-outlined text-[18px]">cancel</span>
               ขอยกเลิกใบงานซ่อมนี้
             </button>
+
+            {onDeleteTicket && (
+              <button
+                onClick={() => { setDeletePassword(''); setDeleteError(''); setIsDeletePromptOpen(true); }}
+                className="w-full h-11 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-label-md text-label-md flex items-center justify-center gap-1.5 transition-colors cursor-pointer font-semibold"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[18px]">delete</span>
+                ลบรายการแจ้งซ่อม
+              </button>
+            )}
           </div>
 
         </div>
@@ -472,6 +486,44 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
           onConfirm={confirmConfig.onConfirm}
           onCancel={() => setConfirmConfig(null)}
         />
+      )}
+
+      {isDeletePromptOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-rose-200" role="dialog" aria-modal="true">
+            <div className="flex items-center gap-3 text-rose-700">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[28px]">delete_forever</span>
+              </div>
+              <div>
+                <h3 className="text-lg sm:text-xl font-bold">ยืนยันการลบรายการ</h3>
+                <p className="text-sm text-slate-600 mt-0.5">การลบรายการนี้ไม่สามารถย้อนกลับได้</p>
+              </div>
+            </div>
+            <label className="block mt-5 text-sm font-bold text-slate-700" htmlFor="delete-password">
+              ใส่รหัสเพื่อยืนยันการลบ
+            </label>
+            <input
+              id="delete-password"
+              type="password"
+              inputMode="numeric"
+              autoFocus
+              value={deletePassword}
+              onChange={(event) => { setDeletePassword(event.target.value); setDeleteError(''); }}
+              onKeyDown={(event) => { if (event.key === 'Enter') void handleDeleteTicket(); }}
+              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-lg tracking-[0.35em] outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-100"
+              placeholder="รหัส 4 หลัก"
+              maxLength={4}
+            />
+            {deleteError && <p className="mt-2 text-sm font-semibold text-rose-600">{deleteError}</p>}
+            <div className="mt-5 flex gap-3">
+              <button type="button" onClick={() => setIsDeletePromptOpen(false)} className="flex-1 rounded-xl bg-slate-100 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200" disabled={isDeleting}>ยกเลิก</button>
+              <button type="button" onClick={() => void handleDeleteTicket()} className="flex-1 rounded-xl bg-rose-600 py-3 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60" disabled={isDeleting}>
+                {isDeleting ? 'กำลังลบ...' : 'ยืนยันลบรายการ'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

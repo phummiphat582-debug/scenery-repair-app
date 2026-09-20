@@ -491,7 +491,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     <button
                       onClick={() => {
                         const targetName = ticket.technicianName || ticket.requesterName || 'ศูนย์ซ่อมฟาร์ม';
-                        const targetPhone = ticket.technicianPhone || ticket.requesterPhone || '081-234-5678';
+                        const targetPhone = ticket.technicianPhone || ticket.requesterPhone || '';
                         setCallConfirmTech({ name: targetName, phone: targetPhone });
                       }}
                       className="flex-1 bg-surface-container-high hover:bg-surface-container text-on-surface rounded-lg py-2 font-label-md text-label-md font-semibold text-center min-h-[42px] flex items-center justify-center gap-1 cursor-pointer"

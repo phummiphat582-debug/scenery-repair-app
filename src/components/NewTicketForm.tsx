@@ -214,7 +214,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
       location: `${zoneObj?.name || selectedZone} - ${locText}`,
       description: problemDetail.trim(),
       requesterName: requesterName.trim() || 'พนักงานฟาร์ม (ไม่ระบุชื่อ)',
-      requesterPhone: requesterPhone.trim() || '081-234-5678',
+      requesterPhone: requesterPhone.trim(),
       priority,
       status: 'pending',
       requestImageUrl: photos[0]?.url || '-',
@@ -906,7 +906,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             <div className="flex flex-col min-w-0 flex-1">
               <span className="font-headline-sm text-[16px] font-bold">ส่งใบแจ้งซ่อมสำเร็จ!</span>
               <span className="font-body-sm text-body-sm text-primary-fixed truncate">
-                หมายเลขงาน: #{submittedRequestId || 'REQ-2026-089'} (รอช่างรับงาน)
+                หมายเลขงาน: #{submittedRequestId} (รอช่างรับงาน)
               </span>
             </div>
             <button

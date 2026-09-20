@@ -72,7 +72,7 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
             ยังไม่มีรายการงานซ่อมในระบบ
           </h3>
           <p className="text-xs text-on-surface-variant">
-            ข้อมูลเดโม่ถูกเคลียร์ออกเรียบร้อยแล้ว เมื่อมีผู้แจ้งซ่อมเข้ามา งานจะมาปรากฏในตารางคิวนี้ทันที
+            เมื่อมีผู้แจ้งซ่อมเข้ามา งานจะมาปรากฏในตารางคิวนี้ทันที
           </p>
         </div>
       </div>

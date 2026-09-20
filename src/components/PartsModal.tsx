@@ -10,8 +10,8 @@ interface PartsModalProps {
 export const PartsModal: React.FC<PartsModalProps> = ({ isOpen, onClose, ticket }) => {
   if (!isOpen) return null;
 
-  const [partName, setPartName] = useState('Expansion Valve Danfoss R404A');
-  const [partCode, setPartCode] = useState('DF-VLV-404');
+  const [partName, setPartName] = useState('');
+  const [partCode, setPartCode] = useState('');
   const [quantity, setQuantity] = useState(1);
 
   const handleSubmit = (e: React.FormEvent) => {

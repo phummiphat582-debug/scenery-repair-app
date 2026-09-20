@@ -164,6 +164,14 @@ export const App: React.FC = () => {
     loadData();
   };
 
+  const handleDeleteTicket = async (id: string) => {
+    await ticketService.deleteTicket(id);
+    setIsDetailModalOpen(false);
+    setSelectedTicket(null);
+    await loadData();
+    showToast('ลบรายการแจ้งซ่อมเรียบร้อยแล้ว', 'info');
+  };
+
   // Handle create ticket from NewTicketForm
   const handleCreateTicket = async (ticketData: any) => {
     const created = await ticketService.createTicket(ticketData);
@@ -340,6 +348,7 @@ export const App: React.FC = () => {
         technicians={technicians}
         onUpdateTicket={handleUpdateTicket}
         onOpenPartsModal={handleOpenPartsModal}
+        onDeleteTicket={handleDeleteTicket}
       />
 
       <MigrationModal
@@ -388,8 +397,8 @@ export const App: React.FC = () => {
           cancelText="ยกเลิก"
           confirmVariant="primary"
           onConfirm={async () => {
-            const activeTech = technicians.find(t => t.isOnDutyToday)?.name || technicians[0]?.name || 'ช่างสมชาย (หัวหน้าช่าง)';
-            const activePhone = technicians.find(t => t.isOnDutyToday)?.phone || technicians[0]?.phone || '081-234-5678';
+            const activeTech = technicians.find(t => t.isOnDutyToday)?.name || technicians[0]?.name || '';
+            const activePhone = technicians.find(t => t.isOnDutyToday)?.phone || technicians[0]?.phone || '';
             await handleUpdateTicket(quickAcceptTicket.id, {
               status: 'in_progress',
               technicianName: activeTech,
