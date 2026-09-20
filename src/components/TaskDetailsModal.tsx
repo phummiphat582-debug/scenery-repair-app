@@ -24,10 +24,13 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 }) => {
   if (!isOpen || !ticket) return null;
 
+  const assignedTechnician = technicians.find(
+    technician => technician.name.toLowerCase() === (ticket.technicianName || '').toLowerCase()
+  );
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [currentTechName, setCurrentTechName] = useState(ticket.technicianName || '');
+  const [currentTechName, setCurrentTechName] = useState(assignedTechnician?.name || '');
   const [currentTechPhone, setCurrentTechPhone] = useState(
-    ticket.technicianPhone || technicians.find(t => t.name === (ticket.technicianName || ''))?.phone || ''
+    assignedTechnician?.phone || ''
   );
   const [isDeletePromptOpen, setIsDeletePromptOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
