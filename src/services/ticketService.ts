@@ -1,10 +1,30 @@
 import { Ticket, Department, Technician, SortOrder } from '../types';
-import { INITIAL_DEPARTMENTS, INITIAL_TECHNICIANS } from '../data/mockData';
+import { INITIAL_DEPARTMENTS } from '../data/mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const LOCAL_STORAGE_TICKETS = 'scenery_repair_v5_tickets';
 const LOCAL_STORAGE_DEPTS = 'scenery_repair_v5_departments';
 const LOCAL_STORAGE_TECHS = 'scenery_repair_v5_technicians';
+const LEGACY_DEMO_TECHNICIAN_IDS = new Set([
+  'tech-1', 'tech-2', 'tech-3', 'tech-4', 'tech-5', 'tech-6', 'tech-7', 'tech-8'
+]);
+const LEGACY_DEMO_TECHNICIAN_NAMES = new Set([
+  'ช่างสมชาย (หัวหน้าช่าง)',
+  'ช่างวิชัย (ไฟฟ้า/แอร์)',
+  'ช่างประสิทธิ์ (ประปา/สุขาภิบาล)',
+  'ช่างเอกชัย (อาคาร/สี)',
+  'ช่างธนพล (ช่างยนต์/เครื่องจักร)',
+  'ช่างเดี่ยว (อู่ภายนอก D.Bike Garage)',
+  'ช่าง 84 (งานปะยาง/เชื่อม/บัดกรี)',
+  'ช่างบูร (ตาฟเกลียว/โรงกลึง)'
+]);
+
+function removeLegacyDemoTechnicians(technicians: Technician[]): Technician[] {
+  return technicians.filter(tech =>
+    !LEGACY_DEMO_TECHNICIAN_IDS.has(String(tech.id)) &&
+    !LEGACY_DEMO_TECHNICIAN_NAMES.has(String(tech.name || '').trim())
+  );
+}
 
 // Database mapping utilities (PostgreSQL snake_case <-> Frontend camelCase)
 function dbToTicket(row: any): Ticket {
@@ -98,25 +118,13 @@ class TicketService {
       this.departments = savedDepts ? JSON.parse(savedDepts) : INITIAL_DEPARTMENTS;
 
       const savedTechs = localStorage.getItem(LOCAL_STORAGE_TECHS);
-      this.technicians = savedTechs ? JSON.parse(savedTechs) : INITIAL_TECHNICIANS;
-
-      // Merge initial technicians if missing photo or phone
-      const techMap = new Map(this.technicians.map(t => [t.name, t]));
-      INITIAL_TECHNICIANS.forEach(initTech => {
-        if (!techMap.has(initTech.name)) {
-          this.technicians.push({ ...initTech });
-        } else {
-          const current = techMap.get(initTech.name)!;
-          if (current.isOnDutyToday === undefined) current.isOnDutyToday = initTech.isOnDutyToday ?? true;
-          if (!current.phone && initTech.phone) current.phone = initTech.phone;
-          if (!current.avatarUrl && initTech.avatarUrl) current.avatarUrl = initTech.avatarUrl;
-        }
-      });
+      const parsedTechs = savedTechs ? JSON.parse(savedTechs) : [];
+      this.technicians = Array.isArray(parsedTechs) ? removeLegacyDemoTechnicians(parsedTechs) : [];
       this.saveToLocalStorage();
     } catch (e) {
       this.tickets = [];
       this.departments = INITIAL_DEPARTMENTS;
-      this.technicians = INITIAL_TECHNICIANS;
+      this.technicians = [];
     }
   }
 
@@ -265,8 +273,8 @@ class TicketService {
             .from('technicians')
             .select('*');
 
-          if (!techErr && Array.isArray(supaTechs) && supaTechs.length > 0) {
-            const mappedTechs = supaTechs.map(dbToTechnician);
+          if (!techErr && Array.isArray(supaTechs)) {
+            const mappedTechs = removeLegacyDemoTechnicians(supaTechs.map(dbToTechnician));
             if (JSON.stringify(mappedTechs) !== JSON.stringify(this.technicians)) {
               this.technicians = mappedTechs;
               changed = true;
@@ -297,9 +305,10 @@ class TicketService {
 
         if (techsRes.status === 'fulfilled' && techsRes.value.ok) {
           const serverTechs: Technician[] = await techsRes.value.json();
-          if (Array.isArray(serverTechs) && serverTechs.length > 0) {
-            if (JSON.stringify(serverTechs) !== JSON.stringify(this.technicians)) {
-              this.technicians = serverTechs;
+          if (Array.isArray(serverTechs)) {
+            const filteredTechs = removeLegacyDemoTechnicians(serverTechs);
+            if (JSON.stringify(filteredTechs) !== JSON.stringify(this.technicians)) {
+              this.technicians = filteredTechs;
               changed = true;
             }
           }
