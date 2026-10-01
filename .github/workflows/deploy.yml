@@ -31,8 +31,8 @@ jobs:
 
       - name: Build with Vite
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://rimwhvvashgcaepyavjq.supabase.co' }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpbXdodnZhc2hnY2FlcHlhdmpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NjkwNzcsImV4cCI6MjEwMTE0NTA3N30.XAo8nJPSDHokoQIv4GkMcXghb3uBeV5I7Re4Wb0mxFw' }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://roqsnzofqtjtendcpdqs.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJvcXNuem9mcXRqdGVuZGNwZHFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA4NTc2NzYsImV4cCI6MjEwNjQzMzY3Nn0.kObOMFrinAFmOOQi05GvXmupvc28_wyKqcqKlwS0tao' }}
           VITE_ONESIGNAL_APP_ID: ${{ secrets.VITE_ONESIGNAL_APP_ID || '43c74ab4-f860-4aed-b49c-5431da9077a3' }}
         run: bun run build
 

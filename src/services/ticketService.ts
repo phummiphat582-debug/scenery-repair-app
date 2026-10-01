@@ -5,6 +5,9 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 const LOCAL_STORAGE_TICKETS = 'scenery_repair_v5_tickets';
 const LOCAL_STORAGE_DEPTS = 'scenery_repair_v5_departments';
 const LOCAL_STORAGE_TECHS = 'scenery_repair_v5_technicians';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const LEGACY_DEMO_TECHNICIAN_IDS = new Set([
   'tech-1', 'tech-2', 'tech-3', 'tech-4', 'tech-5', 'tech-6', 'tech-7', 'tech-8'
 ]);
@@ -53,7 +56,9 @@ function dbToTicket(row: any): Ticket {
 
 function ticketToDb(t: Partial<Ticket>): any {
   const row: any = {};
-  if (t.id && !t.id.startsWith('ticket-')) row.id = t.id;
+  if (t.id && UUID_REGEX.test(t.id)) {
+    row.id = t.id;
+  }
   if (t.requestId) row.request_id = t.requestId;
   if (t.title !== undefined) row.title = t.title;
   if (t.description !== undefined) row.description = t.description;
@@ -87,6 +92,31 @@ function dbToTechnician(row: any): Technician {
   };
 }
 
+function dbToDepartment(row: any): Department {
+  return {
+    id: String(row.id),
+    name: row.name,
+    code: row.code,
+    icon: row.icon || '📌',
+    color: row.color || '#0f766e',
+    description: row.description || ''
+  };
+}
+
+function filterTicketQuery(query: any, id: string) {
+  if (UUID_REGEX.test(id)) {
+    return query.or(`id.eq.${id},request_id.eq.${id}`);
+  }
+  return query.eq('request_id', id);
+}
+
+function filterTechnicianQuery(query: any, idOrName: string) {
+  if (UUID_REGEX.test(idOrName)) {
+    return query.or(`id.eq.${idOrName},name.eq.${idOrName}`);
+  }
+  return query.eq('name', idOrName);
+}
+
 class TicketService {
   private tickets: Ticket[] = [];
   private departments: Department[] = [];
@@ -97,20 +127,20 @@ class TicketService {
   private isInitialSyncDone = false;
   private initialSyncPromise: Promise<void> | null = null;
   private supabaseChannel: any = null;
+  private isConnectedToCloud = false;
 
   constructor() {
     this.initLocalData();
     this.startRealtime();
+    this.setupWindowListeners();
   }
 
   private initLocalData() {
     try {
-      // Clear legacy storage keys with demo data
       ['scenery_repair_tickets', 'scenery_repair_v2_tickets', 'scenery_repair_v3_tickets', 'scenery_repair_v4_tickets'].forEach(key => {
         localStorage.removeItem(key);
       });
 
-      // Strictly empty tickets by default — ZERO DEMO TICKETS
       const savedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS);
       this.tickets = savedTickets ? JSON.parse(savedTickets) : [];
 
@@ -138,26 +168,49 @@ class TicketService {
     }
   }
 
+  private setupWindowListeners() {
+    if (typeof window === 'undefined') return;
+
+    // Fast sync when user switches back to this tab
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        void this.syncFromServer();
+      }
+    });
+
+    // Fast sync when browser window regains focus
+    window.addEventListener('focus', () => {
+      void this.syncFromServer();
+    });
+
+    // Fast sync when device comes back online
+    window.addEventListener('online', () => {
+      void this.syncFromServer();
+    });
+  }
+
   /**
-   * Real-Time Synchronization Engine (Supabase Realtime + Cross-device SSE + Polling Fallback)
+   * Real-Time Synchronization Engine (Supabase Realtime WebSocket + Cross-Device Sync)
    */
   private startRealtime() {
     if (typeof window === 'undefined') return;
 
-    // 1. Initial fetch from server / Supabase
+    // 1. Initial immediate fetch from Supabase
     void this.ensureInitialSync();
 
-    // 2. Setup Supabase Realtime channel
+    // 2. Setup Supabase Realtime channel (Instant WebSocket broadcast)
     this.setupSupabaseRealtime();
 
-    // 3. Connect Server-Sent Events (SSE) for local server or tunnel
+    // 3. Connect Server-Sent Events (SSE) for local development if present
     this.connectSSE();
 
-    // 4. Fallback poll every 3.5 seconds
+    // 4. Background safety polling (every 20s only when page is active)
     if (!this.pollInterval) {
       this.pollInterval = setInterval(() => {
-        this.syncFromServer();
-      }, 3500);
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+          void this.syncFromServer();
+        }
+      }, 20000);
     }
   }
 
@@ -175,24 +228,37 @@ class TicketService {
     if (!isSupabaseConfigured || !supabase || this.supabaseChannel) return;
     try {
       this.supabaseChannel = supabase
-        .channel('scenery_realtime_channel')
+        .channel('scenery_realtime_db_channel')
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'repair_tickets' },
-          () => {
-            this.syncFromServer();
+          (payload) => {
+            console.log('⚡ [Realtime] Ticket event received:', payload.eventType);
+            void this.syncFromServer();
           }
         )
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'technicians' },
-          () => {
-            this.syncFromServer();
+          (payload) => {
+            console.log('⚡ [Realtime] Technician event received:', payload.eventType);
+            void this.syncFromServer();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'departments' },
+          (payload) => {
+            console.log('⚡ [Realtime] Department event received:', payload.eventType);
+            void this.syncFromServer();
           }
         )
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
-            console.log('⚡ [SupabaseRealtime] Connected and listening for database updates');
+            this.isConnectedToCloud = true;
+            console.log('🟢 [SupabaseRealtime] Connected to Central Cloud Database successfully!');
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            console.warn('⚠️ [SupabaseRealtime] Realtime channel status:', status);
           }
         });
     } catch (e) {
@@ -217,7 +283,7 @@ class TicketService {
             data.type === 'TECHNICIANS_UPDATED' ||
             data.type === 'SYNC_REQUIRED'
           ) {
-            this.syncFromServer();
+            void this.syncFromServer();
           }
         } catch {}
       };
@@ -227,12 +293,9 @@ class TicketService {
           this.eventSource.close();
           this.eventSource = null;
         }
-        // Auto-reconnect after 3 seconds
-        setTimeout(() => this.connectSSE(), 3000);
+        setTimeout(() => this.connectSSE(), 10000);
       };
-    } catch (e) {
-      // Offline or static host without local backend
-    }
+    } catch {}
   }
 
   public subscribe(callback: () => void): () => void {
@@ -246,22 +309,28 @@ class TicketService {
     });
   }
 
+  public isCloudOnline(): boolean {
+    return this.isConnectedToCloud && isSupabaseConfigured;
+  }
+
   /**
-   * Fetch latest state from Supabase / central server (cross-device sync)
+   * Fetch latest state from Supabase Cloud (Central single source of truth)
    */
   public async syncFromServer(): Promise<void> {
     try {
       let changed = false;
 
-      // 1. Supabase Sync (if configured & online)
+      // 1. Supabase Sync (Primary Central Cloud Database)
       if (isSupabaseConfigured && supabase) {
         try {
+          // A. Fetch Tickets
           const { data: supaTickets, error: tErr } = await supabase
             .from('repair_tickets')
             .select('*')
             .order('created_at', { ascending: false });
 
           if (!tErr && Array.isArray(supaTickets)) {
+            this.isConnectedToCloud = true;
             const mapped = supaTickets.map(dbToTicket);
             if (JSON.stringify(mapped) !== JSON.stringify(this.tickets)) {
               this.tickets = mapped;
@@ -269,9 +338,11 @@ class TicketService {
             }
           }
 
+          // B. Fetch Technicians
           const { data: supaTechs, error: techErr } = await supabase
             .from('technicians')
-            .select('*');
+            .select('*')
+            .order('name');
 
           if (!techErr && Array.isArray(supaTechs)) {
             const mappedTechs = removeLegacyDemoTechnicians(supaTechs.map(dbToTechnician));
@@ -280,12 +351,26 @@ class TicketService {
               changed = true;
             }
           }
+
+          // C. Fetch Departments
+          const { data: supaDepts, error: dErr } = await supabase
+            .from('departments')
+            .select('*')
+            .order('code');
+
+          if (!dErr && Array.isArray(supaDepts) && supaDepts.length > 0) {
+            const mappedDepts = supaDepts.map(dbToDepartment);
+            if (JSON.stringify(mappedDepts) !== JSON.stringify(this.departments)) {
+              this.departments = mappedDepts;
+              changed = true;
+            }
+          }
         } catch (supaErr) {
-          // Supabase table may not exist yet or connection error
+          console.warn('[TicketService] Cloud sync error:', supaErr);
         }
       }
 
-      // 2. Local REST API Sync (when running Vite dev server or local backend tunnel)
+      // 2. Local REST API Sync (Fallback when running with local express backend)
       try {
         const [ticketsRes, techsRes, deptsRes] = await Promise.allSettled([
           fetch('/api/tickets', { cache: 'no-store' }),
@@ -295,11 +380,9 @@ class TicketService {
 
         if (ticketsRes.status === 'fulfilled' && ticketsRes.value.ok) {
           const serverTickets: Ticket[] = await ticketsRes.value.json();
-          if (Array.isArray(serverTickets)) {
-            if (JSON.stringify(serverTickets) !== JSON.stringify(this.tickets)) {
-              this.tickets = serverTickets;
-              changed = true;
-            }
+          if (Array.isArray(serverTickets) && JSON.stringify(serverTickets) !== JSON.stringify(this.tickets)) {
+            this.tickets = serverTickets;
+            changed = true;
           }
         }
 
@@ -316,11 +399,9 @@ class TicketService {
 
         if (deptsRes.status === 'fulfilled' && deptsRes.value.ok) {
           const serverDepts: Department[] = await deptsRes.value.json();
-          if (Array.isArray(serverDepts) && serverDepts.length > 0) {
-            if (JSON.stringify(serverDepts) !== JSON.stringify(this.departments)) {
-              this.departments = serverDepts;
-              changed = true;
-            }
+          if (Array.isArray(serverDepts) && serverDepts.length > 0 && JSON.stringify(serverDepts) !== JSON.stringify(this.departments)) {
+            this.departments = serverDepts;
+            changed = true;
           }
         }
       } catch {}
@@ -331,7 +412,7 @@ class TicketService {
         this.notify();
       }
     } catch (e) {
-      // Offline mode - keep local storage
+      // Offline fallback
     }
   }
 
@@ -368,9 +449,10 @@ class TicketService {
   }
 
   public async addTechnician(tech: { name: string; role?: string; phone?: string; avatarUrl?: string }): Promise<Technician[]> {
+    const trimmedName = tech.name.trim();
     const newTech: Technician = {
       id: 'tech-' + Date.now(),
-      name: tech.name.trim(),
+      name: trimmedName,
       role: tech.role?.trim() || 'ช่างซ่อมบำรุง',
       status: 'active',
       phone: tech.phone?.trim() || '',
@@ -380,35 +462,37 @@ class TicketService {
 
     if (isSupabaseConfigured && supabase) {
       try {
-        await supabase.from('technicians').insert([{
+        const { data, error } = await supabase.from('technicians').insert([{
           name: newTech.name,
           role: newTech.role,
           status: newTech.status,
           phone: newTech.phone,
           avatar_url: newTech.avatarUrl,
           is_on_duty_today: newTech.isOnDutyToday
-        }]);
-      } catch (e) {}
+        }]).select().single();
+
+        if (!error && data) {
+          newTech.id = String(data.id);
+        }
+      } catch (e) {
+        console.warn('[TicketService] Supabase addTechnician failed:', e);
+      }
     }
 
     try {
-      const res = await fetch('/api/technicians', {
+      await fetch('/api/technicians', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(tech)
       });
-      if (res.ok) {
-        const updatedTechs = await res.json();
-        if (Array.isArray(updatedTechs)) {
-          this.technicians = updatedTechs;
-          this.saveToLocalStorage();
-          this.notify();
-          return [...this.technicians];
-        }
-      }
-    } catch (e) {}
+    } catch {}
 
-    this.technicians.push(newTech);
+    const existingIdx = this.technicians.findIndex(t => t.name === trimmedName);
+    if (existingIdx !== -1) {
+      this.technicians[existingIdx] = newTech;
+    } else {
+      this.technicians.push(newTech);
+    }
     this.saveToLocalStorage();
     this.notify();
     return [...this.technicians];
@@ -427,24 +511,22 @@ class TicketService {
         if (updates.phone !== undefined) row.phone = updates.phone;
         if (updates.avatarUrl !== undefined) row.avatar_url = updates.avatarUrl;
         if (updates.isOnDutyToday !== undefined) row.is_on_duty_today = updates.isOnDutyToday;
-        await supabase.from('technicians').update(row).or(`id.eq.${targetId},name.eq.${targetId}`);
-      } catch (e) {}
+
+        let query = supabase.from('technicians').update(row);
+        query = filterTechnicianQuery(query, targetId);
+        await query;
+      } catch (e) {
+        console.warn('[TicketService] Supabase updateTechnician failed:', e);
+      }
     }
 
     try {
-      const res = await fetch(`/api/technicians/${encodeURIComponent(targetId)}`, {
+      await fetch(`/api/technicians/${encodeURIComponent(targetId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates)
       });
-      if (res.ok) {
-        const updated = await res.json();
-        if (item) Object.assign(item, updated);
-        this.saveToLocalStorage();
-        this.notify();
-        return [...this.technicians];
-      }
-    } catch (e) {}
+    } catch {}
 
     if (item) {
       Object.assign(item, updates);
@@ -460,13 +542,17 @@ class TicketService {
 
     if (isSupabaseConfigured && supabase) {
       try {
-        await supabase.from('technicians').delete().or(`id.eq.${targetId},name.eq.${targetId}`);
-      } catch (e) {}
+        let query = supabase.from('technicians').delete();
+        query = filterTechnicianQuery(query, targetId);
+        await query;
+      } catch (e) {
+        console.warn('[TicketService] Supabase deleteTechnician failed:', e);
+      }
     }
 
     try {
       await fetch(`/api/technicians/${encodeURIComponent(targetId)}`, { method: 'DELETE' });
-    } catch (e) {}
+    } catch {}
 
     this.technicians = this.technicians.filter(t => t.id !== idOrName && t.name !== idOrName);
     this.saveToLocalStorage();
@@ -484,11 +570,12 @@ class TicketService {
 
     if (isSupabaseConfigured && supabase) {
       try {
-        await supabase
-          .from('technicians')
-          .update({ is_on_duty_today: isOnDuty })
-          .or(`id.eq.${id},name.eq.${id}`);
-      } catch (e) {}
+        let query = supabase.from('technicians').update({ is_on_duty_today: isOnDuty });
+        query = filterTechnicianQuery(query, id);
+        await query;
+      } catch (e) {
+        console.warn('[TicketService] Supabase setTechnicianDuty failed:', e);
+      }
     }
 
     try {
@@ -497,7 +584,7 @@ class TicketService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [id]: isOnDuty })
       });
-    } catch (e) {}
+    } catch {}
 
     if (item) {
       item.isOnDutyToday = isOnDuty;
@@ -511,9 +598,13 @@ class TicketService {
     if (isSupabaseConfigured && supabase) {
       try {
         for (const [key, val] of Object.entries(dutyMap)) {
-          await supabase.from('technicians').update({ is_on_duty_today: val }).or(`id.eq.${key},name.eq.${key}`);
+          let query = supabase.from('technicians').update({ is_on_duty_today: val });
+          query = filterTechnicianQuery(query, key);
+          await query;
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn('[TicketService] Supabase bulkSetDuty failed:', e);
+      }
     }
 
     try {
@@ -522,7 +613,7 @@ class TicketService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dutyMap)
       });
-    } catch (e) {}
+    } catch {}
 
     this.technicians.forEach(t => {
       if (dutyMap[t.id] !== undefined) t.isOnDutyToday = dutyMap[t.id];
@@ -618,7 +709,6 @@ class TicketService {
       if (sortOrder === 'lifo') {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
-      // Default FIFO: Oldest created_at first
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
 
@@ -637,7 +727,7 @@ class TicketService {
     const nowIso = new Date().toISOString();
     const count = this.tickets.length + 1;
     const yearMonth = nowIso.slice(0, 7).replace('-', '');
-    const newId = 'REP-' + yearMonth + '-' + String(count).padStart(3, '0');
+    const newId = `REP-${yearMonth}-${String(count).padStart(3, '0')}`;
 
     let created: Ticket = {
       ...ticket,
@@ -647,7 +737,7 @@ class TicketService {
       updatedAt: nowIso
     };
 
-    // 1. Try Supabase
+    // 1. Primary write to Supabase Central Cloud
     if (isSupabaseConfigured && supabase) {
       try {
         const dbRow = ticketToDb(created);
@@ -658,13 +748,23 @@ class TicketService {
           .single();
         if (!error && data) {
           created = dbToTicket(data);
+        } else if (error) {
+          console.warn('[TicketService] Supabase insert returned error:', error.message);
+          // If conflict on request_id, generate collision-free unique id
+          if (error.code === '23505') {
+            const fallbackId = `REP-${yearMonth}-${Date.now().toString().slice(-4)}`;
+            dbRow.request_id = fallbackId;
+            created.requestId = fallbackId;
+            const retryRes = await supabase.from('repair_tickets').insert([dbRow]).select().single();
+            if (retryRes.data) created = dbToTicket(retryRes.data);
+          }
         }
       } catch (e) {
-        console.warn('[TicketService] Supabase insert fallback:', e);
+        console.warn('[TicketService] Supabase insert exception:', e);
       }
     }
 
-    // 2. Try REST API
+    // 2. Try REST API if local server is active
     try {
       const res = await fetch('/api/tickets', {
         method: 'POST',
@@ -675,9 +775,7 @@ class TicketService {
         const serverTicket: Ticket = await res.json();
         created = serverTicket;
       }
-    } catch (e) {
-      // Offline fallback
-    }
+    } catch {}
 
     this.tickets.unshift(created);
     this.saveToLocalStorage();
@@ -686,37 +784,29 @@ class TicketService {
   }
 
   public async updateTicket(id: string, updates: Partial<Ticket>): Promise<Ticket | null> {
-    // 1. Try Supabase
+    // 1. Primary write to Supabase Central Cloud
     if (isSupabaseConfigured && supabase) {
       try {
         const dbUpdates = ticketToDb(updates);
-        await supabase
-          .from('repair_tickets')
-          .update(dbUpdates)
-          .or(`id.eq.${id},request_id.eq.${id}`);
+        let query = supabase.from('repair_tickets').update(dbUpdates);
+        query = filterTicketQuery(query, id);
+        const { error } = await query;
+        if (error) {
+          console.warn('[TicketService] Supabase update returned error:', error.message);
+        }
       } catch (e) {
-        console.warn('[TicketService] Supabase update fallback:', e);
+        console.warn('[TicketService] Supabase update exception:', e);
       }
     }
 
     // 2. Try REST API
     try {
-      const res = await fetch(`/api/tickets/${encodeURIComponent(id)}`, {
+      await fetch(`/api/tickets/${encodeURIComponent(id)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates)
       });
-      if (res.ok) {
-        const updated: Ticket = await res.json();
-        const idx = this.tickets.findIndex(t => t.id === id || t.requestId === id);
-        if (idx !== -1) {
-          this.tickets[idx] = updated;
-        }
-        this.saveToLocalStorage();
-        this.notify();
-        return updated;
-      }
-    } catch (e) {}
+    } catch {}
 
     const item = this.tickets.find(t => t.id === id || t.requestId === id);
     if (!item) return null;
@@ -732,18 +822,23 @@ class TicketService {
   }
 
   public async deleteTicket(id: string): Promise<void> {
+    // 1. Primary delete on Supabase Central Cloud
     if (isSupabaseConfigured && supabase) {
       try {
-        await supabase
-          .from('repair_tickets')
-          .delete()
-          .or(`id.eq.${id},request_id.eq.${id}`);
-      } catch (e) {}
+        let query = supabase.from('repair_tickets').delete();
+        query = filterTicketQuery(query, id);
+        const { error } = await query;
+        if (error) {
+          console.warn('[TicketService] Supabase delete returned error:', error.message);
+        }
+      } catch (e) {
+        console.warn('[TicketService] Supabase delete exception:', e);
+      }
     }
 
     try {
       await fetch(`/api/tickets/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    } catch (e) {}
+    } catch {}
 
     this.tickets = this.tickets.filter(t => t.id !== id && t.requestId !== id);
     this.saveToLocalStorage();
@@ -754,12 +849,14 @@ class TicketService {
     if (isSupabaseConfigured && supabase) {
       try {
         await supabase.from('repair_tickets').delete().neq('request_id', '');
-      } catch (e) {}
+      } catch (e) {
+        console.warn('[TicketService] Supabase clearAllTickets failed:', e);
+      }
     }
 
     try {
       await fetch('/api/tickets/clear-all', { method: 'POST' });
-    } catch (e) {}
+    } catch {}
 
     this.tickets = [];
     this.saveToLocalStorage();

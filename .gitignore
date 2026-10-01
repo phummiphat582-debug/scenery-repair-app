@@ -7,3 +7,5 @@ dist-ssr
 .DS_Store
 cloudflared.exe
 *.log
+supabase/.temp/
+diag-onesignal.cjs

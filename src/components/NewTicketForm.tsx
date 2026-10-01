@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Department, Priority, Ticket } from '../types';
 import { ConfirmModal } from './ConfirmModal';
+import { compressImage } from '../lib/imageCompress';
 
 interface NewTicketFormProps {
   departments: Department[];
@@ -132,21 +133,22 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
     });
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
+      try {
+        const compressedUrl = await compressImage(file, 1200, 1200, 0.75);
+        if (compressedUrl) {
           const now = new Date();
           const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
           setPhotos(prev => [
             ...prev,
-            { url: event.target!.result as string, time: timeStr, label: file.name.slice(0, 10) }
+            { url: compressedUrl, time: timeStr, label: file.name.slice(0, 10) }
           ]);
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.warn('Failed to compress image:', err);
+      }
     }
   };
 
