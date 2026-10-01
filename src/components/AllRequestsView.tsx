@@ -6,6 +6,7 @@ import { TicketList } from './TicketList';
 import { DepartmentBoard } from './DepartmentBoard';
 import { UrgentAlertBanner } from './UrgentAlertBanner';
 import { QueueTableView } from './QueueTableView';
+import { DivisionFilterTabs } from './DivisionFilterTabs';
 
 interface AllRequestsViewProps {
   tickets: Ticket[];
@@ -22,6 +23,7 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
   onSelectTicket,
   onQuickAccept
 }) => {
+  const [selectedDivision, setSelectedDivision] = useState<string>('all');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('active');
   const [onlyUrgent, setOnlyUrgent] = useState<boolean>(false);
@@ -63,6 +65,10 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
   // Filtered & Sorted tickets
   const filteredTickets = useMemo(() => {
     let result = [...tickets];
+
+    if (selectedDivision !== 'all') {
+      result = result.filter(t => (t.division || '84') === selectedDivision);
+    }
 
     if (selectedDepartment !== 'all') {
       result = result.filter(t => t.department === selectedDepartment);
@@ -109,11 +115,20 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
       ...t,
       queueNumber: idx + 1
     }));
-  }, [tickets, selectedDepartment, statusFilter, onlyUrgent, searchQuery, sortOrder]);
+  }, [tickets, selectedDivision, selectedDepartment, statusFilter, onlyUrgent, searchQuery, sortOrder]);
 
   return (
     <div className="flex flex-col w-full pb-20">
       
+      {/* 0. Division Filter Tabs (84 ซ่อมบำรุง, 85 ก่อสร้าง, 86 งานศิลป์) */}
+      <div className="px-4 pt-2 pb-1 bg-surface-container-low/50 border-b border-slate-200/60">
+        <DivisionFilterTabs
+          selectedDivision={selectedDivision}
+          onSelectDivision={setSelectedDivision}
+          tickets={tickets}
+        />
+      </div>
+
       {/* 1. Department Tabs */}
       <DepartmentTabs
         departments={departments}

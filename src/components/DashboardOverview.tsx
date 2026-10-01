@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Ticket, Department, Technician } from '../types';
 import { ConfirmModal } from './ConfirmModal';
+import { DivisionBadge } from './DivisionBadge';
+import { DivisionFilterTabs } from './DivisionFilterTabs';
 
 interface DashboardOverviewProps {
   tickets: Ticket[];
@@ -24,6 +26,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onRefresh
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDivisionFilter, setSelectedDivisionFilter] = useState<string>('all');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
   const [selectedZoneFilter, setSelectedZoneFilter] = useState<string>('all');
   const [callConfirmTech, setCallConfirmTech] = useState<{ name: string; phone: string } | null>(null);
@@ -81,6 +84,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       if (selectedStatusFilter === 'waiting_inspect' && ticket.status !== 'waiting_inspect') return false;
       if (selectedStatusFilter === 'completed' && ticket.status !== 'completed') return false;
 
+      // Division
+      if (selectedDivisionFilter !== 'all' && (ticket.division || '84') !== selectedDivisionFilter) {
+        return false;
+      }
+
       // Zone
       if (selectedZoneFilter !== 'all' && ticket.zone && !ticket.zone.includes(selectedZoneFilter)) {
         return false;
@@ -88,7 +96,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
       return true;
     });
-  }, [tickets, searchQuery, selectedStatusFilter, selectedZoneFilter]);
+  }, [tickets, searchQuery, selectedDivisionFilter, selectedStatusFilter, selectedZoneFilter]);
 
   const getUrgencyText = (priority: string) => {
     switch (priority) {
@@ -307,6 +315,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
       </section>
 
+      {/* 4.5 Division Filter Tabs (84 ซ่อมบำรุง, 85 ก่อสร้าง, 86 งานศิลป์) */}
+      <section className="px-margin my-space-xs">
+        <DivisionFilterTabs
+          selectedDivision={selectedDivisionFilter}
+          onSelectDivision={setSelectedDivisionFilter}
+          tickets={tickets}
+        />
+      </section>
+
       {/* 5. Quick Status Pill Filter Bar */}
       <section className="px-margin my-space-xs">
         <div className="flex items-center gap-1.5 overflow-x-auto py-1 scroll-smooth no-scrollbar">
@@ -396,6 +413,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                       <span className="font-label-md text-label-md font-bold text-primary tracking-tight">
                         #{ticket.requestId}
                       </span>
+                      <DivisionBadge division={ticket.division} size="sm" />
                       {ticket.category && (
                         <span className="px-2 py-0.5 rounded-full bg-primary-fixed/40 text-primary font-bold text-[10px]">
                           {ticket.category}

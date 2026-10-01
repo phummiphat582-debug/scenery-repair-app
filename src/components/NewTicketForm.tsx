@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Department, Priority, Ticket } from '../types';
+import { Department, Priority, Ticket, DivisionId } from '../types';
 import { ConfirmModal } from './ConfirmModal';
 import { compressImage } from '../lib/imageCompress';
+import { DIVISION_LIST, getCategoriesByDivision, getDivisionInfo, WorkCategory } from '../data/divisionData';
+import { DivisionBadge } from './DivisionBadge';
 
 interface NewTicketFormProps {
   departments: Department[];
@@ -23,9 +25,10 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
   const [department, setDepartment] = useState('คาเฟ่ & F&B');
   const [isRequesterDrawerOpen, setIsRequesterDrawerOpen] = useState(true);
 
+  const [selectedDivision, setSelectedDivision] = useState<DivisionId>('84');
   const [selectedZone, setSelectedZone] = useState('C');
   const [specificLocation, setSpecificLocation] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('hvac');
+  const [selectedCategory, setSelectedCategory] = useState('electric');
 
   const [problemDetail, setProblemDetail] = useState('');
   const [priority, setPriority] = useState<Priority>('normal');
@@ -49,80 +52,23 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
     { key: 'HQ', name: 'สำนักงานส่วนกลาง', icon: 'apartment', dept: 'ไอที & ระบบสื่อสาร' }
   ];
 
-  // 8 Standardized Farm Maintenance Work Formats
-  const categories = [
-    { 
-      key: 'electric', 
-      title: 'ระบบไฟฟ้า & แสงสว่าง', 
-      sub: 'ไฟดับ ปลั๊กไหม้ สปอตไลท์ เบรกเกอร์', 
-      icon: 'bolt', 
-      dept: 'ไฟฟ้า & แอร์',
-      tags: ['ไฟดับทั้งโซน', 'เบรกเกอร์ทริป', 'ปลั๊กไฟช็อต/ไหม้', 'หลอดไฟขาด']
-    },
-    { 
-      key: 'hvac', 
-      title: 'ระบบแอร์ & เครื่องเย็น', 
-      sub: 'แอร์ไม่เย็น น้ำแอร์หยด ตู้แช่เสีย', 
-      icon: 'ac_unit', 
-      dept: 'ไฟฟ้า & แอร์',
-      tags: ['แอร์ไม่เย็น/มีแต่ลม', 'น้ำแอร์หยดนอง', 'ตู้แช่วัตถุดิบไม่เย็น', 'คอมเพรสเซอร์เสียงดัง']
-    },
-    { 
-      key: 'plumbing', 
-      title: 'ระบบประปา & สุขาภิบาล', 
-      sub: 'ท่อแตก น้ำไม่ไหล ปั๊มน้ำ ชักโครกตัน', 
-      icon: 'water_drop', 
-      dept: 'ประปา & สุขาภิบาล',
-      tags: ['ท่อประปาแตกน้ำรั่ว', 'น้ำไม่ไหล/ไหลค่อย', 'ปั๊มน้ำไม่ตัด', 'ชักโครก/ท่อตัน']
-    },
-    { 
-      key: 'farm_machinery', 
-      title: 'เครื่องจักร & ยานพาหนะ', 
-      sub: 'รถแทรกเตอร์ รถกอล์ฟ เครื่องตัดหญ้า', 
-      icon: 'agriculture', 
-      dept: 'ฟาร์มสัตว์ & กิจกรรม',
-      tags: ['สตาร์ทไม่ติด', 'เครื่องยนต์ดับ', 'ระบบไฮดรอลิกรั่ว', 'ยางแบน/โซ่หลุด']
-    },
-    { 
-      key: 'structural', 
-      title: 'งานอาคาร โครงสร้าง & สี', 
-      sub: 'ประตู หน้าต่าง หลังคารั่ว รั้วคอกแกะ', 
-      icon: 'carpenter', 
-      dept: 'ซ่อมบำรุงอาคาร & สี',
-      tags: ['หลังคารั่วซึม', 'ประตูลูกบิดเสีย', 'รั้วคอกสัตว์ชำรุด', 'พื้น/ทางเดินชำรุด']
-    },
-    { 
-      key: 'it_system', 
-      title: 'ไอที POS & กล้องวงจรปิด', 
-      sub: 'เครื่อง POS ปริ้นเตอร์บิล Wi-Fi กล้อง', 
-      icon: 'router', 
-      dept: 'ไอที & ระบบสื่อสาร',
-      tags: ['เครื่อง POS ดับ', 'ปริ้นเตอร์ใบเสร็จไม่ออก', 'อินเทอร์เน็ต Wi-Fi หลุด', 'กล้อง CCTV ใช้งานไม่ได้']
-    },
-    { 
-      key: 'landscaping', 
-      title: 'งานสวน & ภูมิทัศน์ฟาร์ม', 
-      sub: 'สปริงเกอร์ ทางเดินหญ้า กิ่งไม้ล้ม', 
-      icon: 'yard', 
-      dept: 'ภูมิทัศน์ & สวนดอกไม้',
-      tags: ['ระบบสปริงเกอร์รั่ว', 'กิ่งไม้หักขวางทาง', 'ระบบระบายน้ำแปลงหญ้า', 'ดินสไลด์ทรุด']
-    },
-    { 
-      key: 'general', 
-      title: 'งานทั่วไป & เบ็ดเตล็ด', 
-      sub: 'โต๊ะเก้าอี้ชำรุด ขนย้าย ป้ายบอกทาง', 
-      icon: 'handyman', 
-      dept: 'คาเฟ่ & F&B',
-      tags: ['โต๊ะเก้าอี้ชำรุด', 'ขอแรงช่วยขนย้าย', 'ป้ายบอกทางชำรุด', 'อุปกรณ์บริการแขกเสีย']
+  // Dynamic categories based on selected division
+  const categories = getCategoriesByDivision(selectedDivision);
+
+  const handleDivisionSelect = (divId: DivisionId) => {
+    setSelectedDivision(divId);
+    const newCats = getCategoriesByDivision(divId);
+    if (newCats.length > 0) {
+      setSelectedCategory(newCats[0].key);
     }
-  ];
+  };
 
   const handleZoneSelect = (z: typeof zones[0]) => {
     setSelectedZone(z.key);
     setDepartment(z.dept);
   };
 
-  const handleCategorySelect = (cat: typeof categories[0]) => {
+  const handleCategorySelect = (cat: WorkCategory) => {
     setSelectedCategory(cat.key);
   };
 
@@ -212,6 +158,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
 
     const payload = {
       title: `${catObj?.title || 'งานซ่อม'}: ${locText}`,
+      division: selectedDivision,
       department: department || zoneObj?.dept || 'คาเฟ่ & F&B',
       location: `${zoneObj?.name || selectedZone} - ${locText}`,
       description: problemDetail.trim(),
@@ -410,6 +357,60 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
         </>)}
 
         {step === 2 && (<>
+        {/* 3-Division Operational Selector */}
+        <section className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm flex flex-col gap-space-sm border-2 border-primary/20">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="font-label-lg text-label-lg text-on-surface flex items-center gap-2 font-bold">
+                <span className="material-symbols-outlined text-primary text-[22px]">diversity_3</span>
+                <span>เลือกสายงานที่รับผิดชอบ</span>
+                <span className="text-error font-bold">*</span>
+              </label>
+              <p className="text-[12px] text-on-surface-variant mt-0.5">
+                ระบบจะแยกงานและแจ้งช่างประจำสายงานโดยตรง (84 ซ่อมบำรุง / 85 ก่อสร้าง / 86 งานศิลป์)
+              </p>
+            </div>
+            <span className="px-2.5 py-1 rounded-full bg-primary/10 text-primary font-bold text-xs">
+              3 สายงาน
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
+            {DIVISION_LIST.map((div) => {
+              const isSelected = selectedDivision === div.id;
+              return (
+                <button
+                  key={div.id}
+                  type="button"
+                  onClick={() => handleDivisionSelect(div.id)}
+                  className={`p-3.5 rounded-2xl text-left flex flex-col gap-2 transition-all cursor-pointer border-2 active:scale-98 ${
+                    isSelected
+                      ? `${div.badgeClass} ring-2 ring-primary/40 shadow-sm font-bold scale-[1.01]`
+                      : 'bg-surface-container-low border-slate-200/80 hover:bg-surface-container hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                        isSelected ? `${div.accentBg} text-white shadow-xs` : 'bg-surface-container-high text-on-surface-variant'
+                      }`}>
+                        <span className="material-symbols-outlined text-[18px]">{div.icon}</span>
+                      </div>
+                      <span className="text-sm font-bold">{div.name}</span>
+                    </div>
+                    {isSelected && (
+                      <span className="material-symbols-outlined text-base">check_circle</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] leading-relaxed opacity-85">
+                    {div.description}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
         {/* Zone Selection */}
         <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm border border-slate-200/40">
           <div className="flex items-center justify-between">
@@ -472,24 +473,24 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
           </div>
         </section>
 
-        {/* Maintenance Category Selection - รูปแบบงานซ่อมบำรุง */}
+        {/* Maintenance Category Selection - รูปแบบงานตามสายงาน */}
         <section className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm flex flex-col gap-space-sm border border-slate-200">
           <div className="flex items-center justify-between">
             <div>
               <label className="font-label-lg text-label-lg text-on-surface flex items-center gap-1.5 font-bold">
                 <span className="material-symbols-outlined text-primary text-[20px]">category</span>
-                รูปแบบงานซ่อมบำรุง <span className="text-error font-bold">*</span>
+                หมวดงาน {getDivisionInfo(selectedDivision).name} <span className="text-error font-bold">*</span>
               </label>
               <p className="text-[11px] text-on-surface-variant mt-0.5">
                 เลือกรูปแบบงานที่ตรงกับปัญหา เพื่อจ่ายงานให้ช่างเฉพาะทางได้รวดเร็ว
               </p>
             </div>
             <span className="font-label-sm text-xs px-2.5 py-0.5 rounded-full bg-primary-fixed/50 text-primary font-bold">
-              8 หมวดหลัก
+              {categories.length} หมวดย่อย
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
             {categories.map(cat => {
               const isSelected = selectedCategory === cat.key;
               return (
@@ -844,8 +845,12 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             <div className="rounded-xl bg-surface-container-low p-3"><span className="text-xs text-on-surface-variant block">ผู้แจ้ง</span><strong>{requesterName}</strong><div className="text-xs text-on-surface-variant">{requesterPhone} • {department}</div></div>
             <div className="rounded-xl bg-surface-container-low p-3"><span className="text-xs text-on-surface-variant block">สถานที่</span><strong>{specificLocation}</strong><div className="text-xs text-on-surface-variant">{zones.find(z => z.key === selectedZone)?.name}</div></div>
             <div className="rounded-xl bg-surface-container-low p-3 sm:col-span-2"><span className="text-xs text-on-surface-variant block">รายละเอียดอาการ</span><strong className="whitespace-pre-wrap">{problemDetail}</strong></div>
-            <div className="rounded-xl bg-surface-container-low p-3"><span className="text-xs text-on-surface-variant block">ประเภทงาน</span><strong>{categories.find(c => c.key === selectedCategory)?.title}</strong></div>
-            <div className="rounded-xl bg-surface-container-low p-3"><span className="text-xs text-on-surface-variant block">ความเร่งด่วน</span><strong>{priority === 'critical' ? 'ด่วนที่สุด / ฉุกเฉิน' : priority === 'high' ? 'ด่วน' : 'ปกติ'}</strong></div>
+            <div className="rounded-xl bg-surface-container-low p-3">
+              <span className="text-xs text-on-surface-variant block mb-1">สายงานที่รับผิดชอบ</span>
+              <DivisionBadge division={selectedDivision} size="sm" />
+            </div>
+            <div className="rounded-xl bg-surface-container-low p-3"><span className="text-xs text-on-surface-variant block">หมวดงาน</span><strong>{categories.find(c => c.key === selectedCategory)?.title}</strong></div>
+            <div className="rounded-xl bg-surface-container-low p-3 sm:col-span-2"><span className="text-xs text-on-surface-variant block">ความเร่งด่วน</span><strong>{priority === 'critical' ? 'ด่วนที่สุด / ฉุกเฉิน' : priority === 'high' ? 'ด่วน' : 'ปกติ'}</strong></div>
           </div>
           <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800">
             <span className="material-symbols-outlined text-[18px]">info</span>

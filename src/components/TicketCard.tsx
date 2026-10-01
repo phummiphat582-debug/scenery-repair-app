@@ -1,6 +1,7 @@
 import React from 'react';
 import { Clock, MapPin, User, CheckCircle, AlertTriangle, Zap, Wrench, ChevronRight, Image as ImageIcon } from 'lucide-react';
 import { Ticket, Department } from '../types';
+import { DivisionBadge } from './DivisionBadge';
 
 interface TicketCardProps {
   ticket: Ticket;
@@ -71,9 +72,12 @@ export const TicketCard: React.FC<TicketCardProps> = ({
           </span>
         </div>
 
-        {/* Request ID & Department Tag */}
-        <div className="flex items-center justify-between gap-2 text-xs text-slate-500 mb-1">
-          <span className="font-mono font-semibold">{ticket.requestId}</span>
+        {/* Request ID, Division & Department Tag */}
+        <div className="flex items-center justify-between gap-2 text-xs text-slate-500 mb-1 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-mono font-semibold">{ticket.requestId}</span>
+            <DivisionBadge division={ticket.division} size="sm" />
+          </div>
           <span 
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold"
             style={{ 

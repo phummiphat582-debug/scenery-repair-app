@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Ticket, Technician } from '../types';
 import { AssignTechnicianModal } from './AssignTechnicianModal';
 import { ConfirmModal } from './ConfirmModal';
+import { DivisionBadge } from './DivisionBadge';
+import { getDivisionInfo } from '../data/divisionData';
 
 interface TaskDetailsModalProps {
   ticket: Ticket | null;
@@ -161,10 +163,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
           {/* Top Incident Summary Card */}
           <div className="p-gutter flex flex-col gap-space-sm bg-surface-container-lowest rounded-2xl shadow-sm border border-slate-200/40">
             <div className="flex items-center justify-between gap-space-xs">
-              <div className="flex items-center gap-space-xs min-w-0">
+              <div className="flex items-center gap-space-xs min-w-0 flex-wrap">
                 <span className="font-label-md text-label-md text-primary bg-primary-fixed px-2.5 py-1 rounded-full font-semibold">
                   #{ticket.requestId}
                 </span>
+                <DivisionBadge division={ticket.division} size="sm" />
                 <span className="font-body-sm text-body-sm text-on-surface-variant truncate">
                   {createdAtText}
                 </span>
@@ -263,6 +266,25 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   {ticket.department} • โทร {ticket.requesterPhone || 'ไม่ได้ระบุเบอร์โทร'}
                 </span>
               </div>
+            </div>
+          </div>
+
+          {/* Section: Division & Work Scope */}
+          <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-2.5 border border-slate-200/40">
+            <div className="flex items-center justify-between">
+              <span className="font-label-lg text-label-lg text-on-surface flex items-center gap-2 font-bold">
+                <span className="material-symbols-outlined text-[20px] text-primary">diversity_3</span>
+                สายงานที่รับผิดชอบ
+              </span>
+              <DivisionBadge division={ticket.division} size="md" />
+            </div>
+            <div className="p-3 rounded-xl bg-surface-container-low text-xs text-on-surface-variant">
+              <div className="font-bold text-on-surface text-sm mb-0.5">
+                {getDivisionInfo(ticket.division).name}
+              </div>
+              <p className="leading-relaxed">
+                {getDivisionInfo(ticket.division).description}
+              </p>
             </div>
           </div>
 

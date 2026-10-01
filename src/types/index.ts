@@ -1,5 +1,19 @@
 export type Priority = 'critical' | 'high' | 'normal' | 'low';
 
+export type DivisionId = '84' | '85' | '86';
+
+export interface DivisionInfo {
+  id: DivisionId;
+  code: string;
+  name: string;
+  shortName: string;
+  icon: string;
+  color: string;
+  badgeClass: string;
+  accentBg: string;
+  description: string;
+}
+
 export type TicketStatus = 
   | 'pending'        // รอดำเนินการ / รอตรวจสอบ
   | 'assigned'       // มอบหมายแล้ว / งานใหม่รอรับ
@@ -62,6 +76,9 @@ export interface Ticket {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  
+  // 3-Division Classification: '84' (ซ่อมบำรุง) | '85' (งานก่อสร้าง) | '86' (งานศิลป์)
+  division?: DivisionId;
   
   // Rich details from design system
   zone?: string;

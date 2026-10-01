@@ -4,6 +4,8 @@ import { NewTicketForm } from './NewTicketForm';
 import { DailyDutyModal } from './DailyDutyModal';
 import { ConfirmModal } from './ConfirmModal';
 import { Phone, Search, Wrench, Clock, CheckCircle2, ChevronRight, User, MapPin, Plus, Shield, CalendarCheck, AlertTriangle, ListOrdered, ClipboardList } from 'lucide-react';
+import { DivisionBadge } from './DivisionBadge';
+import { DivisionFilterTabs } from './DivisionFilterTabs';
 
 interface RequesterPortalViewProps {
   tickets: Ticket[];
@@ -28,6 +30,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'create' | 'queue' | 'track'>('create');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDivisionFilter, setSelectedDivisionFilter] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('all');
   const [isDutyModalOpen, setIsDutyModalOpen] = useState(false);
@@ -43,6 +46,10 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
   // Filter tickets for tracking
   const filteredTickets = useMemo(() => {
     return tickets.filter(t => {
+      if (selectedDivisionFilter !== 'all' && (t.division || '84') !== selectedDivisionFilter) {
+        return false;
+      }
+
       if (selectedDeptFilter !== 'all' && t.department !== selectedDeptFilter) {
         return false;
       }
@@ -60,7 +67,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       if (filterStatus === 'completed') return t.status === 'completed' || t.status === 'waiting_inspect';
       return true;
     });
-  }, [tickets, searchQuery, filterStatus, selectedDeptFilter]);
+  }, [tickets, searchQuery, filterStatus, selectedDivisionFilter, selectedDeptFilter]);
 
   const departmentQueues = useMemo(() => {
     const activeTickets = tickets
@@ -414,6 +421,15 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       {activeSubTab === 'track' && (
         <div className="space-y-4">
           
+          {/* Division Filter Tabs */}
+          <div className="bg-surface-container-lowest p-2 rounded-2xl border border-slate-200 shadow-xs">
+            <DivisionFilterTabs
+              selectedDivision={selectedDivisionFilter}
+              onSelectDivision={setSelectedDivisionFilter}
+              tickets={tickets}
+            />
+          </div>
+
           {/* Search & Filter Bar */}
           <div className="flex flex-col sm:flex-row gap-2.5">
             <div className="relative flex-1">
@@ -503,6 +519,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                         <span className="font-mono text-xs font-extrabold text-primary bg-primary-fixed/40 px-2.5 py-1 rounded-full">
                           #{ticket.requestId}
                         </span>
+                        <DivisionBadge division={ticket.division} size="sm" />
                         <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                           คิวที่ #{queueNum}
                         </span>

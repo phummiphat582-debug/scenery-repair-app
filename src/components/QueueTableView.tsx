@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Ticket, Department, Technician } from '../types';
 import { Phone, CheckCircle2, Clock, Wrench, AlertTriangle, ChevronRight, Eye } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
+import { DivisionBadge } from './DivisionBadge';
 
 interface QueueTableViewProps {
   tickets: Ticket[];
@@ -149,13 +150,14 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
 
                     {/* ปัญหาที่แจ้งซ่อม */}
                     <td className="py-3.5 px-4">
-                      {ticket.category && (
-                        <div className="mb-1">
+                      <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                        <DivisionBadge division={ticket.division} size="sm" />
+                        {ticket.category && (
                           <span className="px-2 py-0.5 rounded-md bg-primary-fixed/40 text-primary font-bold text-[10px]">
                             {ticket.category}
                           </span>
-                        </div>
-                      )}
+                        )}
+                      </div>
                       <div className="font-bold text-on-surface text-xs line-clamp-1 group-hover:text-primary transition-colors">
                         {ticket.title}
                       </div>

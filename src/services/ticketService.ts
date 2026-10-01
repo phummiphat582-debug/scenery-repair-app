@@ -1,4 +1,4 @@
-import { Ticket, Department, Technician, SortOrder } from '../types';
+import { Ticket, Department, Technician, SortOrder, DivisionId } from '../types';
 import { INITIAL_DEPARTMENTS } from '../data/mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
@@ -48,6 +48,7 @@ function dbToTicket(row: any): Ticket {
     remark: row.remark || '',
     requestImageUrl: row.request_image_url || row.requestImageUrl || '',
     resultImageUrl: row.result_image_url || row.resultImageUrl || '',
+    division: (row.division as DivisionId) || '84',
     createdAt: row.created_at || row.createdAt || new Date().toISOString(),
     updatedAt: row.updated_at || row.updatedAt || new Date().toISOString(),
     completedAt: row.completed_at || row.completedAt || undefined
@@ -60,9 +61,12 @@ function ticketToDb(t: Partial<Ticket>): any {
     row.id = t.id;
   }
   if (t.requestId) row.request_id = t.requestId;
+  if (t.division) row.division = t.division;
+  else if (!t.id) row.division = '84';
   if (t.title !== undefined) row.title = t.title;
   if (t.description !== undefined) row.description = t.description;
-  if (t.department !== undefined) row.department = t.department;
+  if (t.department !== undefined) row.department = t.department || 'คาเฟ่ & F&B';
+  else if (!t.id) row.department = 'คาเฟ่ & F&B';
   if (t.location !== undefined) row.location = t.location;
   if (t.requesterName !== undefined) row.requester_name = t.requesterName;
   if (t.requesterPhone !== undefined) row.requester_phone = t.requesterPhone;
@@ -645,6 +649,7 @@ class TicketService {
    */
   public async getTickets(options?: {
     department?: string;
+    division?: string;
     statusFilter?: string;
     priorityFilter?: string;
     sortOrder?: SortOrder;
@@ -682,6 +687,11 @@ class TicketService {
         }
       }
     });
+
+    // 0. Filter by Division ('84' | '85' | '86')
+    if (options?.division && options.division !== 'all') {
+      list = list.filter(t => (t.division || '84') === options.division);
+    }
 
     // 1. Filter by Department
     if (options?.department && options.department !== 'all') {

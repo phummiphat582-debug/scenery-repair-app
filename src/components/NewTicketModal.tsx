@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, AlertTriangle, Image as ImageIcon } from 'lucide-react';
-import { Department, Priority, Ticket } from '../types';
+import { Department, Priority, Ticket, DivisionId } from '../types';
+import { DIVISION_LIST } from '../data/divisionData';
 
 interface NewTicketModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({
   departments,
   onSubmit
 }) => {
+  const [division, setDivision] = useState<DivisionId>('84');
   const [title, setTitle] = useState('');
   const [department, setDepartment] = useState(departments[0]?.name || 'คาเฟ่ & F&B');
   const [location, setLocation] = useState('');
@@ -38,6 +40,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({
     try {
       await onSubmit({
         title: title.trim(),
+        division,
         department,
         location: location.trim(),
         description: description.trim(),
@@ -95,6 +98,33 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({
                   <div className="text-[10px] font-normal opacity-80 mt-0.5">{p.desc}</div>
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Division Selector */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+              สายงานที่รับผิดชอบ (Division) *
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {DIVISION_LIST.map((d) => {
+                const isSelected = division === d.id;
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => setDivision(d.id)}
+                    className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      isSelected
+                        ? `${d.badgeClass} ring-2 ring-primary/40 shadow-xs font-bold`
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">{d.icon}</span>
+                    <span>{d.name}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

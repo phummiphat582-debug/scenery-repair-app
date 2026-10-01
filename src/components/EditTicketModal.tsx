@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { X, Wrench, Clock, MapPin, User, CheckCircle, AlertTriangle, Send } from 'lucide-react';
-import { Ticket, Technician, TicketStatus, Priority } from '../types';
+import { Ticket, Technician, TicketStatus, Priority, DivisionId } from '../types';
+import { DIVISION_LIST } from '../data/divisionData';
+import { DivisionBadge } from './DivisionBadge';
 
 interface EditTicketModalProps {
   ticket: Ticket | null;
@@ -19,6 +21,7 @@ export const EditTicketModal: React.FC<EditTicketModalProps> = ({
 }) => {
   if (!isOpen || !ticket) return null;
 
+  const [division, setDivision] = useState<DivisionId>(ticket.division || '84');
   const [status, setStatus] = useState<TicketStatus>(ticket.status);
   const [priority, setPriority] = useState<Priority>(ticket.priority);
   const [technicianName, setTechnicianName] = useState(ticket.technicianName || '');
@@ -37,6 +40,7 @@ export const EditTicketModal: React.FC<EditTicketModalProps> = ({
     setIsSaving(true);
     try {
       await onUpdate(ticket.id, {
+        division,
         status,
         priority,
         technicianName: technicianName.trim(),
@@ -71,9 +75,10 @@ export const EditTicketModal: React.FC<EditTicketModalProps> = ({
         {/* Header */}
         <div className="scenery-gradient text-white px-6 py-4 flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Wrench className="w-5 h-5 text-teal-300" />
               <h3 className="font-bold text-base sm:text-lg">บันทึกผลการซ่อมและอัปเดตงาน</h3>
+              <DivisionBadge division={ticket.division} size="sm" />
             </div>
             <p className="text-xs text-teal-100 mt-0.5 font-mono">{ticket.requestId} · {ticket.department}</p>
           </div>
@@ -101,6 +106,33 @@ export const EditTicketModal: React.FC<EditTicketModalProps> = ({
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           
+          {/* Division Selector */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">
+              สายงานที่รับผิดชอบ (Division)
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {DIVISION_LIST.map((d) => {
+                const isSelected = division === d.id;
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => setDivision(d.id)}
+                    className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      isSelected
+                        ? `${d.badgeClass} ring-2 ring-primary/40 shadow-xs font-bold`
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">{d.icon}</span>
+                    <span>{d.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Status & Priority Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
