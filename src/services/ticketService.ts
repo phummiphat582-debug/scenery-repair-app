@@ -117,6 +117,10 @@ function filterTechnicianQuery(query: any, idOrName: string) {
   return query.eq('name', idOrName);
 }
 
+const isLocalEnv = (): boolean =>
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
 class TicketService {
   private tickets: Ticket[] = [];
   private departments: Department[] = [];
@@ -267,7 +271,7 @@ class TicketService {
   }
 
   private connectSSE() {
-    if (typeof window === 'undefined' || this.eventSource) return;
+    if (!isLocalEnv() || this.eventSource) return;
 
     try {
       this.eventSource = new EventSource('/api/realtime');
@@ -370,41 +374,43 @@ class TicketService {
         }
       }
 
-      // 2. Local REST API Sync (Fallback when running with local express backend)
-      try {
-        const [ticketsRes, techsRes, deptsRes] = await Promise.allSettled([
-          fetch('/api/tickets', { cache: 'no-store' }),
-          fetch('/api/technicians', { cache: 'no-store' }),
-          fetch('/api/departments', { cache: 'no-store' })
-        ]);
+      // 2. Local REST API Sync (Fallback only when running with local express backend on localhost)
+      if (isLocalEnv()) {
+        try {
+          const [ticketsRes, techsRes, deptsRes] = await Promise.allSettled([
+            fetch('/api/tickets', { cache: 'no-store' }),
+            fetch('/api/technicians', { cache: 'no-store' }),
+            fetch('/api/departments', { cache: 'no-store' })
+          ]);
 
-        if (ticketsRes.status === 'fulfilled' && ticketsRes.value.ok) {
-          const serverTickets: Ticket[] = await ticketsRes.value.json();
-          if (Array.isArray(serverTickets) && JSON.stringify(serverTickets) !== JSON.stringify(this.tickets)) {
-            this.tickets = serverTickets;
-            changed = true;
-          }
-        }
-
-        if (techsRes.status === 'fulfilled' && techsRes.value.ok) {
-          const serverTechs: Technician[] = await techsRes.value.json();
-          if (Array.isArray(serverTechs)) {
-            const filteredTechs = removeLegacyDemoTechnicians(serverTechs);
-            if (JSON.stringify(filteredTechs) !== JSON.stringify(this.technicians)) {
-              this.technicians = filteredTechs;
+          if (ticketsRes.status === 'fulfilled' && ticketsRes.value.ok) {
+            const serverTickets: Ticket[] = await ticketsRes.value.json();
+            if (Array.isArray(serverTickets) && JSON.stringify(serverTickets) !== JSON.stringify(this.tickets)) {
+              this.tickets = serverTickets;
               changed = true;
             }
           }
-        }
 
-        if (deptsRes.status === 'fulfilled' && deptsRes.value.ok) {
-          const serverDepts: Department[] = await deptsRes.value.json();
-          if (Array.isArray(serverDepts) && serverDepts.length > 0 && JSON.stringify(serverDepts) !== JSON.stringify(this.departments)) {
-            this.departments = serverDepts;
-            changed = true;
+          if (techsRes.status === 'fulfilled' && techsRes.value.ok) {
+            const serverTechs: Technician[] = await techsRes.value.json();
+            if (Array.isArray(serverTechs)) {
+              const filteredTechs = removeLegacyDemoTechnicians(serverTechs);
+              if (JSON.stringify(filteredTechs) !== JSON.stringify(this.technicians)) {
+                this.technicians = filteredTechs;
+                changed = true;
+              }
+            }
           }
-        }
-      } catch {}
+
+          if (deptsRes.status === 'fulfilled' && deptsRes.value.ok) {
+            const serverDepts: Department[] = await deptsRes.value.json();
+            if (Array.isArray(serverDepts) && serverDepts.length > 0 && JSON.stringify(serverDepts) !== JSON.stringify(this.departments)) {
+              this.departments = serverDepts;
+              changed = true;
+            }
+          }
+        } catch {}
+      }
 
       if (changed || !this.isInitialSyncDone) {
         this.isInitialSyncDone = true;
@@ -479,13 +485,15 @@ class TicketService {
       }
     }
 
-    try {
-      await fetch('/api/technicians', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tech)
-      });
-    } catch {}
+    if (isLocalEnv()) {
+      try {
+        await fetch('/api/technicians', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(tech)
+        });
+      } catch {}
+    }
 
     const existingIdx = this.technicians.findIndex(t => t.name === trimmedName);
     if (existingIdx !== -1) {
@@ -520,13 +528,15 @@ class TicketService {
       }
     }
 
-    try {
-      await fetch(`/api/technicians/${encodeURIComponent(targetId)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      });
-    } catch {}
+    if (isLocalEnv()) {
+      try {
+        await fetch(`/api/technicians/${encodeURIComponent(targetId)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates)
+        });
+      } catch {}
+    }
 
     if (item) {
       Object.assign(item, updates);
@@ -550,9 +560,11 @@ class TicketService {
       }
     }
 
-    try {
-      await fetch(`/api/technicians/${encodeURIComponent(targetId)}`, { method: 'DELETE' });
-    } catch {}
+    if (isLocalEnv()) {
+      try {
+        await fetch(`/api/technicians/${encodeURIComponent(targetId)}`, { method: 'DELETE' });
+      } catch {}
+    }
 
     this.technicians = this.technicians.filter(t => t.id !== idOrName && t.name !== idOrName);
     this.saveToLocalStorage();
@@ -578,13 +590,15 @@ class TicketService {
       }
     }
 
-    try {
-      await fetch('/api/technicians/duty', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [id]: isOnDuty })
-      });
-    } catch {}
+    if (isLocalEnv()) {
+      try {
+        await fetch('/api/technicians/duty', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [id]: isOnDuty })
+        });
+      } catch {}
+    }
 
     if (item) {
       item.isOnDutyToday = isOnDuty;
@@ -607,13 +621,15 @@ class TicketService {
       }
     }
 
-    try {
-      await fetch('/api/technicians/duty', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dutyMap)
-      });
-    } catch {}
+    if (isLocalEnv()) {
+      try {
+        await fetch('/api/technicians/duty', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dutyMap)
+        });
+      } catch {}
+    }
 
     this.technicians.forEach(t => {
       if (dutyMap[t.id] !== undefined) t.isOnDutyToday = dutyMap[t.id];
@@ -765,17 +781,19 @@ class TicketService {
     }
 
     // 2. Try REST API if local server is active
-    try {
-      const res = await fetch('/api/tickets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(created)
-      });
-      if (res.ok) {
-        const serverTicket: Ticket = await res.json();
-        created = serverTicket;
-      }
-    } catch {}
+    if (isLocalEnv()) {
+      try {
+        const res = await fetch('/api/tickets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(created)
+        });
+        if (res.ok) {
+          const serverTicket: Ticket = await res.json();
+          created = serverTicket;
+        }
+      } catch {}
+    }
 
     this.tickets.unshift(created);
     this.saveToLocalStorage();
@@ -800,13 +818,15 @@ class TicketService {
     }
 
     // 2. Try REST API
-    try {
-      await fetch(`/api/tickets/${encodeURIComponent(id)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      });
-    } catch {}
+    if (isLocalEnv()) {
+      try {
+        await fetch(`/api/tickets/${encodeURIComponent(id)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates)
+        });
+      } catch {}
+    }
 
     const item = this.tickets.find(t => t.id === id || t.requestId === id);
     if (!item) return null;
@@ -836,9 +856,11 @@ class TicketService {
       }
     }
 
-    try {
-      await fetch(`/api/tickets/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    } catch {}
+    if (isLocalEnv()) {
+      try {
+        await fetch(`/api/tickets/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      } catch {}
+    }
 
     this.tickets = this.tickets.filter(t => t.id !== id && t.requestId !== id);
     this.saveToLocalStorage();
@@ -854,9 +876,11 @@ class TicketService {
       }
     }
 
-    try {
-      await fetch('/api/tickets/clear-all', { method: 'POST' });
-    } catch {}
+    if (isLocalEnv()) {
+      try {
+        await fetch('/api/tickets/clear-all', { method: 'POST' });
+      } catch {}
+    }
 
     this.tickets = [];
     this.saveToLocalStorage();
@@ -879,14 +903,16 @@ class TicketService {
       } catch (e) {}
     }
 
-    for (const t of imported) {
-      try {
-        await fetch('/api/tickets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(t)
-        });
-      } catch {}
+    if (isLocalEnv()) {
+      for (const t of imported) {
+        try {
+          await fetch('/api/tickets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(t)
+          });
+        } catch {}
+      }
     }
   }
 
@@ -899,9 +925,11 @@ class TicketService {
         await supabase.from('repair_tickets').delete().neq('request_id', '');
       } catch (e) {}
     }
-    try {
-      await fetch('/api/tickets/clear-all', { method: 'POST' });
-    } catch {}
+    if (isLocalEnv()) {
+      try {
+        await fetch('/api/tickets/clear-all', { method: 'POST' });
+      } catch {}
+    }
   }
 }
 
