@@ -2,8 +2,15 @@ import React, { useState } from 'react';
 import { Department, Priority, Ticket, DivisionId } from '../types';
 import { ConfirmModal } from './ConfirmModal';
 import { compressImage } from '../lib/imageCompress';
-import { DIVISION_LIST, getCategoriesByDivision, getDivisionInfo, WorkCategory } from '../data/divisionData';
+import { DIVISION_LIST, getDivisionInfo } from '../data/divisionData';
 import { DivisionBadge } from './DivisionBadge';
+
+// Quick issue tags tailored per division
+const DIVISION_QUICK_TAGS: Record<DivisionId, string[]> = {
+  '84': ['ไฟดับ/ไฟช็อต', 'แอร์ไม่เย็น/น้ำหยด', 'ท่อแตก/ประปารั่ว', 'ชักโครกตัน/กดไม่ลง', 'ปั๊มน้ำไม่ทำงาน', 'ไฟทางเดินดับ', 'อินเทอร์เน็ตหลุด', 'รถกอล์ฟสตาร์ทไม่ติด'],
+  '85': ['หลังคารั่ว/กระเบื้องแตก', 'ผนังแตกร้าว', 'พื้นทรุด/กระเบื้องร่อน', 'รั้วสัตว์ชำรุด/พัง', 'ประตู/หน้าต่างตกราง', 'รางระบายน้ำอุดตัน', 'ต่อเติมโครงสร้าง'],
+  '86': ['ป้ายบอกทางชำรุด', 'เพ้นท์สีผนังลอก', 'พร็อพถ่ายรูปเสียหาย', 'ซุ้มดอกไม้ชำรุด', 'ป้ายโลโก้หลุด', 'งานตกแต่งตามเทศกาล', 'ฉากกิจกรรมเวที']
+};
 
 interface NewTicketFormProps {
   departments: Department[];
@@ -28,7 +35,6 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
   const [selectedDivision, setSelectedDivision] = useState<DivisionId>('84');
   const [selectedZone, setSelectedZone] = useState('C');
   const [specificLocation, setSpecificLocation] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('electric');
 
   const [problemDetail, setProblemDetail] = useState('');
   const [priority, setPriority] = useState<Priority>('normal');
@@ -52,24 +58,13 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
     { key: 'HQ', name: 'สำนักงานส่วนกลาง', icon: 'apartment', dept: 'ไอที & ระบบสื่อสาร' }
   ];
 
-  // Dynamic categories based on selected division
-  const categories = getCategoriesByDivision(selectedDivision);
-
   const handleDivisionSelect = (divId: DivisionId) => {
     setSelectedDivision(divId);
-    const newCats = getCategoriesByDivision(divId);
-    if (newCats.length > 0) {
-      setSelectedCategory(newCats[0].key);
-    }
   };
 
   const handleZoneSelect = (z: typeof zones[0]) => {
     setSelectedZone(z.key);
     setDepartment(z.dept);
-  };
-
-  const handleCategorySelect = (cat: WorkCategory) => {
-    setSelectedCategory(cat.key);
   };
 
   const appendTag = (tagName: string) => {
@@ -153,11 +148,11 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
     if (!validateRequester() || !validateDetails()) return;
 
     const zoneObj = zones.find(z => z.key === selectedZone);
-    const catObj = categories.find(c => c.key === selectedCategory);
+    const divInfo = getDivisionInfo(selectedDivision);
     const locText = specificLocation.trim() || zoneObj?.name || 'พื้นที่ฟาร์ม';
 
     const payload = {
-      title: `${catObj?.title || 'งานซ่อม'}: ${locText}`,
+      title: `${divInfo.name}: ${locText}`,
       division: selectedDivision,
       department: department || zoneObj?.dept || 'คาเฟ่ & F&B',
       location: `${zoneObj?.name || selectedZone} - ${locText}`,
@@ -168,7 +163,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
       status: 'pending',
       requestImageUrl: photos[0]?.url || '-',
       zone: zoneObj?.name,
-      category: catObj?.title
+      category: divInfo.name
     };
 
     setPendingPayload(payload);
@@ -473,71 +468,6 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
           </div>
         </section>
 
-        {/* Maintenance Category Selection - รูปแบบงานตามสายงาน */}
-        <section className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm flex flex-col gap-space-sm border border-slate-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="font-label-lg text-label-lg text-on-surface flex items-center gap-1.5 font-bold">
-                <span className="material-symbols-outlined text-primary text-[20px]">category</span>
-                หมวดงาน {getDivisionInfo(selectedDivision).name} <span className="text-error font-bold">*</span>
-              </label>
-              <p className="text-[11px] text-on-surface-variant mt-0.5">
-                เลือกรูปแบบงานที่ตรงกับปัญหา เพื่อจ่ายงานให้ช่างเฉพาะทางได้รวดเร็ว
-              </p>
-            </div>
-            <span className="font-label-sm text-xs px-2.5 py-0.5 rounded-full bg-primary-fixed/50 text-primary font-bold">
-              {categories.length} หมวดย่อย
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
-            {categories.map(cat => {
-              const isSelected = selectedCategory === cat.key;
-              return (
-                <button
-                  key={cat.key}
-                  className={`cat-btn p-3 rounded-2xl text-left flex items-start gap-2.5 active:scale-98 transition-all cursor-pointer border ${
-                    isSelected
-                      ? 'bg-primary-fixed/30 border-primary shadow-xs ring-1 ring-primary'
-                      : 'bg-surface-container-low border-slate-200/80 hover:bg-surface-container hover:border-slate-300'
-                  }`}
-                  onClick={() => handleCategorySelect(cat)}
-                  type="button"
-                >
-                  <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                      isSelected
-                        ? 'bg-primary text-white shadow-xs'
-                        : 'bg-surface-container-high text-on-surface-variant'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[20px]">{cat.icon}</span>
-                  </div>
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-1">
-                      <span
-                        className={`font-bold text-xs sm:text-sm truncate ${
-                          isSelected ? 'text-primary' : 'text-on-surface'
-                        }`}
-                      >
-                        {cat.title}
-                      </span>
-                      {isSelected && (
-                        <span className="material-symbols-outlined text-primary text-[16px] shrink-0">
-                          check_circle
-                        </span>
-                      )}
-                    </div>
-                    <span className="font-normal text-[11px] text-on-surface-variant line-clamp-2 mt-0.5 leading-relaxed">
-                      {cat.sub}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
         {/* Problem Description & Text Area */}
         <section className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm flex flex-col gap-space-sm border border-slate-200">
           <div className="flex items-center justify-between">
@@ -561,12 +491,12 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             />
           </div>
 
-          {/* Dynamic Quick Issue Tags based on Selected Category */}
+          {/* Dynamic Quick Issue Tags based on Selected Division */}
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
             <span className="font-label-sm text-[11px] text-on-surface-variant self-center mr-1 font-semibold">
-              แท็กอาการพบบ่อย:
+              แท็กอาการพบบ่อย ({getDivisionInfo(selectedDivision).shortName}):
             </span>
-            {(categories.find(c => c.key === selectedCategory)?.tags || [
+            {(DIVISION_QUICK_TAGS[selectedDivision] || [
               'น้ำหยดนองพื้น',
               'เสียงดังผิดปกติ',
               'ไฟดับ/ช็อต',
@@ -576,7 +506,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
                 key={tag}
                 type="button"
                 onClick={() => appendTag(tag)}
-                className="px-2.5 py-1 rounded-full bg-surface-container-high hover:bg-primary-fixed text-on-surface font-label-sm text-[11px] font-medium active:scale-95 transition-all cursor-pointer shadow-2xs"
+                className="px-2.5 py-1 rounded-full bg-surface-container-high hover:bg-primary-fixed hover:text-primary text-on-surface font-label-sm text-[11px] font-medium active:scale-95 transition-all cursor-pointer shadow-2xs border border-slate-200/50"
               >
                 + {tag}
               </button>
@@ -849,8 +779,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
               <span className="text-xs text-on-surface-variant block mb-1">สายงานที่รับผิดชอบ</span>
               <DivisionBadge division={selectedDivision} size="sm" />
             </div>
-            <div className="rounded-xl bg-surface-container-low p-3"><span className="text-xs text-on-surface-variant block">หมวดงาน</span><strong>{categories.find(c => c.key === selectedCategory)?.title}</strong></div>
-            <div className="rounded-xl bg-surface-container-low p-3 sm:col-span-2"><span className="text-xs text-on-surface-variant block">ความเร่งด่วน</span><strong>{priority === 'critical' ? 'ด่วนที่สุด / ฉุกเฉิน' : priority === 'high' ? 'ด่วน' : 'ปกติ'}</strong></div>
+            <div className="rounded-xl bg-surface-container-low p-3"><span className="text-xs text-on-surface-variant block">ความเร่งด่วน</span><strong>{priority === 'critical' ? 'ด่วนที่สุด / ฉุกเฉิน' : priority === 'high' ? 'ด่วน' : 'ปกติ'}</strong></div>
           </div>
           <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800">
             <span className="material-symbols-outlined text-[18px]">info</span>

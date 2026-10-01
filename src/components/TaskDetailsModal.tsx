@@ -81,21 +81,21 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
   // Step mapping
   const steps = [
-    { id: 'pending', label: 'รอตรวจสอบ' },
-    { id: 'assigned', label: 'มอบหมายแล้ว' },
-    { id: 'received', label: 'รับงานแล้ว' },
-    { id: 'in_progress', label: 'กำลังดำเนินการ' },
-    { id: 'waiting_parts', label: 'รออะไหล่' },
-    { id: 'waiting_inspect', label: 'รอตรวจรับ' },
-    { id: 'completed', label: 'เสร็จสิ้น' }
+    { id: 'pending', label: 'รอตรวจสอบ', sub: 'รอรับเรื่อง' },
+    { id: 'assigned', label: 'มอบหมายแล้ว', sub: 'จ่ายงานช่าง' },
+    { id: 'in_progress', label: 'รับงานแล้ว', sub: 'กำลังดำเนินการ' },
+    { id: 'waiting_parts', label: 'รออะไหล่', sub: 'สั่งซื้อ/รอของ' },
+    { id: 'waiting_inspect', label: 'รอตรวจรับ', sub: 'ซ่อมเสร็จแล้ว' },
+    { id: 'completed', label: 'เสร็จสิ้น', sub: 'ปิดงานเรียบร้อย' }
   ];
 
-  let currentStepIndex = 3; // in_progress default
+  let currentStepIndex = 2; // in_progress default
   if (ticket.status === 'pending') currentStepIndex = 0;
   else if (ticket.status === 'assigned') currentStepIndex = 1;
-  else if (ticket.status === 'waiting_parts') currentStepIndex = 4;
-  else if (ticket.status === 'waiting_inspect') currentStepIndex = 5;
-  else if (ticket.status === 'completed') currentStepIndex = 6;
+  else if (ticket.status === 'in_progress') currentStepIndex = 2;
+  else if (ticket.status === 'waiting_parts') currentStepIndex = 3;
+  else if (ticket.status === 'waiting_inspect') currentStepIndex = 4;
+  else if (ticket.status === 'completed') currentStepIndex = 5;
 
   const handleStatusChange = (newStatus: any, alertText: string) => {
     setConfirmConfig({
@@ -136,7 +136,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col justify-end sm:justify-center items-center overflow-y-auto">
-      <div className="w-full max-w-xl bg-surface rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden my-auto border border-slate-200/50">
+      <div className="w-full max-w-2xl bg-surface rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden my-auto border border-slate-200/50">
         
         {/* Header Bar */}
         <div className="h-16 px-gutter flex items-center justify-between bg-surface-container-lowest border-b border-slate-200/50 shrink-0">
@@ -197,43 +197,58 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
             </div>
           </div>
 
-          {/* Horizontal Workflow Stepper */}
-          <div className="py-4 bg-surface-container-low rounded-xl overflow-x-auto overflow-y-hidden overscroll-y-none touch-pan-x no-scrollbar shadow-inner border border-slate-200/40" style={{ touchAction: 'pan-x' }}>
-            <div className="flex items-center gap-2.5 px-gutter min-w-max">
+          {/* Workflow Progress Status - Clear, Spacious, Never Clipped */}
+          <div className="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200 flex flex-col gap-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+                  <span className="material-symbols-outlined text-[20px]">alt_route</span>
+                </span>
+                <div>
+                  <h4 className="font-bold text-sm text-on-surface">ขั้นตอนสถานะใบงาน</h4>
+                  <p className="text-[11px] text-on-surface-variant">ความคืบหน้าของงานซ่อมบำรุง</p>
+                </div>
+              </div>
+              <span className="inline-flex items-center gap-1.5 bg-primary text-on-primary px-3 py-1 rounded-full text-xs font-bold shadow-xs">
+                <span className="w-2 h-2 rounded-full bg-white animate-ping"></span>
+                <span>{statusLabels[ticket.status] || ticket.status}</span>
+              </span>
+            </div>
+
+            {/* Visual Step Indicator Cards - Fully responsive grid, unmasked and crystal clear */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 pt-1">
               {steps.map((s, idx) => {
                 const isPassed = idx < currentStepIndex;
                 const isActive = idx === currentStepIndex;
                 return (
-                  <React.Fragment key={s.id}>
-                    <div
-                      className={`flex items-center gap-1.5 py-2 px-3.5 rounded-full text-xs sm:text-sm font-semibold shadow-sm transition-all ${
-                        isActive
-                          ? 'bg-primary text-on-primary font-bold shadow-md'
-                          : isPassed
-                          ? 'bg-surface-container-lowest text-on-surface font-medium'
-                          : 'bg-surface-container text-on-surface-variant'
-                      }`}
-                    >
-                      {isActive ? (
-                        <span className="material-symbols-outlined text-[18px] animate-spin">autorenew</span>
-                      ) : isPassed ? (
-                        <span
-                          className="material-symbols-outlined text-[18px] text-primary"
-                          style={{ fontVariationSettings: "'FILL' 1" }}
-                        >
-                          check_circle
-                        </span>
+                  <div
+                    key={s.id}
+                    className={`p-2.5 rounded-xl border flex flex-col items-center justify-center text-center transition-all ${
+                      isActive
+                        ? 'bg-primary text-white border-primary shadow-md font-bold ring-2 ring-primary/30 scale-[1.02]'
+                        : isPassed
+                        ? 'bg-emerald-50 text-emerald-900 border-emerald-200 font-semibold'
+                        : 'bg-surface-container-low text-on-surface-variant border-slate-200/60'
+                    }`}
+                  >
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center mb-1 text-xs font-bold ${
+                      isActive
+                        ? 'bg-white text-primary shadow-xs'
+                        : isPassed
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-surface-container-high text-on-surface-variant'
+                    }`}>
+                      {isPassed ? (
+                        <span className="material-symbols-outlined text-[16px]">check</span>
                       ) : (
-                        <span className="w-2.5 h-2.5 rounded-full bg-outline"></span>
+                        <span>{idx + 1}</span>
                       )}
-                      <span>{s.label}</span>
                     </div>
-                    {idx < steps.length - 1 && (
-                      <div
-                        className={`w-4 h-0.5 ${isPassed ? 'bg-primary' : 'bg-outline-variant'}`}
-                      ></div>
-                    )}
-                  </React.Fragment>
+                    <span className="text-xs font-bold leading-tight">{s.label}</span>
+                    <span className={`text-[10px] mt-0.5 ${isActive ? 'text-white/80' : 'text-on-surface-variant'}`}>
+                      {s.sub}
+                    </span>
+                  </div>
                 );
               })}
             </div>
