@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { X, Users, UserPlus, Trash2, Phone, AlertTriangle, CheckCircle2, Edit3, Save, RotateCcw, Camera, Upload, Image } from 'lucide-react';
-import { Technician } from '../types';
+import { Technician, DivisionId } from '../types';
 import { ticketService } from '../services/ticketService';
+import { DIVISION_LIST, getDivisionInfo, getTechnicianDivision } from '../data/divisionData';
+import { DivisionBadge } from './DivisionBadge';
 
 interface TechnicianRosterModalProps {
   isOpen: boolean;
@@ -10,14 +12,32 @@ interface TechnicianRosterModalProps {
   onRosterChanged: () => void;
 }
 
-const COMMON_ROLES = [
-  'ช่างไฟฟ้า/แอร์',
-  'ช่างยนต์/เครื่องจักร',
-  'ช่างประปา/สุขาภิบาล',
-  'ช่างไม้ อาคาร/สี',
-  'ช่างไอที/เครือข่าย',
-  'อู่ซ่อมภายนอก',
-];
+const DIVISION_ROLES: Record<DivisionId, string[]> = {
+  '84': [
+    'ช่างไฟฟ้า/แอร์',
+    'ช่างประปา/สุขาภิบาล',
+    'ช่างยนต์/เครื่องจักร',
+    'ช่างไอที/เครือข่าย',
+    'ช่างปั๊มน้ำ/ระบบสูบน้ำ',
+    'อู่ซ่อมภายนอก'
+  ],
+  '85': [
+    'ช่างโครงสร้าง/เชื่อมเหล็ก',
+    'ช่างปูน/เทพื้น',
+    'ช่างไม้/อาคาร',
+    'ช่างหลังคา/ฝ้า',
+    'ช่างรั้วคอกสัตว์',
+    'ช่างต่อเติมอาคาร'
+  ],
+  '86': [
+    'ช่างเพ้นท์/ทาสี',
+    'ช่างป้ายสื่อสาร/สติ๊กเกอร์',
+    'ช่างศิลป์/ตกแต่งฟาร์ม',
+    'ช่างพร็อพถ่ายรูป',
+    'ช่างประติมากรรม/ปูนปั้น',
+    'ช่างจัดสวนภูมิทัศน์ศิลป์'
+  ]
+};
 
 export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
   isOpen,
@@ -25,7 +45,9 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
   technicians,
   onRosterChanged
 }) => {
+  const [selectedDivisionFilter, setSelectedDivisionFilter] = useState<'all' | DivisionId>('all');
   const [newName, setNewName] = useState('');
+  const [newDivision, setNewDivision] = useState<DivisionId>('84');
   const [newRole, setNewRole] = useState('ช่างไฟฟ้า/แอร์');
   const [newPhone, setNewPhone] = useState('');
   const [newAvatarUrl, setNewAvatarUrl] = useState('');
@@ -35,6 +57,7 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
   // Editing state for an individual technician
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [editDivision, setEditDivision] = useState<DivisionId>('84');
   const [editRole, setEditRole] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editAvatarUrl, setEditAvatarUrl] = useState('');
@@ -77,13 +100,14 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
       name: newName.trim(),
       role: newRole.trim() || 'ช่างซ่อมบำรุง',
       phone: newPhone.trim(),
-      avatarUrl: newAvatarUrl || ''
+      avatarUrl: newAvatarUrl || '',
+      departmentId: newDivision
     });
 
     setNewName('');
     setNewPhone('');
     setNewAvatarUrl('');
-    showToast(`เพิ่มช่าง "${newName.trim()}" ในระบบเรียบร้อย 👷‍♂️`);
+    showToast(`เพิ่มช่าง "${newName.trim()}" ในแผนก ${getDivisionInfo(newDivision).name} เรียบร้อย 👷‍♂️`);
     onRosterChanged();
   };
 
@@ -93,6 +117,7 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
     setEditRole(t.role);
     setEditPhone(t.phone || '');
     setEditAvatarUrl(t.avatarUrl || '');
+    setEditDivision(getTechnicianDivision(t));
   };
 
   const cancelEdit = () => {
@@ -113,7 +138,8 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
       name: editName.trim(),
       role: editRole.trim() || 'ช่างซ่อมบำรุง',
       phone: editPhone.trim(),
-      avatarUrl: editAvatarUrl || ''
+      avatarUrl: editAvatarUrl || '',
+      departmentId: editDivision
     });
 
     setEditingId(null);
@@ -210,12 +236,43 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
               </div>
             </div>
 
+            {/* Division / Department Selector */}
             <div>
               <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                ความเชี่ยวชาญ / หน้าที่
+                สังกัดแผนก / สายงาน *
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {DIVISION_LIST.map(div => {
+                  const isSel = newDivision === div.id;
+                  return (
+                    <button
+                      key={div.id}
+                      type="button"
+                      onClick={() => {
+                        setNewDivision(div.id);
+                        if (DIVISION_ROLES[div.id]?.length) {
+                          setNewRole(DIVISION_ROLES[div.id][0]);
+                        }
+                      }}
+                      className={`p-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center text-center gap-1 border ${
+                        isSel
+                          ? `${div.badgeClass} ring-2 ring-primary/40 font-bold shadow-xs scale-[1.02]`
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>{div.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                ความเชี่ยวชาญ / หน้าที่ ({getDivisionInfo(newDivision).shortName})
               </label>
               <div className="flex flex-wrap gap-1.5 mb-2">
-                {COMMON_ROLES.map(role => (
+                {(DIVISION_ROLES[newDivision] || []).map(role => (
                   <button
                     key={role}
                     type="button"
@@ -318,22 +375,68 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
             </button>
           </form>
 
-          {/* Technicians List Header */}
-          <div className="flex items-center justify-between pt-1">
-            <h4 className="text-xs font-bold text-slate-800">
-              รายชื่อช่างทั้งหมดในระบบ ({technicians.length} ท่าน)
-            </h4>
-            <span className="text-[11px] text-slate-500">กดแก้ไขเพื่อเปลี่ยนเบอร์หรือข้อมูล</span>
+          {/* Technicians List Header & Division Filter Tabs */}
+          <div className="flex flex-col gap-2 pt-1">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-800">
+                รายชื่อช่างในระบบ ({technicians.length} ท่าน)
+              </h4>
+              <span className="text-[11px] text-slate-500">กรองแยกตามแผนกหรือกดแก้ไขข้อมูล</span>
+            </div>
+
+            {/* Division Filter Tabs */}
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl overflow-x-auto no-scrollbar">
+              <button
+                type="button"
+                onClick={() => setSelectedDivisionFilter('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                  selectedDivisionFilter === 'all'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                ทั้งหมด ({technicians.length})
+              </button>
+              {DIVISION_LIST.map(div => {
+                const count = technicians.filter(t => getTechnicianDivision(t) === div.id).length;
+                const isSelected = selectedDivisionFilter === div.id;
+                return (
+                  <button
+                    key={div.id}
+                    type="button"
+                    onClick={() => setSelectedDivisionFilter(div.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-white text-primary shadow-xs ring-1 ring-primary/20'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>{div.name}</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${isSelected ? 'bg-primary-fixed text-primary' : 'bg-slate-200 text-slate-700'}`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Technicians List */}
           <div className="space-y-2.5 pr-1">
-            {technicians.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                ยังไม่มีรายชื่อช่างในระบบ กรุณาเพิ่มช่างด้านบน
-              </div>
-            ) : (
-              technicians.map(t => {
+            {(() => {
+              const filteredTechnicians = selectedDivisionFilter === 'all'
+                ? technicians
+                : technicians.filter(t => getTechnicianDivision(t) === selectedDivisionFilter);
+
+              if (filteredTechnicians.length === 0) {
+                return (
+                  <div className="p-8 text-center text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    ไม่มีรายชื่อช่างในหมวดนี้ กรุณาเพิ่มช่างด้านบน
+                  </div>
+                );
+              }
+
+              return filteredTechnicians.map(t => {
                 const isEditing = editingId === t.id;
 
                 if (isEditing) {
@@ -388,8 +491,55 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
                         </div>
                       </div>
 
+                      {/* Edit Division / Department */}
                       <div>
-                        <label className="text-[10px] font-semibold text-slate-600 block mb-0.5">ตำแหน่ง / หน้าที่</label>
+                        <label className="text-[10px] font-semibold text-slate-600 block mb-1">สังกัดแผนก / สายงาน</label>
+                        <div className="grid grid-cols-3 gap-1.5 mb-1.5">
+                          {DIVISION_LIST.map(div => {
+                            const isSel = editDivision === div.id;
+                            return (
+                              <button
+                                key={div.id}
+                                type="button"
+                                onClick={() => {
+                                  setEditDivision(div.id);
+                                  if (DIVISION_ROLES[div.id]?.length) {
+                                    setEditRole(DIVISION_ROLES[div.id][0]);
+                                  }
+                                }}
+                                className={`p-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center border ${
+                                  isSel
+                                    ? `${div.badgeClass} ring-2 ring-primary/40 font-bold shadow-xs scale-[1.02]`
+                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                }`}
+                              >
+                                {div.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-semibold text-slate-600 block mb-0.5">
+                          ตำแหน่ง / หน้าที่ ({getDivisionInfo(editDivision).shortName})
+                        </label>
+                        <div className="flex flex-wrap gap-1 mb-1.5">
+                          {(DIVISION_ROLES[editDivision] || []).map(r => (
+                            <button
+                              key={r}
+                              type="button"
+                              onClick={() => setEditRole(r)}
+                              className={`px-2 py-0.5 rounded-lg text-[9px] font-medium transition-all cursor-pointer ${
+                                editRole === r
+                                  ? 'bg-primary text-white shadow-xs font-bold'
+                                  : 'bg-white border border-slate-200 text-slate-600 hover:border-primary/40'
+                              }`}
+                            >
+                              {r}
+                            </button>
+                          ))}
+                        </div>
                         <input
                           type="text"
                           value={editRole}
@@ -499,8 +649,9 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
                           />
                         </div>
                         <div className="min-w-0">
-                          <div className="font-bold text-slate-900 text-xs sm:text-sm truncate flex items-center gap-1.5">
+                          <div className="font-bold text-slate-900 text-xs sm:text-sm truncate flex items-center gap-1.5 flex-wrap">
                             <span>{t.name}</span>
+                            <DivisionBadge division={getTechnicianDivision(t)} size="sm" />
                             {t.status === 'active' && (
                               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
                             )}
@@ -588,8 +739,8 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
 
                   </div>
                 );
-              })
-            )}
+              });
+            })()}
           </div>
 
         </div>

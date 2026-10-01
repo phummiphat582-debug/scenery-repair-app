@@ -8,13 +8,15 @@ interface TicketListProps {
   departments: Department[];
   onOpenEdit: (ticket: Ticket) => void;
   onQuickAccept: (ticket: Ticket) => void;
+  onDeleteTicket?: (ticket: Ticket) => void;
 }
 
 export const TicketList: React.FC<TicketListProps> = ({
   tickets,
   departments,
   onOpenEdit,
-  onQuickAccept
+  onQuickAccept,
+  onDeleteTicket
 }) => {
   const deptMap = React.useMemo(() => {
     const map = new Map<string, Department>();
@@ -48,6 +50,7 @@ export const TicketList: React.FC<TicketListProps> = ({
             departmentInfo={deptMap.get(ticket.department)}
             onOpenEdit={onOpenEdit}
             onQuickAccept={onQuickAccept}
+            onDeleteTicket={onDeleteTicket}
           />
         ))}
       </div>

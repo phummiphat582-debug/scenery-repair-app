@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, MapPin, User, CheckCircle, AlertTriangle, Zap, Wrench, ChevronRight, Image as ImageIcon } from 'lucide-react';
+import { Clock, MapPin, User, CheckCircle, AlertTriangle, Zap, Wrench, ChevronRight, Trash2, Image as ImageIcon } from 'lucide-react';
 import { Ticket, Department } from '../types';
 import { DivisionBadge } from './DivisionBadge';
 
@@ -8,13 +8,15 @@ interface TicketCardProps {
   departmentInfo?: Department;
   onOpenEdit: (ticket: Ticket) => void;
   onQuickAccept: (ticket: Ticket) => void;
+  onDeleteTicket?: (ticket: Ticket) => void;
 }
 
 export const TicketCard: React.FC<TicketCardProps> = ({
   ticket,
   departmentInfo,
   onOpenEdit,
-  onQuickAccept
+  onQuickAccept,
+  onDeleteTicket
 }) => {
   // Priority styles
   const priorityConfig = {
@@ -161,6 +163,20 @@ export const TicketCard: React.FC<TicketCardProps> = ({
             <span>จัดการงาน</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
+
+          {onDeleteTicket && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteTicket(ticket);
+              }}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+              title="ลบรายการนี้ (ใส่รหัส 1234)"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 

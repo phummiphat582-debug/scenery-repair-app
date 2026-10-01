@@ -57,6 +57,12 @@ export const App: React.FC = () => {
   const [partsModalTicket, setPartsModalTicket] = useState<Ticket | null>(null);
   const [isQRScannerModalOpen, setIsQRScannerModalOpen] = useState(false);
 
+  // Quick Delete confirmation with PIN 1234
+  const [ticketToDelete, setTicketToDelete] = useState<Ticket | null>(null);
+  const [deletePin, setDeletePin] = useState('');
+  const [deletePinError, setDeletePinError] = useState('');
+  const [isDeletingTicket, setIsDeletingTicket] = useState(false);
+
   // Confirmation Modal for Quick Accept
   const [quickAcceptTicket, setQuickAcceptTicket] = useState<Ticket | null>(null);
 
@@ -170,6 +176,29 @@ export const App: React.FC = () => {
     setSelectedTicket(null);
     await loadData();
     showToast('ลบรายการแจ้งซ่อมเรียบร้อยแล้ว', 'info');
+  };
+
+  const handleRequestDeleteTicket = (ticket: Ticket) => {
+    setTicketToDelete(ticket);
+    setDeletePin('');
+    setDeletePinError('');
+  };
+
+  const handleConfirmDeletePin = async () => {
+    if (!ticketToDelete) return;
+    if (deletePin !== '1234') {
+      setDeletePinError('รหัสผ่านไม่ถูกต้อง (กรุณาใส่ 1234)');
+      return;
+    }
+    setIsDeletingTicket(true);
+    try {
+      await handleDeleteTicket(ticketToDelete.id);
+      setTicketToDelete(null);
+      setDeletePin('');
+      setDeletePinError('');
+    } finally {
+      setIsDeletingTicket(false);
+    }
   };
 
   // Handle create ticket from NewTicketForm
@@ -299,6 +328,7 @@ export const App: React.FC = () => {
                     onQuickAccept={(ticket) => {
                       setQuickAcceptTicket(ticket);
                     }}
+                    onDeleteTicket={handleRequestDeleteTicket}
                   />
                 )}
 
@@ -408,6 +438,57 @@ export const App: React.FC = () => {
           }}
           onCancel={() => setQuickAcceptTicket(null)}
         />
+      )}
+
+      {/* Quick Delete PIN 1234 Modal */}
+      {ticketToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-rose-200 animate-in zoom-in-95 duration-150" role="dialog" aria-modal="true">
+            <div className="flex items-center gap-3 text-rose-700">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[28px]">delete_forever</span>
+              </div>
+              <div>
+                <h3 className="text-lg sm:text-xl font-bold">ยืนยันการลบรายการแจ้งซ่อม</h3>
+                <p className="text-sm text-slate-600 mt-0.5">#{ticketToDelete.requestId} - {ticketToDelete.title}</p>
+              </div>
+            </div>
+            <label className="block mt-5 text-sm font-bold text-slate-700" htmlFor="quick-delete-pin">
+              ใส่รหัสผ่าน 4 หลัก (1234) เพื่อลบรายการ:
+            </label>
+            <input
+              id="quick-delete-pin"
+              type="password"
+              inputMode="numeric"
+              autoFocus
+              value={deletePin}
+              onChange={(e) => { setDeletePin(e.target.value); setDeletePinError(''); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') void handleConfirmDeletePin(); }}
+              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-xl tracking-[0.4em] text-center font-bold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-100"
+              placeholder="1234"
+              maxLength={4}
+            />
+            {deletePinError && <p className="mt-2 text-sm font-semibold text-rose-600 text-center">{deletePinError}</p>}
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setTicketToDelete(null); setDeletePin(''); setDeletePinError(''); }}
+                className="flex-1 rounded-xl bg-slate-100 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200 cursor-pointer"
+                disabled={isDeletingTicket}
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmDeletePin()}
+                className="flex-1 rounded-xl bg-rose-600 py-3 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60 cursor-pointer shadow-xs"
+                disabled={isDeletingTicket}
+              >
+                {isDeletingTicket ? 'กำลังลบ...' : 'ยืนยันลบรายการ (1234)'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Toast Notification */}

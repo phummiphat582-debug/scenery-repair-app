@@ -231,3 +231,17 @@ export function getDivisionInfo(divisionId?: string): DivisionInfo {
 export function getCategoriesByDivision(divisionId: DivisionId): WorkCategory[] {
   return ALL_WORK_CATEGORIES.filter(c => c.division === divisionId);
 }
+
+export function getTechnicianDivision(tech: { departmentId?: string; role?: string; name?: string }): DivisionId {
+  if (tech.departmentId === '84' || tech.departmentId === '85' || tech.departmentId === '86') {
+    return tech.departmentId as DivisionId;
+  }
+  const text = `${tech.role || ''} ${tech.name || ''}`.toLowerCase();
+  if (text.includes('ก่อสร้าง') || text.includes('ปูน') || text.includes('ไม้') || text.includes('อาคาร') || text.includes('โครงสร้าง') || text.includes('เชื่อม') || text.includes('หลังคา')) {
+    return '85';
+  }
+  if (text.includes('ศิลป์') || text.includes('สี') || text.includes('เพ้นท์') || text.includes('ป้าย') || text.includes('พร็อพ') || text.includes('ตกแต่ง')) {
+    return '86';
+  }
+  return '84';
+}

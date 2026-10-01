@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Technician } from '../types';
+import { Technician, DivisionId } from '../types';
 import { ticketService } from '../services/ticketService';
 import { X, Users, CheckCircle2, Phone, Save, Edit3, ShieldAlert, Camera } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
+import { DIVISION_LIST, getTechnicianDivision } from '../data/divisionData';
+import { DivisionBadge } from './DivisionBadge';
 
 interface DailyDutyModalProps {
   isOpen: boolean;
@@ -18,6 +20,8 @@ export const DailyDutyModal: React.FC<DailyDutyModalProps> = ({
   onDutyChanged
 }) => {
   if (!isOpen) return null;
+
+  const [selectedDivision, setSelectedDivision] = useState<'all' | DivisionId>('all');
 
   // Local state of duties
   const [dutyMap, setDutyMap] = useState<Record<string, boolean>>(() => {
@@ -153,66 +157,116 @@ export const DailyDutyModal: React.FC<DailyDutyModalProps> = ({
           </div>
         </div>
 
-        {/* Technicians List */}
-        <div className="p-4 overflow-y-auto space-y-2.5 flex-1">
-          {technicians.map(tech => {
-            const isOnDuty = dutyMap[tech.id] ?? false;
-            const isEditingPhone = editingPhoneId === tech.id;
-
+        {/* Division Filter Tabs */}
+        <div className="px-4 py-2 bg-slate-50 border-b border-slate-200 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+          <button
+            type="button"
+            onClick={() => setSelectedDivision('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
+              selectedDivision === 'all'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            ทั้งหมด ({technicians.length})
+          </button>
+          {DIVISION_LIST.map(div => {
+            const count = technicians.filter(t => getTechnicianDivision(t) === div.id).length;
+            const isSel = selectedDivision === div.id;
             return (
-              <div
-                key={tech.id}
-                className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2 ${
-                  isOnDuty
-                    ? 'bg-emerald-50/50 border-emerald-300 shadow-xs'
-                    : 'bg-surface-container-lowest border-slate-200 opacity-70'
+              <button
+                key={div.id}
+                type="button"
+                onClick={() => setSelectedDivision(div.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1.5 ${
+                  isSel
+                    ? 'bg-white text-primary shadow-xs ring-1 ring-primary/20'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="relative group shrink-0">
-                      {tech.avatarUrl ? (
-                        <img 
-                          src={tech.avatarUrl} 
-                          alt={tech.name} 
-                          className={`w-11 h-11 rounded-2xl object-cover border-2 shadow-xs transition-transform group-hover:scale-105 ${
-                            isOnDuty ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-slate-200 opacity-60'
-                          }`} 
-                        />
-                      ) : (
-                        <span className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm shadow-xs ${
-                          isOnDuty ? 'bg-primary text-white' : 'bg-slate-200 text-slate-500'
-                        }`}>
-                          {tech.name.slice(4, 5) || tech.name.slice(0, 1) || 'ช'}
-                        </span>
-                      )}
-                      <label 
-                        htmlFor={`duty-avatar-${tech.id}`}
-                        className="absolute inset-0 bg-slate-900/60 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer text-white shadow-xs"
-                        title="คลิกเพื่อเปลี่ยนรูปถ่ายช่าง"
-                      >
-                        <Camera className="w-4 h-4" />
-                      </label>
-                      <input 
-                        id={`duty-avatar-${tech.id}`}
-                        type="file" 
-                        accept="image/*" 
-                        className="hidden" 
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleDirectPhotoUpload(tech, file);
-                        }}
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-bold text-xs sm:text-sm text-on-surface truncate flex items-center gap-1.5">
-                        <span>{tech.name}</span>
-                        {isOnDuty && (
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                            เข้าเวรวันนี้
+                <span>{div.name}</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${isSel ? 'bg-primary-fixed text-primary' : 'bg-slate-200 text-slate-700'}`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Technicians List */}
+        <div className="p-4 overflow-y-auto space-y-2.5 flex-1">
+          {(() => {
+            const filteredTechs = selectedDivision === 'all'
+              ? technicians
+              : technicians.filter(t => getTechnicianDivision(t) === selectedDivision);
+
+            if (filteredTechs.length === 0) {
+              return (
+                <div className="p-8 text-center text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  ไม่มีรายชื่อช่างในแผนกนี้
+                </div>
+              );
+            }
+
+            return filteredTechs.map(tech => {
+              const isOnDuty = dutyMap[tech.id] ?? false;
+              const isEditingPhone = editingPhoneId === tech.id;
+
+              return (
+                <div
+                  key={tech.id}
+                  className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2 ${
+                    isOnDuty
+                      ? 'bg-emerald-50/50 border-emerald-300 shadow-xs'
+                      : 'bg-surface-container-lowest border-slate-200 opacity-70'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="relative group shrink-0">
+                        {tech.avatarUrl ? (
+                          <img 
+                            src={tech.avatarUrl} 
+                            alt={tech.name} 
+                            className={`w-11 h-11 rounded-2xl object-cover border-2 shadow-xs transition-transform group-hover:scale-105 ${
+                              isOnDuty ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-slate-200 opacity-60'
+                            }`} 
+                          />
+                        ) : (
+                          <span className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm shadow-xs ${
+                            isOnDuty ? 'bg-primary text-white' : 'bg-slate-200 text-slate-500'
+                          }`}>
+                            {tech.name.slice(4, 5) || tech.name.slice(0, 1) || 'ช'}
                           </span>
                         )}
+                        <label 
+                          htmlFor={`duty-avatar-${tech.id}`}
+                          className="absolute inset-0 bg-slate-900/60 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer text-white shadow-xs"
+                          title="คลิกเพื่อเปลี่ยนรูปถ่ายช่าง"
+                        >
+                          <Camera className="w-4 h-4" />
+                        </label>
+                        <input 
+                          id={`duty-avatar-${tech.id}`}
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleDirectPhotoUpload(tech, file);
+                          }}
+                        />
                       </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-xs sm:text-sm text-on-surface truncate flex items-center gap-1.5 flex-wrap">
+                          <span>{tech.name}</span>
+                          <DivisionBadge division={getTechnicianDivision(tech)} size="sm" />
+                          {isOnDuty && (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                              เข้าเวรวันนี้
+                            </span>
+                          )}
+                        </div>
                       <div className="text-[11px] text-on-surface-variant truncate">
                         {tech.role}
                       </div>
@@ -288,7 +342,8 @@ export const DailyDutyModal: React.FC<DailyDutyModalProps> = ({
 
               </div>
             );
-          })}
+          });
+        })()}
         </div>
 
         {/* Footer */}

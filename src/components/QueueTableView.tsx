@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Ticket, Department, Technician } from '../types';
-import { Phone, CheckCircle2, Clock, Wrench, AlertTriangle, ChevronRight, Eye } from 'lucide-react';
+import { Phone, CheckCircle2, Clock, Wrench, AlertTriangle, ChevronRight, Eye, Trash2 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { DivisionBadge } from './DivisionBadge';
 
@@ -10,6 +10,7 @@ interface QueueTableViewProps {
   technicians?: Technician[];
   onSelectTicket: (ticket: Ticket) => void;
   onQuickAccept?: (ticket: Ticket) => void;
+  onDeleteTicket?: (ticket: Ticket) => void;
 }
 
 export const QueueTableView: React.FC<QueueTableViewProps> = ({
@@ -17,7 +18,8 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
   departments,
   technicians,
   onSelectTicket,
-  onQuickAccept
+  onQuickAccept,
+  onDeleteTicket
 }) => {
   const [callConfirmTech, setCallConfirmTech] = useState<{ name: string; phone: string } | null>(null);
 
@@ -247,6 +249,16 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
                         >
                           <Eye className="w-4 h-4" />
                         </button>
+                        {onDeleteTicket && (
+                          <button
+                            type="button"
+                            onClick={() => onDeleteTicket(ticket)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="ลบรายการนี้ (ใส่รหัส 1234)"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
 

@@ -14,6 +14,7 @@ interface AllRequestsViewProps {
   technicians?: Technician[];
   onSelectTicket: (ticket: Ticket) => void;
   onQuickAccept: (ticket: Ticket) => void;
+  onDeleteTicket?: (ticket: Ticket) => void;
 }
 
 export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
@@ -21,7 +22,8 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
   departments,
   technicians,
   onSelectTicket,
-  onQuickAccept
+  onQuickAccept,
+  onDeleteTicket
 }) => {
   const [selectedDivision, setSelectedDivision] = useState<string>('all');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
@@ -167,6 +169,7 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
           technicians={technicians}
           onSelectTicket={onSelectTicket}
           onQuickAccept={onQuickAccept}
+          onDeleteTicket={onDeleteTicket}
         />
       ) : viewMode === 'queue' ? (
         <TicketList
@@ -174,6 +177,7 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
           departments={departments}
           onOpenEdit={onSelectTicket}
           onQuickAccept={onQuickAccept}
+          onDeleteTicket={onDeleteTicket}
         />
       ) : (
         <DepartmentBoard
@@ -181,6 +185,7 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
           departments={departments}
           onOpenEdit={onSelectTicket}
           onQuickAccept={onQuickAccept}
+          onDeleteTicket={onDeleteTicket}
         />
       )}
 

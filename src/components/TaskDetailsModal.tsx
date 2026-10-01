@@ -63,39 +63,36 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   };
 
   const handleDeleteTicket = async () => {
-    if (deletePassword !== '2904') {
-      setDeleteError('รหัสผ่านไม่ถูกต้อง');
+    if (deletePassword !== '1234') {
+      setDeleteError('รหัสผ่านไม่ถูกต้อง (กรุณาใส่ 1234)');
       return;
     }
     if (!onDeleteTicket) return;
     setIsDeleting(true);
     try {
       await onDeleteTicket(ticket.id);
+      setIsDeletePromptOpen(false);
+      onClose();
     } finally {
       setIsDeleting(false);
       setDeletePassword('');
       setDeleteError('');
-      setIsDeletePromptOpen(false);
     }
   };
 
-  // Step mapping
+  // Step mapping - Only 4 core steps: 1. รอตรวจสอบ, 2. รับงานแล้ว, 3. รออะไหล่, 4. เสร็จสิ้น
   const steps = [
-    { id: 'pending', label: 'รอตรวจสอบ', sub: 'รอรับเรื่อง' },
-    { id: 'assigned', label: 'มอบหมายแล้ว', sub: 'จ่ายงานช่าง' },
-    { id: 'in_progress', label: 'รับงานแล้ว', sub: 'กำลังดำเนินการ' },
-    { id: 'waiting_parts', label: 'รออะไหล่', sub: 'สั่งซื้อ/รอของ' },
-    { id: 'waiting_inspect', label: 'รอตรวจรับ', sub: 'ซ่อมเสร็จแล้ว' },
-    { id: 'completed', label: 'เสร็จสิ้น', sub: 'ปิดงานเรียบร้อย' }
+    { id: 'pending', label: '1. รอตรวจสอบ', sub: 'รอรับเรื่อง' },
+    { id: 'in_progress', label: '2. รับงานแล้ว', sub: 'กำลังดำเนินการ' },
+    { id: 'waiting_parts', label: '3. รออะไหล่', sub: 'สั่งซื้อ/รอของ' },
+    { id: 'completed', label: '4. เสร็จสิ้น', sub: 'ปิดงานเรียบร้อย' }
   ];
 
-  let currentStepIndex = 2; // in_progress default
+  let currentStepIndex = 1; // in_progress default
   if (ticket.status === 'pending') currentStepIndex = 0;
-  else if (ticket.status === 'assigned') currentStepIndex = 1;
-  else if (ticket.status === 'in_progress') currentStepIndex = 2;
-  else if (ticket.status === 'waiting_parts') currentStepIndex = 3;
-  else if (ticket.status === 'waiting_inspect') currentStepIndex = 4;
-  else if (ticket.status === 'completed') currentStepIndex = 5;
+  else if (ticket.status === 'assigned' || ticket.status === 'in_progress') currentStepIndex = 1;
+  else if (ticket.status === 'waiting_parts') currentStepIndex = 2;
+  else if (ticket.status === 'waiting_inspect' || ticket.status === 'completed') currentStepIndex = 3;
 
   const handleStatusChange = (newStatus: any, alertText: string) => {
     setConfirmConfig({
@@ -215,8 +212,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               </span>
             </div>
 
-            {/* Visual Step Indicator Cards - Fully responsive grid, unmasked and crystal clear */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 pt-1">
+            {/* Visual Step Indicator Cards - 4 Core Steps: 1, 3, 4, 6 */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
               {steps.map((s, idx) => {
                 const isPassed = idx < currentStepIndex;
                 const isActive = idx === currentStepIndex;
@@ -462,41 +459,78 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
           {/* Section 6: Quick Action Status Buttons */}
           <div className="flex flex-col gap-2.5 pt-2">
-            <button
-              onClick={() => handleStatusChange('waiting_inspect', 'ส่งงานเรียบร้อย รอผู้แจ้งตรวจรับ')}
-              className="w-full h-12 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer font-bold"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[20px]">assignment_turned_in</span>
-              ส่งงานเพื่อให้ผู้แจ้งตรวจรับ (Ready for Inspection)
-            </button>
+            {ticket.status === 'pending' && (
+              <button
+                onClick={() => handleStatusChange('in_progress', 'รับงานซ่อมและเริ่มดำเนินการ')}
+                className="w-full h-12 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer font-bold"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[20px]">play_circle</span>
+                กดรับงานซ่อม (เริ่มดำเนินการ)
+              </button>
+            )}
 
-            <button
-              onClick={() => handleStatusChange('waiting_parts', 'บันทึกสถานะรออะไหล่เรียบร้อย')}
-              className="w-full h-12 rounded-xl bg-secondary-container hover:bg-secondary text-on-secondary-container font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98] cursor-pointer font-bold"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[20px]">hourglass_top</span>
-              ขอเบิกอะไหล่ / พักรองาน (Waiting Parts)
-            </button>
+            {ticket.status !== 'completed' && ticket.status !== 'cancelled' && (
+              <button
+                onClick={() => handleStatusChange('completed', 'บันทึกปิดงานซ่อมเรียบร้อย')}
+                className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer font-bold"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                ปิดงานซ่อม / เสร็จสิ้นสมบูรณ์ (Completed)
+              </button>
+            )}
+
+            {ticket.status === 'in_progress' && (
+              <button
+                onClick={() => handleStatusChange('waiting_parts', 'บันทึกสถานะรออะไหล่เรียบร้อย')}
+                className="w-full h-11 rounded-xl bg-secondary-container hover:bg-secondary text-on-secondary-container font-label-md text-label-md flex items-center justify-center gap-2 shadow-xs transition-all active:scale-[0.98] cursor-pointer font-bold"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[18px]">hourglass_top</span>
+                ขอเบิกอะไหล่ / พักรองาน (Waiting Parts)
+              </button>
+            )}
+
+            {ticket.status === 'waiting_parts' && (
+              <button
+                onClick={() => handleStatusChange('in_progress', 'ได้รับอะไหล่แล้ว กลับมาดำเนินการต่อ')}
+                className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-label-md text-label-md flex items-center justify-center gap-2 shadow-xs transition-all active:scale-[0.98] cursor-pointer font-bold"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[18px]">build</span>
+                ได้รับอะไหล่แล้ว (เริ่มซ่อมต่อ)
+              </button>
+            )}
+
+            {ticket.status === 'completed' && (
+              <button
+                onClick={() => handleStatusChange('in_progress', 'เปิดงานซ่อมใหม่')}
+                className="w-full h-11 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-label-md text-label-md flex items-center justify-center gap-2 transition-colors cursor-pointer font-bold"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[18px]">replay</span>
+                เปิดงานซ่อมใหม่ (Reopen Ticket)
+              </button>
+            )}
 
             <button
               onClick={() => handleStatusChange('cancelled', 'ยกเลิกใบงานซ่อมนี้')}
-              className="w-full h-11 rounded-xl bg-surface-container hover:bg-surface-container-high text-error font-label-md text-label-md flex items-center justify-center gap-1.5 transition-colors cursor-pointer font-semibold"
+              className="w-full h-10 rounded-xl bg-surface-container hover:bg-surface-container-high text-error font-label-md text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer font-semibold"
               type="button"
             >
-              <span className="material-symbols-outlined text-[18px]">cancel</span>
+              <span className="material-symbols-outlined text-[16px]">cancel</span>
               ขอยกเลิกใบงานซ่อมนี้
             </button>
 
             {onDeleteTicket && (
               <button
                 onClick={() => { setDeletePassword(''); setDeleteError(''); setIsDeletePromptOpen(true); }}
-                className="w-full h-11 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-label-md text-label-md flex items-center justify-center gap-1.5 transition-colors cursor-pointer font-semibold"
+                className="w-full h-11 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-label-md text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer font-bold mt-1 shadow-xs"
                 type="button"
               >
-                <span className="material-symbols-outlined text-[18px]">delete</span>
-                ลบรายการแจ้งซ่อม
+                <span className="material-symbols-outlined text-[18px]">delete_forever</span>
+                ลบรายการแจ้งซ่อม (ใส่รหัส 1234)
               </button>
             )}
           </div>
@@ -536,12 +570,12 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 <span className="material-symbols-outlined text-[28px]">delete_forever</span>
               </div>
               <div>
-                <h3 className="text-lg sm:text-xl font-bold">ยืนยันการลบรายการ</h3>
-                <p className="text-sm text-slate-600 mt-0.5">การลบรายการนี้ไม่สามารถย้อนกลับได้</p>
+                <h3 className="text-lg sm:text-xl font-bold">ยืนยันการลบรายการแจ้งซ่อม</h3>
+                <p className="text-sm text-slate-600 mt-0.5">ใส่รหัส 1234 เพื่อยืนยันการลบถาวร</p>
               </div>
             </div>
             <label className="block mt-5 text-sm font-bold text-slate-700" htmlFor="delete-password">
-              ใส่รหัสเพื่อยืนยันการลบ
+              ใส่รหัสผ่าน 4 หลัก (1234) เพื่อลบรายการ:
             </label>
             <input
               id="delete-password"
@@ -551,15 +585,15 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               value={deletePassword}
               onChange={(event) => { setDeletePassword(event.target.value); setDeleteError(''); }}
               onKeyDown={(event) => { if (event.key === 'Enter') void handleDeleteTicket(); }}
-              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-lg tracking-[0.35em] outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-100"
-              placeholder="รหัส 4 หลัก"
+              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-xl tracking-[0.4em] text-center font-bold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-100"
+              placeholder="1234"
               maxLength={4}
             />
-            {deleteError && <p className="mt-2 text-sm font-semibold text-rose-600">{deleteError}</p>}
+            {deleteError && <p className="mt-2 text-sm font-semibold text-rose-600 text-center">{deleteError}</p>}
             <div className="mt-5 flex gap-3">
-              <button type="button" onClick={() => setIsDeletePromptOpen(false)} className="flex-1 rounded-xl bg-slate-100 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200" disabled={isDeleting}>ยกเลิก</button>
-              <button type="button" onClick={() => void handleDeleteTicket()} className="flex-1 rounded-xl bg-rose-600 py-3 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60" disabled={isDeleting}>
-                {isDeleting ? 'กำลังลบ...' : 'ยืนยันลบรายการ'}
+              <button type="button" onClick={() => setIsDeletePromptOpen(false)} className="flex-1 rounded-xl bg-slate-100 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200 cursor-pointer" disabled={isDeleting}>ยกเลิก</button>
+              <button type="button" onClick={() => void handleDeleteTicket()} className="flex-1 rounded-xl bg-rose-600 py-3 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60 cursor-pointer shadow-xs" disabled={isDeleting}>
+                {isDeleting ? 'กำลังลบ...' : 'ยืนยันลบรายการ (1234)'}
               </button>
             </div>
           </div>

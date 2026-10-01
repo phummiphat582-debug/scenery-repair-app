@@ -92,7 +92,8 @@ function dbToTechnician(row: any): Technician {
     status: row.status || 'active',
     phone: row.phone || '',
     avatarUrl: row.avatar_url || row.avatarUrl || '',
-    isOnDutyToday: row.is_on_duty_today ?? row.isOnDutyToday ?? true
+    isOnDutyToday: row.is_on_duty_today ?? row.isOnDutyToday ?? true,
+    departmentId: row.department_id || row.departmentId || undefined
   };
 }
 
@@ -458,7 +459,7 @@ class TicketService {
     return [...this.technicians];
   }
 
-  public async addTechnician(tech: { name: string; role?: string; phone?: string; avatarUrl?: string }): Promise<Technician[]> {
+  public async addTechnician(tech: { name: string; role?: string; phone?: string; avatarUrl?: string; departmentId?: string }): Promise<Technician[]> {
     const trimmedName = tech.name.trim();
     const newTech: Technician = {
       id: 'tech-' + Date.now(),
@@ -467,7 +468,8 @@ class TicketService {
       status: 'active',
       phone: tech.phone?.trim() || '',
       avatarUrl: tech.avatarUrl || '',
-      isOnDutyToday: true
+      isOnDutyToday: true,
+      departmentId: tech.departmentId || undefined
     };
 
     if (isSupabaseConfigured && supabase) {
@@ -478,7 +480,8 @@ class TicketService {
           status: newTech.status,
           phone: newTech.phone,
           avatar_url: newTech.avatarUrl,
-          is_on_duty_today: newTech.isOnDutyToday
+          is_on_duty_today: newTech.isOnDutyToday,
+          department_id: newTech.departmentId
         }]).select().single();
 
         if (!error && data) {
@@ -523,6 +526,7 @@ class TicketService {
         if (updates.phone !== undefined) row.phone = updates.phone;
         if (updates.avatarUrl !== undefined) row.avatar_url = updates.avatarUrl;
         if (updates.isOnDutyToday !== undefined) row.is_on_duty_today = updates.isOnDutyToday;
+        if (updates.departmentId !== undefined) row.department_id = updates.departmentId;
 
         let query = supabase.from('technicians').update(row);
         query = filterTechnicianQuery(query, targetId);
