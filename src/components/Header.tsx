@@ -27,7 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const getSubtext = () => {
     if (subtitle) return subtitle;
-    if (userRole === 'requester') return 'หน้าแจ้งงานสำหรับแผนก (Department Requester Portal)';
+    if (userRole === 'requester') return 'ระบบแจ้งซ่อม Scenery Farm';
     switch (currentTab) {
       case 'dashboard':
         return 'ภาพรวมระบบ & KPIs งานซ่อม';
@@ -83,13 +83,11 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
               
               {/* Role Indicator Pill */}
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-[10px] shrink-0 font-bold ${
-                userRole === 'requester'
-                  ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                  : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-              }`}>
-                {userRole === 'requester' ? '🏢 แผนกที่แจ้งงาน' : '🛠️ ระบบช่างรับงาน'}
-              </span>
+              {userRole === 'technician' && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-[10px] shrink-0 font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                  🛠️ ระบบช่างรับงาน
+                </span>
+              )}
             </div>
             <span className="font-label-sm text-[11px] text-on-surface-variant truncate">
               {getSubtext()}
@@ -108,7 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
             }`}
           >
-            <span>🏢 หน้าแจ้งงาน (สำหรับแผนก)</span>
+            <span>📝 หน้าแจ้งซ่อม</span>
           </button>
           
           <button
@@ -189,7 +187,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'text-on-surface-variant hover:text-on-surface'
             }`}
           >
-            <span>🏢 หน้าแจ้งงาน (แผนก)</span>
+            <span>📝 หน้าแจ้งซ่อม</span>
           </button>
           <button
             type="button"

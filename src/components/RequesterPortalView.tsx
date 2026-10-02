@@ -162,11 +162,8 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-secondary-fixed text-xs font-bold mb-2">
-              <span>🏢 หน้าแจ้งงาน (สำหรับแผนกที่แจ้งงาน)</span>
-            </div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-              ระบบแจ้งซ่อมสำหรับแผนก • Scenery Farm
+              ระบบแจ้งซ่อม • Scenery Farm
             </h1>
             <p className="text-xs sm:text-sm text-primary-fixed mt-1 max-w-xl leading-relaxed">
               สำหรับพนักงานทุกแผนก (คาเฟ่, วิลล่า, โรงแกะ, กิจกรรม ฯลฯ) ส่งใบแจ้งซ่อม ตรวจสอบรายชื่อช่างที่มาปฏิบัติงานวันนี้ โทรติดต่อช่าง และติดตามสถานะงานซ่อม
