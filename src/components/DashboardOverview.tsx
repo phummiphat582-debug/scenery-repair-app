@@ -11,7 +11,6 @@ interface DashboardOverviewProps {
   onSelectTicket: (ticket: Ticket) => void;
   onQuickAssign: (ticket: Ticket) => void;
   onOpenQRScanner: () => void;
-  onOpenFarmMap: () => void;
   onRefresh: () => void;
 }
 
@@ -22,7 +21,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onSelectTicket,
   onQuickAssign,
   onOpenQRScanner,
-  onOpenFarmMap,
   onRefresh
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -534,20 +532,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           })
         )}
       </section>
-
-      {/* 8. Floating Shortcut Bar */}
-      <aside className="sticky bottom-24 z-30 px-margin flex items-center justify-center pointer-events-none">
-        <div className="pointer-events-auto bg-surface-container-lowest/95 backdrop-blur-md rounded-full px-4 py-2 shadow-xl flex items-center gap-3 border border-slate-200/60">
-          <button
-            onClick={onOpenFarmMap}
-            className="flex items-center gap-1.5 text-on-surface-variant hover:text-primary font-label-md text-label-md font-semibold px-3 py-1 rounded-full hover:bg-surface-container-high transition-colors cursor-pointer bg-transparent border-none"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[20px]">map</span>
-            <span>แผนผังฟาร์ม</span>
-          </button>
-        </div>
-      </aside>
 
       {/* Phone Call Confirmation Modal */}
       {callConfirmTech && (

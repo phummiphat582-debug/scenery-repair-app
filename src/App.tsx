@@ -12,7 +12,6 @@ import { ConfirmModal } from './components/ConfirmModal';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { MigrationModal } from './components/MigrationModal';
 import { TechnicianRosterModal } from './components/TechnicianRosterModal';
-import { FarmMapModal } from './components/FarmMapModal';
 import { SOSModal } from './components/SOSModal';
 import { PartsModal } from './components/PartsModal';
 import { QRScannerModal } from './components/QRScannerModal';
@@ -51,7 +50,6 @@ export const App: React.FC = () => {
   const [isDailyDutyModalOpen, setIsDailyDutyModalOpen] = useState(false);
   const [isMigrationModalOpen, setIsMigrationModalOpen] = useState(false);
   const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
-  const [isFarmMapModalOpen, setIsFarmMapModalOpen] = useState(false);
   const [isSOSModalOpen, setIsSOSModalOpen] = useState(false);
   const [isPartsModalOpen, setIsPartsModalOpen] = useState(false);
   const [partsModalTicket, setPartsModalTicket] = useState<Ticket | null>(null);
@@ -305,7 +303,6 @@ export const App: React.FC = () => {
                     onSelectTicket={handleSelectTicket}
                     onQuickAssign={handleQuickAssign}
                     onOpenQRScanner={() => setIsQRScannerModalOpen(true)}
-                    onOpenFarmMap={() => setIsFarmMapModalOpen(true)}
                     onRefresh={loadData}
                   />
                 )}
@@ -393,11 +390,6 @@ export const App: React.FC = () => {
         onClose={() => setIsRosterModalOpen(false)}
         technicians={technicians}
         onRosterChanged={loadData}
-      />
-
-      <FarmMapModal
-        isOpen={isFarmMapModalOpen}
-        onClose={() => setIsFarmMapModalOpen(false)}
       />
 
       <SOSModal

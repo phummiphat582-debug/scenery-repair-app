@@ -8,7 +8,6 @@ interface TechnicianTasksViewProps {
   technicians: Technician[];
   onSelectTicket: (ticket: Ticket) => void;
   onUpdateTicketStatus: (id: string, updates: Partial<Ticket>) => Promise<void>;
-  onOpenFarmMap: () => void;
   onOpenSOSModal: () => void;
   onOpenPartsModal: (ticket?: Ticket) => void;
 }
@@ -18,7 +17,6 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
   technicians,
   onSelectTicket,
   onUpdateTicketStatus,
-  onOpenFarmMap,
   onOpenSOSModal,
   onOpenPartsModal
 }) => {
@@ -459,15 +457,6 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
         >
           <AlertCircle className="w-4 h-4" />
           <span>SOS ฉุกเฉิน</span>
-        </button>
-
-        <button
-          onClick={onOpenFarmMap}
-          className="w-11 h-11 rounded-full bg-primary hover:bg-primary-container text-white flex items-center justify-center shadow-lg active:scale-95 transition-all cursor-pointer"
-          type="button"
-          title="เปิดแผนที่โซนฟาร์ม"
-        >
-          <span className="material-symbols-outlined text-[20px]">near_me</span>
         </button>
       </aside>
 
