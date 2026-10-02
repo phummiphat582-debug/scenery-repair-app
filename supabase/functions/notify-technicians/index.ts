@@ -30,16 +30,29 @@ Deno.serve(async (request) => {
     const body = await request.json();
     const ticketId = String(body?.ticketId || '');
     const requestId = String(body?.requestId || '');
-    if (!ticketId && !requestId) return json({ error: 'ticketId or requestId is required' }, 400);
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-    let query = supabase.from('repair_tickets').select('id, request_id, title, department, location, priority').limit(1);
-    query = ticketId && !ticketId.startsWith('ticket-')
-      ? query.eq('id', ticketId)
-      : query.eq('request_id', requestId);
-    const { data: tickets, error: ticketError } = await query;
-    if (ticketError) return json({ error: ticketError.message }, 500);
-    const ticket = tickets?.[0];
+    let ticket = body?.ticket ? {
+      id: body.ticket.id || ticketId,
+      request_id: body.ticket.requestId || body.ticket.request_id || requestId,
+      title: body.ticket.title || 'รายการแจ้งซ่อม',
+      department: body.ticket.department || '',
+      location: body.ticket.location || '',
+      priority: body.ticket.priority || 'normal'
+    } : null;
+
+    if (!ticket) {
+      if (!ticketId && !requestId) return json({ error: 'ticketId or requestId is required' }, 400);
+
+      const supabase = createClient(supabaseUrl, serviceRoleKey);
+      let query = supabase.from('repair_tickets').select('id, request_id, title, department, location, priority').limit(1);
+      query = ticketId && !ticketId.startsWith('ticket-')
+        ? query.eq('id', ticketId)
+        : query.eq('request_id', requestId);
+      const { data: tickets, error: ticketError } = await query;
+      if (ticketError) return json({ error: ticketError.message }, 500);
+      ticket = tickets?.[0];
+    }
+
     if (!ticket) return json({ sent: false, reason: 'ticket-not-found' }, 404);
 
     const title = ticket.priority === 'critical' || ticket.priority === 'high'
@@ -69,7 +82,12 @@ Deno.serve(async (request) => {
       return json({ sent: false, error: 'OneSignal rejected the notification' }, 502);
     }
 
-    return json({ sent: Boolean(result?.id), notificationId: result?.id || null });
+    return json({
+      sent: Boolean(result?.id),
+      notificationId: result?.id || null,
+      recipients: result?.recipients ?? null,
+      oneSignalResult: result
+    });
   } catch (error) {
     console.error('[notify-technicians]', error);
     return json({ error: 'Unexpected notification error' }, 500);

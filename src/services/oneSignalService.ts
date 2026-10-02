@@ -28,6 +28,11 @@ const isConfigured = appIdPattern.test(appId);
 const TECHNICIAN_TAG = 'scenery_role';
 let oneSignalPromise: Promise<OneSignalInstance | null> | null = null;
 
+const NOTIFICATION_FUNCTION_URL =
+  'https://rimwhvvashgcaepyavjq.supabase.co/functions/v1/notify-technicians';
+const NOTIFICATION_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpbXdodnZhc2hnY2FlcHlhdmpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NjkwNzcsImV4cCI6MjEwMTE0NTA3N30.XAo8nJPSDHokoQIv4GkMcXghb3uBeV5I7Re4Wb0mxFw';
+
 const getNotificationPermission = (): NotificationPermission => (
   typeof Notification === 'undefined' ? 'default' : Notification.permission
 );
@@ -111,21 +116,103 @@ export const oneSignalService = {
     }
   },
 
-  async notifyTechnicians(ticket: { id: string; requestId: string }): Promise<boolean> {
-    if (!isConfigured || !isSupabaseConfigured || !supabase) return false;
+  async notifyTechnicians(ticket: {
+    id: string;
+    requestId: string;
+    title?: string;
+    department?: string;
+    location?: string;
+    priority?: string;
+  }): Promise<boolean> {
+    if (!isConfigured) return false;
 
     try {
-      const { data, error } = await supabase.functions.invoke('notify-technicians', {
-        body: { ticketId: ticket.id, requestId: ticket.requestId }
+      const response = await fetch(NOTIFICATION_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${NOTIFICATION_ANON_KEY}`,
+          'apikey': NOTIFICATION_ANON_KEY
+        },
+        body: JSON.stringify({
+          ticketId: ticket.id,
+          requestId: ticket.requestId,
+          ticket: {
+            id: ticket.id,
+            requestId: ticket.requestId,
+            title: ticket.title || 'รายการแจ้งซ่อม',
+            department: ticket.department || '',
+            location: ticket.location || '',
+            priority: ticket.priority || 'normal'
+          }
+        })
       });
-      if (error) {
-        console.warn('[OneSignal] notification function failed:', error);
+
+      if (!response.ok) {
+        console.warn('[OneSignal] notification function HTTP error:', response.status);
         return false;
       }
+
+      const data = await response.json();
+      console.log('[OneSignal] Notification successfully sent:', data);
       return Boolean(data?.sent);
     } catch (error) {
       console.warn('[OneSignal] notification request failed:', error);
       return false;
     }
+  },
+
+  async testPushNotification(): Promise<{ ok: boolean; message: string; notificationId?: string }> {
+    try {
+      const oneSignal = await this.getInstance();
+      if (oneSignal) {
+        try {
+          await oneSignal.User.addTag(TECHNICIAN_TAG, 'technician');
+        } catch (e) {
+          console.warn('[OneSignal] test tag add error:', e);
+        }
+      }
+
+      const response = await fetch(NOTIFICATION_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${NOTIFICATION_ANON_KEY}`,
+          'apikey': NOTIFICATION_ANON_KEY
+        },
+        body: JSON.stringify({
+          ticket: {
+            id: 'test-' + Date.now(),
+            requestId: 'TEST-' + Math.floor(100 + Math.random() * 900),
+            title: 'ทดสอบแจ้งเตือนมือถือช่าง 🔔',
+            department: '84 ซ่อมบำรุง',
+            location: 'ระบบแจ้งเตือน OneSignal',
+            priority: 'high'
+          }
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data?.sent) {
+        return {
+          ok: true,
+          message: `ยิงแจ้งเตือน OneSignal สำเร็จ (ID: ${data.notificationId || 'OK'})`,
+          notificationId: data.notificationId
+        };
+      }
+      return {
+        ok: false,
+        message: data?.error || 'เซิร์ฟเวอร์แจ้งเตือนตอบกลับว่าไม่สำเร็จ'
+      };
+    } catch (error: any) {
+      return {
+        ok: false,
+        message: error?.message || 'เชื่อมต่อเซิร์ฟเวอร์แจ้งเตือนไม่สำเร็จ'
+      };
+    }
+  },
+
+  getPermission(): NotificationPermission {
+    return getNotificationPermission();
   }
 };

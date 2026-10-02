@@ -38,11 +38,12 @@ export const TechnicianPushPrompt: React.FC = () => {
     const result = await oneSignalService.enableTechnicianNotifications();
     setState(result);
 
-    // If successfully enabled, show confirmation for 2.5 seconds, then hide completely forever
+    // If successfully enabled, trigger a test push and show confirmation for 4 seconds, then hide
     if (result === 'enabled') {
+      void oneSignalService.testPushNotification();
       setTimeout(() => {
         setIsVisible(false);
-      }, 2500);
+      }, 4000);
     }
   };
 
@@ -51,7 +52,7 @@ export const TechnicianPushPrompt: React.FC = () => {
       <div className="mx-auto mb-4 flex w-[calc(100%-2rem)] max-w-7xl items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800 shadow-sm animate-in fade-in duration-200">
         <div className="flex items-center gap-3">
           <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
-          <span className="text-sm font-semibold">เปิดแจ้งเตือนงานเข้าให้ทีมช่างเรียบร้อยแล้ว ✅</span>
+          <span className="text-sm font-semibold">เปิดแจ้งเตือนงานเข้าเรียบร้อยแล้ว ✅ (กำลังส่งสัญญาณทดสอบเข้ามือถือคุณ)</span>
         </div>
         <button
           type="button"
