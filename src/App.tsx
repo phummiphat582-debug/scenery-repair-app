@@ -141,6 +141,8 @@ export const App: React.FC = () => {
     }
   };
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Urgent count
   const urgentCount = useMemo(() => {
     return tickets.filter(
@@ -150,6 +152,19 @@ export const App: React.FC = () => {
     ).length;
   }, [tickets]);
 
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    try {
+      await ticketService.manualSync();
+      await loadData();
+      showToast('ซิงค์ข้อมูลกับฐานข้อมูลกลางสำเร็จ 🟢 (ข้อมูลล่าสุดแล้ว)', 'success');
+    } catch {
+      showToast('ซิงค์ข้อมูลไม่สำเร็จ กรุณาตรวจสอบสัญญาณเน็ต', 'error');
+    } finally {
+      setTimeout(() => setIsSyncing(false), 500);
+    }
+  };
+
   // Handle open ticket details
   const handleSelectTicket = (ticket: Ticket) => {
     setSelectedTicket(ticket);
@@ -158,22 +173,31 @@ export const App: React.FC = () => {
 
   // Handle update ticket
   const handleUpdateTicket = async (id: string, updates: Partial<Ticket>) => {
-    await ticketService.updateTicket(id, updates);
-    if (updates.status === 'completed' || updates.status === 'waiting_inspect') {
+    const updated = await ticketService.updateTicket(id, updates);
+    const targetRequestId = updated?.requestId || id;
+    if (updates.status === 'completed') {
       confetti({ particleCount: 50, spread: 70, origin: { y: 0.7 } });
-      showToast('ส่งตรวจรับงานซ่อมเรียบร้อย! 🎉');
+      showToast(`🎉 ปิดงานซ่อม #${targetRequestId} เรียบร้อย! สามารถดูรายการได้ที่แท็บ "เสร็จสิ้น"`, 'success');
+    } else if (updates.status === 'in_progress') {
+      showToast(`🟢 รับงานซ่อม #${targetRequestId} เรียบร้อย! ปรับสถานะเป็น "กำลังซ่อม"`, 'success');
+    } else if (updates.status === 'cancelled') {
+      showToast(`🚫 ยกเลิกใบงาน #${targetRequestId} เรียบร้อย! สามารถดูรายการได้ที่แท็บ "ยกเลิกแล้ว"`, 'info');
+    } else if (updates.status === 'waiting_parts') {
+      showToast(`📦 บันทึกขอเบิก/รออะไหล่สำหรับใบงาน #${targetRequestId} เรียบร้อย!`, 'info');
     } else {
-      showToast('อัปเดตข้อมูลงานซ่อมเรียบร้อย');
+      showToast(`อัปเดตข้อมูลใบงาน #${targetRequestId} เรียบร้อย`);
     }
-    loadData();
+    await loadData();
   };
 
   const handleDeleteTicket = async (id: string) => {
+    const target = tickets.find(t => t.id === id || t.requestId === id);
+    const reqId = target?.requestId || id;
     await ticketService.deleteTicket(id);
     setIsDetailModalOpen(false);
     setSelectedTicket(null);
     await loadData();
-    showToast('ลบรายการแจ้งซ่อมเรียบร้อยแล้ว', 'info');
+    showToast(`🗑️ ลบรายการ #${reqId} ออกจากฐานข้อมูลเรียบร้อยแล้ว`, 'info');
   };
 
   const handleRequestDeleteTicket = (ticket: Ticket) => {
@@ -261,6 +285,8 @@ export const App: React.FC = () => {
           }
         }}
         urgentCount={urgentCount}
+        onRefresh={handleManualSync}
+        isSyncing={isSyncing}
         onOpenNotifications={() => {
           if (userRole === 'technician') setCurrentTab('all-requests');
         }}

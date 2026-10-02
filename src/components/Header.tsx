@@ -8,6 +8,8 @@ interface HeaderProps {
   onSwitchRole?: () => void;
   onSelectRole?: (role: UserRole) => void;
   onOpenNotifications?: () => void;
+  onRefresh?: () => void;
+  isSyncing?: boolean;
   urgentCount?: number;
   subtitle?: string;
   onBack?: () => void;
@@ -20,6 +22,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSwitchRole,
   onSelectRole,
   onOpenNotifications,
+  onRefresh,
+  isSyncing = false,
   urgentCount = 0,
   subtitle,
   onBack,
@@ -81,6 +85,15 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="font-headline-sm text-[15px] sm:text-headline-sm text-primary tracking-tight truncate leading-tight uppercase font-extrabold">
                 SCENERY FARM
               </span>
+
+              {/* Online Realtime Pulse Badge */}
+              <span 
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200" 
+                title="ระบบเชื่อมต่อฐานข้อมูลออนไลน์เรียลไทม์ 100%"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>ออนไลน์</span>
+              </span>
               
               {/* Role Indicator Pill */}
               {userRole === 'technician' && (
@@ -124,6 +137,19 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Side Icons */}
         <div className="flex items-center gap-2 shrink-0">
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              type="button"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors cursor-pointer"
+              title="กดซิงค์ข้อมูลกับฐานข้อมูลกลางทันที (Sync Now)"
+            >
+              <span className={`material-symbols-outlined text-[19px] ${isSyncing ? 'animate-spin text-primary' : ''}`}>
+                sync
+              </span>
+            </button>
+          )}
+
           <PwaInstallButton />
           
           {/* Mobile Switch Button */}

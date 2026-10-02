@@ -64,6 +64,19 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
     return tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length;
   }, [tickets]);
 
+  // Status counts for QueueControls pills
+  const statusCounts = useMemo(() => {
+    return {
+      active: tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length,
+      pending: tickets.filter(t => t.status === 'pending' || t.status === 'assigned').length,
+      in_progress: tickets.filter(t => t.status === 'in_progress').length,
+      waiting_parts: tickets.filter(t => t.status === 'waiting_parts').length,
+      completed: tickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length,
+      cancelled: tickets.filter(t => t.status === 'cancelled').length,
+      all: tickets.length
+    };
+  }, [tickets]);
+
   // Filtered & Sorted tickets
   const filteredTickets = useMemo(() => {
     let result = [...tickets];
@@ -81,9 +94,13 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
     } else if (statusFilter === 'pending') {
       result = result.filter(t => t.status === 'pending' || t.status === 'assigned');
     } else if (statusFilter === 'in_progress') {
-      result = result.filter(t => t.status === 'in_progress' || t.status === 'waiting_parts');
+      result = result.filter(t => t.status === 'in_progress');
+    } else if (statusFilter === 'waiting_parts') {
+      result = result.filter(t => t.status === 'waiting_parts');
     } else if (statusFilter === 'completed') {
-      result = result.filter(t => t.status === 'completed');
+      result = result.filter(t => t.status === 'completed' || t.status === 'waiting_inspect');
+    } else if (statusFilter === 'cancelled') {
+      result = result.filter(t => t.status === 'cancelled');
     }
 
     if (onlyUrgent) {
@@ -157,6 +174,7 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
         onSortOrderChange={setSortOrder}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
+        statusCounts={statusCounts}
         onlyUrgent={onlyUrgent}
         onToggleUrgent={() => setOnlyUrgent(!onlyUrgent)}
       />

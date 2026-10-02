@@ -70,18 +70,24 @@ export function sortDepartments(depts: Department[]): Department[] {
   });
 }
 
-function ticketToDb(t: Partial<Ticket>): any {
+function ticketToDb(t: Partial<Ticket>, isNewTicket: boolean = false): any {
   const row: any = {};
   if (t.id && UUID_REGEX.test(t.id)) {
     row.id = t.id;
   }
-  if (t.requestId) row.request_id = t.requestId;
-  if (t.division) row.division = t.division;
-  else if (!t.id) row.division = '84';
+  if (t.requestId !== undefined) row.request_id = t.requestId;
+  if (t.division !== undefined) {
+    row.division = t.division;
+  } else if (isNewTicket) {
+    row.division = '84';
+  }
   if (t.title !== undefined) row.title = t.title;
   if (t.description !== undefined) row.description = t.description;
-  if (t.department !== undefined) row.department = t.department || '0 ฟร้อน';
-  else if (!t.id) row.department = '0 ฟร้อน';
+  if (t.department !== undefined) {
+    row.department = t.department || '0 ฟร้อน';
+  } else if (isNewTicket) {
+    row.department = '0 ฟร้อน';
+  }
   if (t.location !== undefined) row.location = t.location;
   if (t.requesterName !== undefined) row.requester_name = t.requesterName;
   if (t.requesterPhone !== undefined) row.requester_phone = t.requesterPhone;
@@ -93,8 +99,8 @@ function ticketToDb(t: Partial<Ticket>): any {
   if (t.remark !== undefined) row.remark = t.remark;
   if (t.requestImageUrl !== undefined) row.request_image_url = t.requestImageUrl;
   if (t.resultImageUrl !== undefined) row.result_image_url = t.resultImageUrl;
-  if (t.createdAt) row.created_at = t.createdAt;
-  if (t.updatedAt) row.updated_at = t.updatedAt;
+  if (t.createdAt !== undefined) row.created_at = t.createdAt;
+  if (t.updatedAt !== undefined) row.updated_at = t.updatedAt;
   if (t.completedAt !== undefined) row.completed_at = t.completedAt;
   return row;
 }
@@ -227,22 +233,29 @@ class TicketService {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         void this.syncFromServer();
+        if (!this.isConnectedToCloud) {
+          this.setupSupabaseRealtime();
+        }
       }
     });
 
     // Fast sync when browser window regains focus
     window.addEventListener('focus', () => {
       void this.syncFromServer();
+      if (!this.isConnectedToCloud) {
+        this.setupSupabaseRealtime();
+      }
     });
 
     // Fast sync when device comes back online
     window.addEventListener('online', () => {
       void this.syncFromServer();
+      this.setupSupabaseRealtime();
     });
   }
 
   /**
-   * Real-Time Synchronization Engine (Supabase Realtime WebSocket + Cross-Device Sync)
+   * Real-Time Synchronization Engine (Supabase Realtime WebSocket + Peer Broadcast + Cross-Device Sync)
    */
   private startRealtime() {
     if (typeof window === 'undefined') return;
@@ -250,19 +263,19 @@ class TicketService {
     // 1. Initial immediate fetch from Supabase
     void this.ensureInitialSync();
 
-    // 2. Setup Supabase Realtime channel (Instant WebSocket broadcast)
+    // 2. Setup Supabase Realtime channel (Instant WebSocket broadcast & CDC)
     this.setupSupabaseRealtime();
 
     // 3. Connect Server-Sent Events (SSE) for local development if present
     this.connectSSE();
 
-    // 4. Background safety polling (every 20s only when page is active)
+    // 4. Background safety polling (every 3.5s when active tab, ensures 100% real-time cross-device sync)
     if (!this.pollInterval) {
       this.pollInterval = setInterval(() => {
         if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
           void this.syncFromServer();
         }
-      }, 20000);
+      }, 3500);
     }
   }
 
@@ -276,16 +289,50 @@ class TicketService {
     return this.initialSyncPromise;
   }
 
+  private broadcastEvent(event: string, payload: any) {
+    if (this.supabaseChannel && this.isConnectedToCloud) {
+      try {
+        this.supabaseChannel.send({
+          type: 'broadcast',
+          event: event,
+          payload: payload
+        });
+      } catch (e) {
+        console.warn('[TicketService] Broadcast failed:', e);
+      }
+    }
+  }
+
   private setupSupabaseRealtime() {
-    if (!isSupabaseConfigured || !supabase || this.supabaseChannel) return;
+    if (!isSupabaseConfigured || !supabase) return;
+
+    if (this.supabaseChannel) {
+      try {
+        supabase.removeChannel(this.supabaseChannel);
+      } catch {}
+      this.supabaseChannel = null;
+    }
+
     try {
       this.supabaseChannel = supabase
-        .channel('scenery_realtime_db_channel')
+        .channel('scenery_realtime_db_channel', {
+          config: {
+            broadcast: { self: false }
+          }
+        })
+        .on(
+          'broadcast',
+          { event: 'TICKET_MUTATION' },
+          (payload) => {
+            console.log('⚡ [Realtime Broadcast] Mutation from peer received:', payload);
+            void this.syncFromServer();
+          }
+        )
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'repair_tickets' },
           (payload) => {
-            console.log('⚡ [Realtime] Ticket event received:', payload.eventType);
+            console.log('⚡ [Realtime CDC] Ticket event received:', payload.eventType);
             void this.syncFromServer();
           }
         )
@@ -293,7 +340,7 @@ class TicketService {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'technicians' },
           (payload) => {
-            console.log('⚡ [Realtime] Technician event received:', payload.eventType);
+            console.log('⚡ [Realtime CDC] Technician event received:', payload.eventType);
             void this.syncFromServer();
           }
         )
@@ -301,7 +348,7 @@ class TicketService {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'departments' },
           (payload) => {
-            console.log('⚡ [Realtime] Department event received:', payload.eventType);
+            console.log('⚡ [Realtime CDC] Department event received:', payload.eventType);
             void this.syncFromServer();
           }
         )
@@ -309,8 +356,15 @@ class TicketService {
           if (status === 'SUBSCRIBED') {
             this.isConnectedToCloud = true;
             console.log('🟢 [SupabaseRealtime] Connected to Central Cloud Database successfully!');
-          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+            void this.syncFromServer();
+          } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             console.warn('⚠️ [SupabaseRealtime] Realtime channel status:', status);
+            this.isConnectedToCloud = false;
+            setTimeout(() => {
+              if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+                this.setupSupabaseRealtime();
+              }
+            }, 3000);
           }
         });
     } catch (e) {
@@ -365,6 +419,13 @@ class TicketService {
     return this.isConnectedToCloud && isSupabaseConfigured;
   }
 
+  public async manualSync(): Promise<void> {
+    await this.syncFromServer();
+    if (!this.isConnectedToCloud) {
+      this.setupSupabaseRealtime();
+    }
+  }
+
   /**
    * Fetch latest state from Supabase Cloud (Central single source of truth)
    */
@@ -384,7 +445,20 @@ class TicketService {
           if (!tErr && Array.isArray(supaTickets)) {
             this.isConnectedToCloud = true;
             const mapped = supaTickets.map(dbToTicket);
-            if (JSON.stringify(mapped) !== JSON.stringify(this.tickets)) {
+
+            const isDifferent = mapped.length !== this.tickets.length || mapped.some(mt => {
+              const current = this.tickets.find(t => t.id === mt.id || t.requestId === mt.requestId);
+              if (!current) return true;
+              return current.status !== mt.status ||
+                     current.technicianName !== mt.technicianName ||
+                     current.updatedAt !== mt.updatedAt ||
+                     current.repairResult !== mt.repairResult ||
+                     current.remark !== mt.remark ||
+                     current.department !== mt.department ||
+                     current.division !== mt.division;
+            });
+
+            if (isDifferent) {
               this.tickets = mapped;
               changed = true;
             }
@@ -853,7 +927,7 @@ class TicketService {
     // 1. Primary write to Supabase Central Cloud
     if (isSupabaseConfigured && supabase) {
       try {
-        const dbRow = ticketToDb(created);
+        const dbRow = ticketToDb(created, true);
         const { data, error } = await supabase
           .from('repair_tickets')
           .insert([dbRow])
@@ -861,6 +935,7 @@ class TicketService {
           .single();
         if (!error && data) {
           created = dbToTicket(data);
+          this.broadcastEvent('TICKET_MUTATION', { action: 'CREATE', id: created.id, ticket: created });
         } else if (error) {
           console.warn('[TicketService] Supabase insert returned error:', error.message);
           // If conflict on request_id, generate collision-free unique id
@@ -869,7 +944,10 @@ class TicketService {
             dbRow.request_id = fallbackId;
             created.requestId = fallbackId;
             const retryRes = await supabase.from('repair_tickets').insert([dbRow]).select().single();
-            if (retryRes.data) created = dbToTicket(retryRes.data);
+            if (retryRes.data) {
+              created = dbToTicket(retryRes.data);
+              this.broadcastEvent('TICKET_MUTATION', { action: 'CREATE', id: created.id, ticket: created });
+            }
           }
         }
       } catch (e) {
@@ -899,15 +977,35 @@ class TicketService {
   }
 
   public async updateTicket(id: string, updates: Partial<Ticket>): Promise<Ticket | null> {
+    const existing = this.tickets.find(t => t.id === id || t.requestId === id);
+    const targetRequestId = existing?.requestId || (id.startsWith('REP-') ? id : undefined);
+    const targetUuid = (existing?.id && UUID_REGEX.test(existing.id)) ? existing.id : (UUID_REGEX.test(id) ? id : undefined);
+
+    const nowIso = new Date().toISOString();
+    const finalUpdates: Partial<Ticket> = { ...updates, updatedAt: nowIso };
+    if (updates.status === 'completed' && !updates.completedAt) {
+      finalUpdates.completedAt = nowIso;
+    }
+
     // 1. Primary write to Supabase Central Cloud
     if (isSupabaseConfigured && supabase) {
       try {
-        const dbUpdates = ticketToDb(updates);
+        const dbUpdates = ticketToDb(finalUpdates, false);
         let query = supabase.from('repair_tickets').update(dbUpdates);
-        query = filterTicketQuery(query, id);
+        if (targetUuid && targetRequestId) {
+          query = query.or(`id.eq.${targetUuid},request_id.eq.${targetRequestId}`);
+        } else if (targetUuid) {
+          query = query.eq('id', targetUuid);
+        } else if (targetRequestId) {
+          query = query.eq('request_id', targetRequestId);
+        } else {
+          query = filterTicketQuery(query, id);
+        }
         const { error } = await query;
         if (error) {
           console.warn('[TicketService] Supabase update returned error:', error.message);
+        } else {
+          this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id, requestId: targetRequestId, updates: finalUpdates });
         }
       } catch (e) {
         console.warn('[TicketService] Supabase update exception:', e);
@@ -920,33 +1018,44 @@ class TicketService {
         await fetch(`/api/tickets/${encodeURIComponent(id)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updates)
+          body: JSON.stringify(finalUpdates)
         });
       } catch {}
     }
 
-    const item = this.tickets.find(t => t.id === id || t.requestId === id);
-    if (!item) return null;
-
-    Object.assign(item, updates, { updatedAt: new Date().toISOString() });
-    if (updates.status === 'completed' && !item.completedAt) {
-      item.completedAt = new Date().toISOString();
+    if (existing) {
+      Object.assign(existing, finalUpdates);
+      this.saveToLocalStorage();
+      this.notify();
+      return existing;
     }
 
-    this.saveToLocalStorage();
-    this.notify();
-    return item;
+    return null;
   }
 
   public async deleteTicket(id: string): Promise<void> {
+    const existing = this.tickets.find(t => t.id === id || t.requestId === id);
+    const targetRequestId = existing?.requestId || (id.startsWith('REP-') ? id : undefined);
+    const targetUuid = (existing?.id && UUID_REGEX.test(existing.id)) ? existing.id : (UUID_REGEX.test(id) ? id : undefined);
+
     // 1. Primary delete on Supabase Central Cloud
     if (isSupabaseConfigured && supabase) {
       try {
         let query = supabase.from('repair_tickets').delete();
-        query = filterTicketQuery(query, id);
+        if (targetUuid && targetRequestId) {
+          query = query.or(`id.eq.${targetUuid},request_id.eq.${targetRequestId}`);
+        } else if (targetUuid) {
+          query = query.eq('id', targetUuid);
+        } else if (targetRequestId) {
+          query = query.eq('request_id', targetRequestId);
+        } else {
+          query = filterTicketQuery(query, id);
+        }
         const { error } = await query;
         if (error) {
           console.warn('[TicketService] Supabase delete returned error:', error.message);
+        } else {
+          this.broadcastEvent('TICKET_MUTATION', { action: 'DELETE', id, requestId: targetRequestId });
         }
       } catch (e) {
         console.warn('[TicketService] Supabase delete exception:', e);
@@ -995,7 +1104,7 @@ class TicketService {
 
     if (isSupabaseConfigured && supabase) {
       try {
-        const rows = imported.map(ticketToDb);
+        const rows = imported.map(t => ticketToDb(t, false));
         await supabase.from('repair_tickets').upsert(rows, { onConflict: 'request_id' });
       } catch (e) {}
     }

@@ -65,6 +65,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       if (filterStatus === 'pending') return t.status === 'pending' || t.status === 'assigned';
       if (filterStatus === 'in_progress') return t.status === 'in_progress' || t.status === 'waiting_parts';
       if (filterStatus === 'completed') return t.status === 'completed' || t.status === 'waiting_inspect';
+      if (filterStatus === 'cancelled') return t.status === 'cancelled';
       return true;
     });
   }, [tickets, searchQuery, filterStatus, selectedDivisionFilter, selectedDeptFilter]);
@@ -456,22 +457,28 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
               {[
-                { id: 'all', label: 'ทั้งหมด' },
-                { id: 'pending', label: 'รอรับงาน' },
-                { id: 'in_progress', label: 'กำลังซ่อม' },
-                { id: 'completed', label: 'เสร็จสิ้น' },
+                { id: 'all', label: 'ทั้งหมด', count: tickets.length },
+                { id: 'pending', label: 'รอรับงาน', count: tickets.filter(t => t.status === 'pending' || t.status === 'assigned').length },
+                { id: 'in_progress', label: 'กำลังซ่อม', count: tickets.filter(t => t.status === 'in_progress' || t.status === 'waiting_parts').length },
+                { id: 'completed', label: 'เสร็จสิ้น', count: tickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length },
+                { id: 'cancelled', label: 'ยกเลิก', count: tickets.filter(t => t.status === 'cancelled').length },
               ].map(f => (
                 <button
                   key={f.id}
                   type="button"
                   onClick={() => setFilterStatus(f.id)}
-                  className={`px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
                     filterStatus === f.id
                       ? 'bg-primary text-white shadow-xs'
                       : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant'
                   }`}
                 >
-                  {f.label}
+                  <span>{f.label}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                    filterStatus === f.id ? 'bg-white/20 text-white' : 'bg-surface-container-highest text-on-surface'
+                  }`}>
+                    {f.count}
+                  </span>
                 </button>
               ))}
             </div>

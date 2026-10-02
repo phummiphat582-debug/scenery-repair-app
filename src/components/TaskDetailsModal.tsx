@@ -95,15 +95,41 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   else if (ticket.status === 'waiting_inspect' || ticket.status === 'completed') currentStepIndex = 3;
 
   const handleStatusChange = (newStatus: any, alertText: string) => {
+    let confirmMsg = `คุณต้องการบันทึกสถานะงานเป็น "${alertText}" ใช่หรือไม่?`;
+    let confirmBtn = 'ยืนยันเปลี่ยนสถานะ';
+    let variant: 'primary' | 'danger' | 'warning' | 'success' = 'primary';
+
+    if (newStatus === 'completed') {
+      confirmMsg = `ยืนยันว่าการซ่อมงาน #${ticket.requestId} ("${ticket.title}") เสร็จสิ้นสมบูรณ์แล้ว รายการนี้จะถูกย้ายไปที่แท็บ "✅ เสร็จสิ้น"`;
+      confirmBtn = 'ยืนยันปิดงานซ่อม';
+      variant = 'success';
+    } else if (newStatus === 'cancelled') {
+      confirmMsg = `คุณต้องการยกเลิกใบงาน #${ticket.requestId} ใช่หรือไม่? รายการนี้จะถูกย้ายไปที่แท็บ "🚫 ยกเลิกแล้ว"`;
+      confirmBtn = 'ยืนยันยกเลิกใบงาน';
+      variant = 'danger';
+    } else if (newStatus === 'in_progress') {
+      confirmMsg = `คุณต้องการรับงาน #${ticket.requestId} เข้าสู่สถานะ "🔧 กำลังซ่อม" ใช่หรือไม่?`;
+      confirmBtn = 'ยืนยันเริ่มงาน';
+      variant = 'primary';
+    } else if (newStatus === 'waiting_parts') {
+      confirmMsg = `คุณต้องการพักงาน #${ticket.requestId} เพื่อรออะไหล่/อุปกรณ์ ใช่หรือไม่? รายการจะแสดงที่แท็บ "📦 รออะไหล่"`;
+      confirmBtn = 'ยืนยันพักรออะไหล่';
+      variant = 'warning';
+    }
+
     setConfirmConfig({
       isOpen: true,
-      title: 'ยืนยันการเปลี่ยนสถานะใบงาน',
-      message: `คุณต้องการบันทึกสถานะงานเป็น "${alertText}" ใช่หรือไม่?`,
-      confirmText: 'ยืนยันเปลี่ยนสถานะ',
-      cancelText: 'ยกเลิก',
-      confirmVariant: newStatus === 'cancelled' ? 'danger' : 'primary',
+      title: newStatus === 'completed' ? 'ยืนยันการปิดงานซ่อม' : (newStatus === 'cancelled' ? 'ยืนยันการยกเลิกใบงาน' : 'ยืนยันการเปลี่ยนสถานะใบงาน'),
+      message: confirmMsg,
+      confirmText: confirmBtn,
+      cancelText: 'ย้อนกลับ',
+      confirmVariant: variant,
       onConfirm: async () => {
-        await onUpdateTicket(ticket.id, { status: newStatus });
+        const updates: Partial<Ticket> = { status: newStatus };
+        if (newStatus === 'completed') {
+          updates.completedAt = new Date().toISOString();
+        }
+        await onUpdateTicket(ticket.id, updates);
         setConfirmConfig(null);
         onClose();
       }
