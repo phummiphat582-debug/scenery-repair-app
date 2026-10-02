@@ -187,7 +187,7 @@ export const App: React.FC = () => {
   const handleConfirmDeletePin = async () => {
     if (!ticketToDelete) return;
     if (deletePin !== '1234') {
-      setDeletePinError('รหัสผ่านไม่ถูกต้อง (กรุณาใส่ 1234)');
+      setDeletePinError('รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
       return;
     }
     setIsDeletingTicket(true);
@@ -454,7 +454,7 @@ export const App: React.FC = () => {
               </div>
             </div>
             <label className="block mt-5 text-sm font-bold text-slate-700" htmlFor="quick-delete-pin">
-              ใส่รหัสผ่าน 4 หลัก (1234) เพื่อลบรายการ:
+              ใส่รหัสผ่าน 4 หลัก เพื่อลบรายการ:
             </label>
             <input
               id="quick-delete-pin"
@@ -465,7 +465,7 @@ export const App: React.FC = () => {
               onChange={(e) => { setDeletePin(e.target.value); setDeletePinError(''); }}
               onKeyDown={(e) => { if (e.key === 'Enter') void handleConfirmDeletePin(); }}
               className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-xl tracking-[0.4em] text-center font-bold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-100"
-              placeholder="1234"
+              placeholder="••••"
               maxLength={4}
             />
             {deletePinError && <p className="mt-2 text-sm font-semibold text-rose-600 text-center">{deletePinError}</p>}
@@ -484,7 +484,7 @@ export const App: React.FC = () => {
                 className="flex-1 rounded-xl bg-rose-600 py-3 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60 cursor-pointer shadow-xs"
                 disabled={isDeletingTicket}
               >
-                {isDeletingTicket ? 'กำลังลบ...' : 'ยืนยันลบรายการ (1234)'}
+                {isDeletingTicket ? 'กำลังลบ...' : 'ยืนยันลบรายการ'}
               </button>
             </div>
           </div>

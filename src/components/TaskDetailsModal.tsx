@@ -64,7 +64,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
   const handleDeleteTicket = async () => {
     if (deletePassword !== '1234') {
-      setDeleteError('รหัสผ่านไม่ถูกต้อง (กรุณาใส่ 1234)');
+      setDeleteError('รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
       return;
     }
     if (!onDeleteTicket) return;
@@ -530,7 +530,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 type="button"
               >
                 <span className="material-symbols-outlined text-[18px]">delete_forever</span>
-                ลบรายการแจ้งซ่อม (ใส่รหัส 1234)
+                ลบรายการแจ้งซ่อม
               </button>
             )}
           </div>
@@ -571,11 +571,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               </div>
               <div>
                 <h3 className="text-lg sm:text-xl font-bold">ยืนยันการลบรายการแจ้งซ่อม</h3>
-                <p className="text-sm text-slate-600 mt-0.5">ใส่รหัส 1234 เพื่อยืนยันการลบถาวร</p>
+                <p className="text-sm text-slate-600 mt-0.5">การลบรายการนี้ไม่สามารถกู้คืนได้</p>
               </div>
             </div>
             <label className="block mt-5 text-sm font-bold text-slate-700" htmlFor="delete-password">
-              ใส่รหัสผ่าน 4 หลัก (1234) เพื่อลบรายการ:
+              ใส่รหัสผ่าน 4 หลัก เพื่อยืนยันการลบ:
             </label>
             <input
               id="delete-password"
@@ -586,14 +586,14 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               onChange={(event) => { setDeletePassword(event.target.value); setDeleteError(''); }}
               onKeyDown={(event) => { if (event.key === 'Enter') void handleDeleteTicket(); }}
               className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-xl tracking-[0.4em] text-center font-bold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-100"
-              placeholder="1234"
+              placeholder="••••"
               maxLength={4}
             />
             {deleteError && <p className="mt-2 text-sm font-semibold text-rose-600 text-center">{deleteError}</p>}
             <div className="mt-5 flex gap-3">
               <button type="button" onClick={() => setIsDeletePromptOpen(false)} className="flex-1 rounded-xl bg-slate-100 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200 cursor-pointer" disabled={isDeleting}>ยกเลิก</button>
               <button type="button" onClick={() => void handleDeleteTicket()} className="flex-1 rounded-xl bg-rose-600 py-3 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60 cursor-pointer shadow-xs" disabled={isDeleting}>
-                {isDeleting ? 'กำลังลบ...' : 'ยืนยันลบรายการ (1234)'}
+                {isDeleting ? 'กำลังลบ...' : 'ยืนยันลบรายการ'}
               </button>
             </div>
           </div>

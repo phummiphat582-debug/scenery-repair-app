@@ -172,7 +172,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
                 onDeleteTicket(ticket);
               }}
               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-              title="ลบรายการนี้ (ใส่รหัส 1234)"
+              title="ลบรายการนี้"
             >
               <Trash2 className="w-4 h-4" />
             </button>

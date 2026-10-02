@@ -51,6 +51,7 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
   const [newRole, setNewRole] = useState('ช่างไฟฟ้า/แอร์');
   const [newPhone, setNewPhone] = useState('');
   const [newAvatarUrl, setNewAvatarUrl] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -94,21 +95,32 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim()) return;
+    if (!newName.trim() || isSubmitting) return;
 
-    await ticketService.addTechnician({
-      name: newName.trim(),
-      role: newRole.trim() || 'ช่างซ่อมบำรุง',
-      phone: newPhone.trim(),
-      avatarUrl: newAvatarUrl || '',
-      departmentId: newDivision
-    });
+    const addedName = newName.trim();
+    const targetDivision = newDivision;
 
-    setNewName('');
-    setNewPhone('');
-    setNewAvatarUrl('');
-    showToast(`เพิ่มช่าง "${newName.trim()}" ในแผนก ${getDivisionInfo(newDivision).name} เรียบร้อย 👷‍♂️`);
-    onRosterChanged();
+    try {
+      setIsSubmitting(true);
+      await ticketService.addTechnician({
+        name: addedName,
+        role: newRole.trim() || 'ช่างซ่อมบำรุง',
+        phone: newPhone.trim(),
+        avatarUrl: newAvatarUrl || '',
+        departmentId: targetDivision
+      });
+
+      setNewName('');
+      setNewPhone('');
+      setNewAvatarUrl('');
+      setSelectedDivisionFilter(targetDivision);
+      showToast(`เพิ่มช่าง "${addedName}" ในแผนก ${getDivisionInfo(targetDivision).name} สำเร็จ 👷‍♂️`);
+      onRosterChanged();
+    } catch (err: any) {
+      alert('เกิดข้อผิดพลาดในการบันทึกช่าง: ' + (err?.message || 'กรุณาลองใหม่อีกครั้ง'));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const startEdit = (t: Technician) => {
@@ -368,10 +380,11 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
 
             <button
               type="submit"
-              className="w-full py-2.5 bg-primary hover:bg-primary-container text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              disabled={isSubmitting || !newName.trim()}
+              className="w-full py-2.5 bg-primary hover:bg-primary-container text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <UserPlus className="w-4 h-4" />
-              <span>บันทึกเพิ่มรายชื่อช่าง</span>
+              <span>{isSubmitting ? 'กำลังบันทึกข้อมูล...' : 'บันทึกเพิ่มรายชื่อช่าง'}</span>
             </button>
           </form>
 

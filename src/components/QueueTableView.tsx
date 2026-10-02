@@ -254,7 +254,7 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
                             type="button"
                             onClick={() => onDeleteTicket(ticket)}
                             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                            title="ลบรายการนี้ (ใส่รหัส 1234)"
+                            title="ลบรายการนี้"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>

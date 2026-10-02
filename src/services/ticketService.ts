@@ -24,8 +24,7 @@ const LEGACY_DEMO_TECHNICIAN_NAMES = new Set([
 
 function removeLegacyDemoTechnicians(technicians: Technician[]): Technician[] {
   return technicians.filter(tech =>
-    !LEGACY_DEMO_TECHNICIAN_IDS.has(String(tech.id)) &&
-    !LEGACY_DEMO_TECHNICIAN_NAMES.has(String(tech.name || '').trim())
+    !LEGACY_DEMO_TECHNICIAN_IDS.has(String(tech.id))
   );
 }
 
@@ -85,15 +84,38 @@ function ticketToDb(t: Partial<Ticket>): any {
 }
 
 function dbToTechnician(row: any): Technician {
+  const rawRole = row.role || 'ช่างซ่อมบำรุง';
+  let division: string | undefined = undefined;
+
+  const tagMatch = rawRole.match(/\[(84|85|86)\]/);
+  if (tagMatch) {
+    division = tagMatch[1];
+  } else if (row.department_id === '84' || row.department_id === '85' || row.department_id === '86') {
+    division = row.department_id;
+  } else if (row.departmentId === '84' || row.departmentId === '85' || row.departmentId === '86') {
+    division = row.departmentId;
+  } else {
+    const text = `${rawRole} ${row.name || ''}`.toLowerCase();
+    if (text.includes('85') || text.includes('ก่อสร้าง') || text.includes('ปูน') || text.includes('ไม้') || text.includes('อาคาร') || text.includes('โครงสร้าง') || text.includes('เชื่อม') || text.includes('หลังคา')) {
+      division = '85';
+    } else if (text.includes('86') || text.includes('ศิลป์') || text.includes('สี') || text.includes('เพ้นท์') || text.includes('ป้าย') || text.includes('พร็อพ') || text.includes('ตกแต่ง')) {
+      division = '86';
+    } else {
+      division = '84';
+    }
+  }
+
+  const cleanRole = rawRole.replace(/\s*\[(84|85|86)\]\s*/g, '').trim() || rawRole;
+
   return {
     id: String(row.id),
     name: row.name,
-    role: row.role || 'ช่างซ่อมบำรุง',
+    role: cleanRole,
     status: row.status || 'active',
     phone: row.phone || '',
     avatarUrl: row.avatar_url || row.avatarUrl || '',
     isOnDutyToday: row.is_on_duty_today ?? row.isOnDutyToday ?? true,
-    departmentId: row.department_id || row.departmentId || undefined
+    departmentId: division
   };
 }
 
@@ -461,34 +483,57 @@ class TicketService {
 
   public async addTechnician(tech: { name: string; role?: string; phone?: string; avatarUrl?: string; departmentId?: string }): Promise<Technician[]> {
     const trimmedName = tech.name.trim();
+    const divisionId = (tech.departmentId === '84' || tech.departmentId === '85' || tech.departmentId === '86')
+      ? tech.departmentId
+      : '84';
+
+    const baseRole = (tech.role?.trim() || 'ช่างซ่อมบำรุง').replace(/\s*\[(84|85|86)\]\s*/g, '').trim();
+    const roleWithDivision = `${baseRole} [${divisionId}]`;
+
     const newTech: Technician = {
       id: 'tech-' + Date.now(),
       name: trimmedName,
-      role: tech.role?.trim() || 'ช่างซ่อมบำรุง',
+      role: baseRole,
       status: 'active',
       phone: tech.phone?.trim() || '',
       avatarUrl: tech.avatarUrl || '',
       isOnDutyToday: true,
-      departmentId: tech.departmentId || undefined
+      departmentId: divisionId
     };
 
     if (isSupabaseConfigured && supabase) {
       try {
-        const { data, error } = await supabase.from('technicians').insert([{
+        const insertPayload: any = {
           name: newTech.name,
-          role: newTech.role,
+          role: roleWithDivision,
           status: newTech.status,
           phone: newTech.phone,
-          avatar_url: newTech.avatarUrl,
-          is_on_duty_today: newTech.isOnDutyToday,
-          department_id: newTech.departmentId
-        }]).select().single();
+          avatar_url: newTech.avatarUrl || null,
+          is_on_duty_today: newTech.isOnDutyToday
+        };
 
-        if (!error && data) {
+        // department_id in Supabase is a UUID foreign key. Only set if valid UUID format.
+        if (tech.departmentId && UUID_REGEX.test(tech.departmentId)) {
+          insertPayload.department_id = tech.departmentId;
+        }
+
+        const { data, error } = await supabase
+          .from('technicians')
+          .insert([insertPayload])
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[TicketService] Supabase addTechnician error:', error);
+          throw new Error(error.message || 'ไม่สามารถเพิ่มช่างลงฐานข้อมูลออนไลน์ได้');
+        }
+
+        if (data) {
           newTech.id = String(data.id);
         }
-      } catch (e) {
-        console.warn('[TicketService] Supabase addTechnician failed:', e);
+      } catch (e: any) {
+        console.error('[TicketService] Supabase addTechnician failed:', e);
+        throw e;
       }
     }
 
@@ -502,7 +547,7 @@ class TicketService {
       } catch {}
     }
 
-    const existingIdx = this.technicians.findIndex(t => t.name === trimmedName);
+    const existingIdx = this.technicians.findIndex(t => t.name.toLowerCase() === trimmedName.toLowerCase());
     if (existingIdx !== -1) {
       this.technicians[existingIdx] = newTech;
     } else {
@@ -517,20 +562,36 @@ class TicketService {
     const item = this.technicians.find(t => t.id === idOrName || t.name === idOrName);
     const targetId = item ? item.id : idOrName;
 
+    const divisionId = updates.departmentId !== undefined
+      ? ((updates.departmentId === '84' || updates.departmentId === '85' || updates.departmentId === '86') ? updates.departmentId : undefined)
+      : (item?.departmentId);
+
+    const baseRole = (updates.role !== undefined ? updates.role : (item?.role || 'ช่างซ่อมบำรุง')).replace(/\s*\[(84|85|86)\]\s*/g, '').trim();
+    const roleWithDivision = divisionId ? `${baseRole} [${divisionId}]` : baseRole;
+
     if (isSupabaseConfigured && supabase) {
       try {
         const row: any = {};
-        if (updates.name) row.name = updates.name;
-        if (updates.role) row.role = updates.role;
+        if (updates.name) row.name = updates.name.trim();
+        row.role = roleWithDivision;
         if (updates.status) row.status = updates.status;
         if (updates.phone !== undefined) row.phone = updates.phone;
         if (updates.avatarUrl !== undefined) row.avatar_url = updates.avatarUrl;
         if (updates.isOnDutyToday !== undefined) row.is_on_duty_today = updates.isOnDutyToday;
-        if (updates.departmentId !== undefined) row.department_id = updates.departmentId;
+
+        if (updates.departmentId && UUID_REGEX.test(updates.departmentId)) {
+          row.department_id = updates.departmentId;
+        } else if (updates.departmentId === null) {
+          row.department_id = null;
+        }
 
         let query = supabase.from('technicians').update(row);
         query = filterTechnicianQuery(query, targetId);
-        await query;
+        const { error } = await query;
+        if (error) {
+          console.error('[TicketService] Supabase updateTechnician error:', error);
+          throw error;
+        }
       } catch (e) {
         console.warn('[TicketService] Supabase updateTechnician failed:', e);
       }
@@ -548,6 +609,8 @@ class TicketService {
 
     if (item) {
       Object.assign(item, updates);
+      if (divisionId) item.departmentId = divisionId;
+      item.role = baseRole;
       this.saveToLocalStorage();
       this.notify();
     }
