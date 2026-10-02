@@ -54,6 +54,22 @@ function dbToTicket(row: any): Ticket {
   };
 }
 
+const DEPT_ORDER = [
+  '0', '10', '11', '13', '14', '16', '17', '19', '20', '21', '22', '23', '24', '25', '33', '34',
+  '84', '85', '86', '91', '92', 'H0', 'H12', 'H13', 'H18'
+];
+
+export function sortDepartments(depts: Department[]): Department[] {
+  return [...depts].sort((a, b) => {
+    const idxA = DEPT_ORDER.indexOf(a.code);
+    const idxB = DEPT_ORDER.indexOf(b.code);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return a.name.localeCompare(b.name, 'th');
+  });
+}
+
 function ticketToDb(t: Partial<Ticket>): any {
   const row: any = {};
   if (t.id && UUID_REGEX.test(t.id)) {
@@ -64,8 +80,8 @@ function ticketToDb(t: Partial<Ticket>): any {
   else if (!t.id) row.division = '84';
   if (t.title !== undefined) row.title = t.title;
   if (t.description !== undefined) row.description = t.description;
-  if (t.department !== undefined) row.department = t.department || 'คาเฟ่ & F&B';
-  else if (!t.id) row.department = 'คาเฟ่ & F&B';
+  if (t.department !== undefined) row.department = t.department || '0 ฟร้อน';
+  else if (!t.id) row.department = '0 ฟร้อน';
   if (t.location !== undefined) row.location = t.location;
   if (t.requesterName !== undefined) row.requester_name = t.requesterName;
   if (t.requesterPhone !== undefined) row.requester_phone = t.requesterPhone;
@@ -176,7 +192,12 @@ class TicketService {
       this.tickets = savedTickets ? JSON.parse(savedTickets) : [];
 
       const savedDepts = localStorage.getItem(LOCAL_STORAGE_DEPTS);
-      this.departments = savedDepts ? JSON.parse(savedDepts) : INITIAL_DEPARTMENTS;
+      const parsedDepts = savedDepts ? JSON.parse(savedDepts) : null;
+      if (Array.isArray(parsedDepts) && parsedDepts.some(d => d.code === '0' || d.name?.includes('ฟร้อน'))) {
+        this.departments = sortDepartments(parsedDepts);
+      } else {
+        this.departments = INITIAL_DEPARTMENTS;
+      }
 
       const savedTechs = localStorage.getItem(LOCAL_STORAGE_TECHS);
       const parsedTechs = savedTechs ? JSON.parse(savedTechs) : [];
@@ -386,11 +407,10 @@ class TicketService {
           // C. Fetch Departments
           const { data: supaDepts, error: dErr } = await supabase
             .from('departments')
-            .select('*')
-            .order('code');
+            .select('*');
 
           if (!dErr && Array.isArray(supaDepts) && supaDepts.length > 0) {
-            const mappedDepts = supaDepts.map(dbToDepartment);
+            const mappedDepts = sortDepartments(supaDepts.map(dbToDepartment));
             if (JSON.stringify(mappedDepts) !== JSON.stringify(this.departments)) {
               this.departments = mappedDepts;
               changed = true;
@@ -454,7 +474,7 @@ class TicketService {
    */
   public async getDepartments(): Promise<Department[]> {
     await this.ensureInitialSync();
-    return [...this.departments];
+    return sortDepartments(this.departments);
   }
 
   /**

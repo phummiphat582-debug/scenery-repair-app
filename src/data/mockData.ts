@@ -1,15 +1,31 @@
 import { Department, Technician, Ticket } from '../types';
 
 export const INITIAL_DEPARTMENTS: Department[] = [
-  { id: 'dept-1', name: 'คาเฟ่ & F&B', code: 'CAFE', icon: '☕', color: '#d97706', description: 'ร้านกาแฟ เบเกอรี่ และห้องอาหารหลัก' },
-  { id: 'dept-2', name: 'ห้องพัก & วิลล่า', code: 'HOTEL', icon: '🏨', color: '#7c3aed', description: 'บ้านพักวิลล่า โซนรีสอร์ท และบริการแม่บ้าน' },
-  { id: 'dept-3', name: 'ฟาร์มสัตว์ & กิจกรรม', code: 'FARM', icon: '🐑', color: '#059669', description: 'ลานป้อนอาหารแกะ ซุ้มกิจกรรม และโรงเรือนสัตว์' },
-  { id: 'dept-4', name: 'ไฟฟ้า & แอร์', code: 'ELEC', icon: '⚡', color: '#2563eb', description: 'ระบบไฟฟ้ากำลัง เครื่องปรับอากาศ แสงสว่าง และหม้อแปลง' },
-  { id: 'dept-5', name: 'ประปา & สุขาภิบาล', code: 'PLUMB', icon: '💧', color: '#0891b2', description: 'ระบบประปา สปริงเกอร์ บำบัดน้ำเสีย และห้องน้ำส่วนรวม' },
-  { id: 'dept-6', name: 'ซ่อมบำรุงอาคาร & สี', code: 'BLDG', icon: '🛠️', color: '#475467', description: 'โครงสร้างอาคาร รั้วฟาร์ม งานสี ประตูหน้าต่าง' },
-  { id: 'dept-7', name: 'งานสวน & ภูมิทัศน์', code: 'GARDEN', icon: '🌿', color: '#16a34a', description: 'สนามหญ้า ต้นไม้ ไม้ดอก และระบบระบายน้ำผิวดิน' },
-  { id: 'dept-8', name: 'รถบริการ & ยานพาหนะ', code: 'VEHICLE', icon: '🚗', color: '#ea580c', description: 'รถรางบริการนักท่องเที่ยว รถกอล์ฟ และเครื่องจักรกลฟาร์ม' },
-  { id: 'dept-9', name: 'ไอที & ระบบสื่อสาร', code: 'IT', icon: '💻', color: '#e11d48', description: 'ระบบแคชเชียร์ POS กล้องวงจรปิด Wi-Fi และเครือข่าย' },
+  { id: 'dept-0', name: '0 ฟร้อน', code: '0', icon: '🛎️', color: '#2563eb', description: 'ต้อนรับส่วนหน้า / ฟร้อน' },
+  { id: 'dept-10', name: '10 สโตร์SC', code: '10', icon: '📦', color: '#475569', description: 'สโตร์และคลังสินค้ากลาง' },
+  { id: 'dept-11', name: '11 บุคคล', code: '11', icon: '👥', color: '#0284c7', description: 'ฝ่ายบุคคลและธุรการ' },
+  { id: 'dept-13', name: '13 ไอศกรีม', code: '13', icon: '🍦', color: '#ec4899', description: 'จุดจำหน่ายไอศกรีม' },
+  { id: 'dept-14', name: '14 รปภ', code: '14', icon: '🛡️', color: '#dc2626', description: 'รักษาความปลอดภัยและจราจร' },
+  { id: 'dept-16', name: '16 บัญชี', code: '16', icon: '💼', color: '#059669', description: 'ฝ่ายบัญชีและการเงิน' },
+  { id: 'dept-17', name: '17 ลำธาร', code: '17', icon: '🌊', color: '#0891b2', description: 'โซนกิจกรรมลำธาร' },
+  { id: 'dept-19', name: '19 คนสวน', code: '19', icon: '🌿', color: '#16a34a', description: 'ทีมสวนและภูมิทัศน์' },
+  { id: 'dept-20', name: '20 ซุ้มเกม', code: '20', icon: '🎯', color: '#d97706', description: 'ซุ้มเกมและกิจกรรมฟาร์ม' },
+  { id: 'dept-21', name: '21 เบเกอรี่(แกรนด์มา ลำธาร บูธน้ำ)', code: '21', icon: '🥐', color: '#b45309', description: 'เบเกอรี่ แกรนด์มาคาเฟ่ ลำธาร บูธน้ำ' },
+  { id: 'dept-22', name: '22 ร้านอาหาร', code: '22', icon: '🍽️', color: '#ea580c', description: 'ห้องอาหารหลักและครัว' },
+  { id: 'dept-23', name: '23 ขายของที่ระลึก (สโตร์+SPS3)', code: '23', icon: '🎁', color: '#7c3aed', description: 'ร้านขายของที่ระลึก สโตร์ และ SPS3' },
+  { id: 'dept-24', name: '24 แม่บ้าน', code: '24', icon: '🧹', color: '#6366f1', description: 'แผนกแม่บ้านและทำความสะอาด' },
+  { id: 'dept-25', name: '25 การตลาด', code: '25', icon: '📢', color: '#e11d48', description: 'ฝ่ายการตลาดและประชาสัมพันธ์' },
+  { id: 'dept-33', name: '33 มอลทาเดล', code: '33', icon: '☕', color: '#92400e', description: 'ร้านกาแฟมอลทาเดล' },
+  { id: 'dept-34', name: '34 ผู้บริหาร', code: '34', icon: '👑', color: '#4f46e5', description: 'สำนักงานผู้บริหาร' },
+  { id: 'dept-84', name: '84 ซ่อมบำรุง', code: '84', icon: '🛠️', color: '#2563eb', description: 'ฝ่ายซ่อมบำรุง 84' },
+  { id: 'dept-85', name: '85 ก่อสร้าง', code: '85', icon: '🏗️', color: '#ea580c', description: 'ฝ่ายก่อสร้างและต่อเติม 85' },
+  { id: 'dept-86', name: '86 ศิลป์', code: '86', icon: '🎨', color: '#9333ea', description: 'ฝ่ายงานศิลป์ ป้าย สี ตกแต่ง 86' },
+  { id: 'dept-91', name: '91 ดูแลสัตว์', code: '91', icon: '🐑', color: '#10b981', description: 'แผนกดูแลสัตว์และคอกฟาร์ม' },
+  { id: 'dept-92', name: '92 โชว์', code: '92', icon: '🎪', color: '#f59e0b', description: 'เวทีการแสดงและโชว์ฟาร์ม' },
+  { id: 'dept-H0', name: 'H0 บ้านพัก', code: 'H0', icon: '🏡', color: '#0d9488', description: 'บ้านพักรีสอร์ท' },
+  { id: 'dept-H12', name: 'H12 สวนผึ้งอิกลู', code: 'H12', icon: '🛖', color: '#0284c7', description: 'โซนสวนผึ้งอิกลู' },
+  { id: 'dept-H13', name: 'H13 หอพักพนักงาน', code: 'H13', icon: '🏢', color: '#64748b', description: 'อาคารหอพักพนักงาน' },
+  { id: 'dept-H18', name: 'H18 แคนทีน', code: 'H18', icon: '🍲', color: '#ca8a04', description: 'โรงอาหารพนักงาน' }
 ];
 
 export const INITIAL_TECHNICIANS: Technician[] = [

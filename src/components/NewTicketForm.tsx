@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Department, Priority, Ticket, DivisionId } from '../types';
 import { ConfirmModal } from './ConfirmModal';
 import { compressImage } from '../lib/imageCompress';
@@ -29,8 +29,14 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
   const [step, setStep] = useState<number>(1);
   const [requesterName, setRequesterName] = useState('');
   const [requesterPhone, setRequesterPhone] = useState('');
-  const [department, setDepartment] = useState('คาเฟ่ & F&B');
+  const [department, setDepartment] = useState(() => departments[0]?.name || '0 ฟร้อน');
   const [isRequesterDrawerOpen, setIsRequesterDrawerOpen] = useState(true);
+
+  useEffect(() => {
+    if (departments.length > 0 && (!department || !departments.some(d => d.name === department))) {
+      setDepartment(departments[0].name);
+    }
+  }, [departments]);
 
   const [selectedDivision, setSelectedDivision] = useState<DivisionId>('84');
   const [selectedZone, setSelectedZone] = useState('C');
@@ -51,11 +57,11 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
 
   // Zone list
   const zones = [
-    { key: 'A', name: 'โซน A • โรงแกะ', icon: 'pets', dept: 'ฟาร์มสัตว์ & กิจกรรม' },
-    { key: 'B', name: 'โซน B • ลานกิจกรรม', icon: 'festival', dept: 'ฟาร์มสัตว์ & กิจกรรม' },
-    { key: 'C', name: 'โซน C • ร้านอาหาร/คาเฟ่', icon: 'restaurant', dept: 'คาเฟ่ & F&B' },
-    { key: 'D', name: 'โซน D • บ้านพักวิลล่า', icon: 'cottage', dept: 'ห้องพัก & วิลล่า' },
-    { key: 'HQ', name: 'สำนักงานส่วนกลาง', icon: 'apartment', dept: 'ไอที & ระบบสื่อสาร' }
+    { key: 'A', name: 'โซน A • โรงแกะ/สัตว์', icon: 'pets', dept: '91 ดูแลสัตว์' },
+    { key: 'B', name: 'โซน B • ลานกิจกรรม/โชว์', icon: 'festival', dept: '92 โชว์' },
+    { key: 'C', name: 'โซน C • ร้านอาหาร/คาเฟ่', icon: 'restaurant', dept: '22 ร้านอาหาร' },
+    { key: 'D', name: 'โซน D • บ้านพักวิลล่า', icon: 'cottage', dept: 'H0 บ้านพัก' },
+    { key: 'HQ', name: 'สำนักงานส่วนกลาง', icon: 'apartment', dept: '0 ฟร้อน' }
   ];
 
   const handleDivisionSelect = (divId: DivisionId) => {
@@ -154,7 +160,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
     const payload = {
       title: `${divInfo.name}: ${locText}`,
       division: selectedDivision,
-      department: department || zoneObj?.dept || 'คาเฟ่ & F&B',
+      department: department || zoneObj?.dept || departments[0]?.name || '0 ฟร้อน',
       location: `${zoneObj?.name || selectedZone} - ${locText}`,
       description: problemDetail.trim(),
       requesterName: requesterName.trim() || 'พนักงานฟาร์ม (ไม่ระบุชื่อ)',

@@ -89,7 +89,7 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
             id: 'imp-' + Date.now() + '-' + idx,
             requestId: parts[1] || ('IMP-' + (idx + 1)),
             title: parts[2] || 'งานซ่อมนำเข้า',
-            department: parts[3] || 'คาเฟ่ & F&B',
+            department: parts[3] || '0 ฟร้อน',
             location: parts[4] || '-',
             requesterName: parts[5] || 'ระบบนำเข้า',
             requesterPhone: parts[6] || '-',
