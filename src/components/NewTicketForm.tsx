@@ -17,26 +17,30 @@ interface NewTicketFormProps {
   onSubmit: (ticketData: any) => Promise<void>;
   onCancel?: () => void;
   onOpenQRScanner?: () => void;
+  defaultDepartment?: string;
 }
 
 export const NewTicketForm: React.FC<NewTicketFormProps> = ({
   departments,
   onSubmit,
   onCancel,
-  onOpenQRScanner
+  onOpenQRScanner,
+  defaultDepartment
 }) => {
   // Form States - Clean slate without dummy text
   const [step, setStep] = useState<number>(1);
   const [requesterName, setRequesterName] = useState('');
   const [requesterPhone, setRequesterPhone] = useState('');
-  const [department, setDepartment] = useState(() => departments[0]?.name || '0 ฟร้อน');
+  const [department, setDepartment] = useState(() => defaultDepartment || departments[0]?.name || '0 ฟร้อน');
   const [isRequesterDrawerOpen, setIsRequesterDrawerOpen] = useState(true);
 
   useEffect(() => {
-    if (departments.length > 0 && (!department || !departments.some(d => d.name === department))) {
+    if (defaultDepartment) {
+      setDepartment(defaultDepartment);
+    } else if (departments.length > 0 && (!department || !departments.some(d => d.name === department))) {
       setDepartment(departments[0].name);
     }
-  }, [departments]);
+  }, [defaultDepartment, departments]);
 
   const [selectedDivision, setSelectedDivision] = useState<DivisionId>('84');
   const [selectedZone, setSelectedZone] = useState('C');

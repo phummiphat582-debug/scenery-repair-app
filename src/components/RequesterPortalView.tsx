@@ -3,7 +3,7 @@ import { Ticket, Department, Technician } from '../types';
 import { NewTicketForm } from './NewTicketForm';
 import { DailyDutyModal } from './DailyDutyModal';
 import { ConfirmModal } from './ConfirmModal';
-import { Phone, Search, Wrench, Clock, CheckCircle2, ChevronRight, User, MapPin, Plus, Shield, CalendarCheck, AlertTriangle, ListOrdered, ClipboardList } from 'lucide-react';
+import { Phone, Search, Wrench, Clock, CheckCircle2, ChevronRight, User, MapPin, Plus, Shield, CalendarCheck, AlertTriangle, ListOrdered, ClipboardList, ArrowRightLeft, X, Building2 } from 'lucide-react';
 import { DivisionBadge } from './DivisionBadge';
 import { DivisionFilterTabs } from './DivisionFilterTabs';
 
@@ -32,25 +32,48 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDivisionFilter, setSelectedDivisionFilter] = useState<string>('84');
   const [filterStatus, setFilterStatus] = useState<string>('active');
-  const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('all');
+  const [myDepartment, setMyDepartment] = useState<string>(() => {
+    return localStorage.getItem('scenery_selected_dept') || '';
+  });
+  const [isChangingDept, setIsChangingDept] = useState(false);
+  const [deptSearchText, setDeptSearchText] = useState('');
   const [isDutyModalOpen, setIsDutyModalOpen] = useState(false);
 
   // Call confirmation modal
   const [callConfirmTech, setCallConfirmTech] = useState<{ name: string; phone: string } | null>(null);
+
+  const handleSelectDepartment = (deptName: string) => {
+    setMyDepartment(deptName);
+    try {
+      localStorage.setItem('scenery_selected_dept', deptName);
+    } catch {}
+    setIsChangingDept(false);
+  };
+
+  const currentDeptObj = useMemo(() => {
+    return departments.find(d => d.name === myDepartment);
+  }, [departments, myDepartment]);
+
+  const myDeptTickets = useMemo(() => {
+    return myDepartment ? tickets.filter(t => t.department === myDepartment) : [];
+  }, [tickets, myDepartment]);
 
   // Technicians on duty today
   const onDutyTechs = useMemo(() => {
     return technicians.filter(t => t.isOnDutyToday !== false && t.status === 'active');
   }, [technicians]);
 
-  // Filter tickets for tracking
+  // Filter tickets for tracking (strictly for selected department)
   const filteredTickets = useMemo(() => {
+    if (!myDepartment) return [];
+
     return tickets.filter(t => {
-      if (selectedDivisionFilter !== 'all' && (t.division || '84') !== selectedDivisionFilter) {
+      // Strictly only tickets of myDepartment
+      if (t.department !== myDepartment) {
         return false;
       }
 
-      if (selectedDeptFilter !== 'all' && t.department !== selectedDeptFilter) {
+      if (selectedDivisionFilter !== 'all' && (t.division || '84') !== selectedDivisionFilter) {
         return false;
       }
 
@@ -62,7 +85,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
       if (!matchSearch) return false;
 
-      if (filterStatus === 'active' || filterStatus === 'all') {
+      if (filterStatus === 'active') {
         return t.status !== 'completed' && t.status !== 'cancelled';
       }
       if (filterStatus === 'pending') return t.status === 'pending' || t.status === 'assigned';
@@ -71,7 +94,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       if (filterStatus === 'cancelled') return t.status === 'cancelled';
       return t.status !== 'completed' && t.status !== 'cancelled';
     });
-  }, [tickets, searchQuery, filterStatus, selectedDivisionFilter, selectedDeptFilter]);
+  }, [tickets, searchQuery, filterStatus, selectedDivisionFilter, myDepartment]);
 
   const departmentQueues = useMemo(() => {
     const activeTickets = tickets
@@ -277,6 +300,40 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
         )}
       </div>
 
+      {/* 2.5 Active Department Banner */}
+      <div className="bg-surface-container-lowest rounded-2xl border border-slate-200/90 p-3 sm:p-3.5 shadow-xs flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-base shrink-0 border border-primary/20">
+            {currentDeptObj?.icon || '🏢'}
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
+              {myDepartment ? 'แผนกของคุณ' : 'ยังไม่ได้เลือกแผนก'}
+            </div>
+            <div className="font-extrabold text-xs sm:text-sm text-on-surface truncate flex items-center gap-2">
+              <span className="truncate">{myDepartment || 'แตะเพื่อระบุแผนกของคุณ'}</span>
+              {myDepartment && (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
+                  {myDeptTickets.length} งาน
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setIsChangingDept(true);
+            setActiveSubTab('track');
+          }}
+          className="px-3 py-1.5 bg-surface-container hover:bg-primary hover:text-white text-on-surface-variant rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer shadow-xs active:scale-95 flex items-center gap-1.5"
+        >
+          <ArrowRightLeft className="w-3.5 h-3.5" />
+          <span>{myDepartment ? 'เปลี่ยนแผนก' : 'เลือกแผนก'}</span>
+        </button>
+      </div>
+
       {/* 3. Top Segmented Tabs: create, department queues, tracking */}
       <div className="grid grid-cols-3 gap-1.5 bg-surface-container-low p-1.5 rounded-2xl border border-slate-200 shadow-xs">
         <button
@@ -315,11 +372,11 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
           }`}
         >
           <Clock className="w-4 h-4" />
-          <span>ติดตามงาน</span>
+          <span>{myDepartment ? 'งานแผนกคุณ' : 'งานแจ้งซ่อม'}</span>
           <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
             activeSubTab === 'track' ? 'bg-white text-primary' : 'bg-surface-container-highest text-on-surface'
           }`}>
-            {tickets.length}
+            {myDepartment ? myDeptTickets.length : '-'}
           </span>
         </button>
       </div>
@@ -329,9 +386,12 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
         <div className="bg-surface-container-lowest rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
           <NewTicketForm
             departments={departments}
+            defaultDepartment={myDepartment}
             onSubmit={async (ticketData) => {
               await onSubmitTicket(ticketData);
-              setSelectedDeptFilter(ticketData.department || 'all');
+              if (ticketData.department) {
+                handleSelectDepartment(ticketData.department);
+              }
               setActiveSubTab('track');
             }}
             onCancel={() => setActiveSubTab('track')}
@@ -384,7 +444,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                           key={ticket.id}
                           type="button"
                           onClick={() => {
-                            setSelectedDeptFilter(ticket.department);
+                            handleSelectDepartment(ticket.department);
                             setActiveSubTab('track');
                           }}
                           className="w-full text-left rounded-2xl bg-surface-container-low hover:bg-surface-container p-3 transition-colors cursor-pointer"
@@ -402,7 +462,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                       <button
                         type="button"
                         onClick={() => {
-                          setSelectedDeptFilter(department.name);
+                          handleSelectDepartment(department.name);
                           setActiveSubTab('track');
                         }}
                         className="w-full text-center text-xs text-primary font-bold py-1 cursor-pointer"
@@ -421,91 +481,213 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       {/* 6. Sub-Tab 3: Track Tickets List */}
       {activeSubTab === 'track' && (
         <div className="space-y-4">
-          
-          {/* Division Filter Tabs */}
-          <div className="bg-surface-container-lowest p-2 rounded-2xl border border-slate-200 shadow-xs">
-            <DivisionFilterTabs
-              selectedDivision={selectedDivisionFilter}
-              onSelectDivision={setSelectedDivisionFilter}
-              tickets={tickets}
-            />
-          </div>
+          {(!myDepartment || isChangingDept) ? (
+            /* Department Selection Picker */
+            <div className="bg-surface-container-lowest rounded-3xl border border-slate-200 p-5 sm:p-7 shadow-xs space-y-5">
+              <div className="text-center max-w-md mx-auto space-y-2">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-2xl shadow-inner border border-primary/20">
+                  🏢
+                </div>
+                <h3 className="font-extrabold text-base sm:text-lg text-on-surface">
+                  เลือกแผนกของคุณเพื่อดูงานแจ้งซ่อม
+                </h3>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  เลือกแผนกของท่านเพื่อดูรายการแจ้งซ่อมของแผนกตนเอง ระบบจะจดจำไว้ตลอดการใช้งาน
+                </p>
+                {isChangingDept && myDepartment && (
+                  <button
+                    type="button"
+                    onClick={() => setIsChangingDept(false)}
+                    className="text-xs text-primary hover:underline font-bold cursor-pointer inline-flex items-center gap-1 mt-1"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>ยกเลิก (คงไว้ที่ "{myDepartment}")</span>
+                  </button>
+                )}
+              </div>
 
-          {/* Search & Filter Bar */}
-          <div className="flex flex-col sm:flex-row gap-2.5">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-on-surface-variant" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="ค้นหาด้วยรหัสใบแจ้ง, ปัญหา, หรือสถานที่..."
-                className="w-full pl-10 pr-4 py-2.5 bg-surface-container-lowest border border-slate-200 rounded-2xl text-xs sm:text-sm text-on-surface outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-xs"
-              />
-            </div>
+              {/* Department Search Input */}
+              <div className="relative max-w-md mx-auto">
+                <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-on-surface-variant" />
+                <input
+                  type="text"
+                  value={deptSearchText}
+                  onChange={(e) => setDeptSearchText(e.target.value)}
+                  placeholder="พิมพ์ค้นหาชื่อแผนก เช่น ฟร้อน, อาหาร, แม่บ้าน, สโตร์..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-surface-container-low border border-slate-200 rounded-2xl text-xs sm:text-sm text-on-surface outline-none focus:border-primary focus:bg-surface-container-lowest focus:ring-1 focus:ring-primary shadow-xs"
+                />
+              </div>
 
-            {/* Department Filter Dropdown */}
-            <div className="shrink-0">
-              <select
-                value={selectedDeptFilter}
-                onChange={(e) => setSelectedDeptFilter(e.target.value)}
-                className="w-full sm:w-auto h-[42px] px-3 bg-surface-container-lowest border border-slate-200 rounded-2xl text-xs font-bold text-on-surface outline-none focus:border-primary shadow-xs cursor-pointer"
-              >
-                <option value="all">🏢 ทุกแผนก</option>
-                {departments.map(d => (
-                  <option key={d.id} value={d.name}>{d.name}</option>
-                ))}
-              </select>
-            </div>
+              {/* Department Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
+                {departments
+                  .filter(d =>
+                    !deptSearchText.trim() ||
+                    d.name.toLowerCase().includes(deptSearchText.toLowerCase()) ||
+                    d.id.toLowerCase().includes(deptSearchText.toLowerCase())
+                  )
+                  .map(dept => {
+                    const deptActiveCount = tickets.filter(
+                      t => t.department === dept.name && t.status !== 'completed' && t.status !== 'cancelled'
+                    ).length;
+                    const isSelected = dept.name === myDepartment;
 
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-              {[
-                { id: 'active', label: 'งานรอซ่อม', count: tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length },
-                { id: 'pending', label: 'รอรับงาน', count: tickets.filter(t => t.status === 'pending' || t.status === 'assigned').length },
-                { id: 'in_progress', label: 'กำลังซ่อม', count: tickets.filter(t => t.status === 'in_progress' || t.status === 'waiting_parts').length },
-                { id: 'completed', label: 'เสร็จสิ้น', count: tickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length },
-                { id: 'cancelled', label: 'ยกเลิก', count: tickets.filter(t => t.status === 'cancelled').length },
-              ].map(f => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setFilterStatus(f.id)}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
-                    filterStatus === f.id
-                      ? 'bg-primary text-white shadow-xs'
-                      : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant'
-                  }`}
-                >
-                  <span>{f.label}</span>
-                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
-                    filterStatus === f.id ? 'bg-white/20 text-white' : 'bg-surface-container-highest text-on-surface'
-                  }`}>
-                    {f.count}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
+                    return (
+                      <button
+                        key={dept.id}
+                        type="button"
+                        onClick={() => handleSelectDepartment(dept.name)}
+                        className={`p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                          isSelected
+                            ? 'border-primary bg-primary/10 ring-2 ring-primary/30 shadow-xs'
+                            : 'border-slate-200 bg-surface-container-low hover:border-primary/50 hover:bg-surface-container shadow-xs active:scale-[0.98]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span
+                            className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 border border-slate-200/50"
+                            style={{ backgroundColor: `${dept.color}18` }}
+                          >
+                            {dept.icon}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="font-bold text-xs sm:text-sm text-on-surface truncate">
+                              {dept.name}
+                            </div>
+                            <div className="text-[11px] text-on-surface-variant">
+                              {deptActiveCount > 0 ? (
+                                <span className="text-amber-600 font-semibold">{deptActiveCount} งานกำลังซ่อม</span>
+                              ) : (
+                                'ไม่มีงานค้าง'
+                              )}
+                            </div>
+                          </div>
+                        </div>
 
-          {/* Tickets Cards List */}
-          {filteredTickets.length === 0 ? (
-            <div className="p-12 text-center bg-surface-container-lowest rounded-3xl border border-dashed border-slate-200 text-on-surface-variant flex flex-col items-center gap-3">
-              <Clock className="w-10 h-10 text-slate-300" />
-              <span className="text-sm font-semibold">ยังไม่มีประวัติการแจ้งซ่อมในหมวดนี้</span>
-              <p className="text-xs text-slate-400 max-w-sm">
-                เมื่อแผนกของท่านส่งใบแจ้งซ่อม รายการจะแสดงสถานะ คิวงาน และชื่อช่างผู้รับผิดชอบตรงนี้
-              </p>
-              <button
-                type="button"
-                onClick={() => setActiveSubTab('create')}
-                className="mt-2 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary-container cursor-pointer shadow-xs"
-              >
-                + แจ้งซ่อมงานใหม่
-              </button>
+                        <ChevronRight className={`w-4 h-4 shrink-0 ${isSelected ? 'text-primary' : 'text-slate-400'}`} />
+                      </button>
+                    );
+                  })}
+              </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3.5">
-              {filteredTickets.map((ticket, idx) => {
+            /* Selected Department Tickets View */
+            <div className="space-y-4">
+              {/* Department Header & Quick Switcher */}
+              <div className="bg-surface-container-lowest p-4 rounded-3xl border border-slate-200 shadow-xs flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl shrink-0"
+                    style={{ backgroundColor: `${currentDeptObj?.color || '#3b82f6'}18` }}
+                  >
+                    {currentDeptObj?.icon || '🏢'}
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="font-extrabold text-sm sm:text-base text-on-surface truncate">
+                      งานแจ้งซ่อมของ "{myDepartment}"
+                    </h2>
+                    <p className="text-[11px] text-on-surface-variant">
+                      มีงานทั้งหมด {myDeptTickets.length} รายการ (กำลังซ่อม {myDeptTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length} รายการ)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Quick Switch Dropdown & Change Button */}
+                <div className="flex items-center gap-2">
+                  <select
+                    value={myDepartment}
+                    onChange={(e) => handleSelectDepartment(e.target.value)}
+                    className="h-[38px] px-3 bg-surface-container-low border border-slate-200 rounded-xl text-xs font-bold text-on-surface outline-none focus:border-primary shadow-xs cursor-pointer"
+                  >
+                    {departments.map(d => (
+                      <option key={d.id} value={d.name}>{d.name}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsChangingDept(true)}
+                    className="h-[38px] px-3 bg-surface-container-low hover:bg-surface-container text-on-surface-variant rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5"
+                    title="เลือกดูแผนกอื่น"
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">เปลี่ยนแผนก</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Division Filter Tabs (Scoped to myDeptTickets) */}
+              <div className="bg-surface-container-lowest p-2 rounded-2xl border border-slate-200 shadow-xs">
+                <DivisionFilterTabs
+                  selectedDivision={selectedDivisionFilter}
+                  onSelectDivision={setSelectedDivisionFilter}
+                  tickets={myDeptTickets}
+                />
+              </div>
+
+              {/* Search & Status Pills Filter Bar */}
+              <div className="flex flex-col sm:flex-row gap-2.5">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-on-surface-variant" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="ค้นหารหัสใบแจ้ง, ปัญหา หรือสถานที่..."
+                    className="w-full pl-10 pr-4 py-2.5 bg-surface-container-lowest border border-slate-200 rounded-2xl text-xs sm:text-sm text-on-surface outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-xs"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                  {[
+                    { id: 'active', label: 'งานรอซ่อม', count: myDeptTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length },
+                    { id: 'pending', label: 'รอรับงาน', count: myDeptTickets.filter(t => t.status === 'pending' || t.status === 'assigned').length },
+                    { id: 'in_progress', label: 'กำลังซ่อม', count: myDeptTickets.filter(t => t.status === 'in_progress' || t.status === 'waiting_parts').length },
+                    { id: 'completed', label: 'เสร็จสิ้น', count: myDeptTickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length },
+                    { id: 'cancelled', label: 'ยกเลิก', count: myDeptTickets.filter(t => t.status === 'cancelled').length },
+                  ].map(f => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setFilterStatus(f.id)}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                        filterStatus === f.id
+                          ? 'bg-primary text-white shadow-xs'
+                          : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant'
+                      }`}
+                    >
+                      <span>{f.label}</span>
+                      <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                        filterStatus === f.id ? 'bg-white/20 text-white' : 'bg-surface-container-highest text-on-surface'
+                      }`}>
+                        {f.count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tickets Cards List */}
+              {filteredTickets.length === 0 ? (
+                <div className="p-12 text-center bg-surface-container-lowest rounded-3xl border border-dashed border-slate-200 text-on-surface-variant flex flex-col items-center gap-3">
+                  <Clock className="w-10 h-10 text-slate-300" />
+                  <span className="text-sm font-semibold">
+                    ยังไม่มีรายการแจ้งซ่อมของ "{myDepartment}" {filterStatus === 'completed' ? 'ที่เสร็จสิ้น' : 'ในหมวดนี้'}
+                  </span>
+                  <p className="text-xs text-slate-400 max-w-sm">
+                    เมื่อแผนก {myDepartment} ส่งใบแจ้งซ่อม รายการจะแสดงสถานะ คิวงาน และชื่อช่างผู้รับผิดชอบตรงนี้
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSubTab('create')}
+                    className="mt-2 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary-container cursor-pointer shadow-xs"
+                  >
+                    + แจ้งซ่อมงานใหม่
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3.5">
+                  {filteredTickets.map((ticket, idx) => {
                 const sBadge = statusLabel(ticket.status);
                 const techPhone = getTechPhone(ticket);
                 const isAssigned = !!ticket.technicianName;
@@ -666,9 +848,10 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
               })}
             </div>
           )}
-
         </div>
       )}
+    </div>
+  )}
 
       {/* Daily Duty Attendance Modal */}
       <DailyDutyModal
