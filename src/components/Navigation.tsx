@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavTab } from '../types';
+import { LayoutDashboard, Plus, ClipboardList, Settings } from 'lucide-react';
 
 interface NavigationProps {
   currentTab: NavTab;
@@ -22,12 +23,7 @@ export const Navigation: React.FC<NavigationProps> = ({
               : 'text-on-surface-variant hover:text-primary'
           }`}
         >
-          <span
-            className="material-symbols-outlined text-[24px]"
-            style={{ fontVariationSettings: currentTab === 'dashboard' ? "'FILL' 1" : "'FILL' 0" }}
-          >
-            dashboard
-          </span>
+          <LayoutDashboard size={24} className={currentTab === 'dashboard' ? 'stroke-[2.5]' : 'stroke-2'} />
           <span className="font-label-sm text-label-sm mt-0.5 text-center leading-tight truncate max-w-[64px]">
             ภาพรวม
           </span>
@@ -39,7 +35,7 @@ export const Navigation: React.FC<NavigationProps> = ({
           className="flex flex-col items-center justify-center min-w-[56px] min-h-[48px] -mt-5 group cursor-pointer focus:outline-none"
         >
           <div className="w-12 h-12 rounded-full bg-primary-container text-on-primary flex items-center justify-center shadow-[0_4px_10px_rgba(24,78,56,0.3)] group-active:scale-95 group-hover:bg-primary transition-transform">
-            <span className="material-symbols-outlined text-[28px]">add</span>
+            <Plus size={28} className="stroke-[2.5]" />
           </div>
           <span
             className={`font-label-sm text-label-sm mt-1 text-center ${
@@ -59,12 +55,7 @@ export const Navigation: React.FC<NavigationProps> = ({
               : 'text-on-surface-variant hover:text-primary'
           }`}
         >
-          <span
-            className="material-symbols-outlined text-[24px]"
-            style={{ fontVariationSettings: currentTab === 'all-requests' ? "'FILL' 1" : "'FILL' 0" }}
-          >
-            assignment
-          </span>
+          <ClipboardList size={24} className={currentTab === 'all-requests' ? 'stroke-[2.5]' : 'stroke-2'} />
           <span className="font-label-sm text-label-sm mt-0.5 text-center leading-tight truncate max-w-[64px]">
             รายการ
           </span>
@@ -79,12 +70,7 @@ export const Navigation: React.FC<NavigationProps> = ({
               : 'text-on-surface-variant hover:text-primary'
           }`}
         >
-          <span
-            className="material-symbols-outlined text-[24px]"
-            style={{ fontVariationSettings: currentTab === 'settings' ? "'FILL' 1" : "'FILL' 0" }}
-          >
-            tune
-          </span>
+          <Settings size={24} className={currentTab === 'settings' ? 'stroke-[2.5]' : 'stroke-2'} />
           <span className="font-label-sm text-label-sm mt-0.5 text-center leading-tight truncate max-w-[64px]">
             ตั้งค่า
           </span>

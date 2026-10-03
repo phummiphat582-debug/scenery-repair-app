@@ -22,6 +22,7 @@ import { ticketService } from './services/ticketService';
 import { oneSignalService } from './services/oneSignalService';
 import { Ticket, Department, Technician, NavTab, UserRole } from './types';
 import confetti from 'canvas-confetti';
+import { RotateCw, Trash2 } from 'lucide-react';
 
 export const App: React.FC = () => {
   // User Role: 'requester' (ผู้แจ้ง) | 'technician' (ช่าง / หลังบ้าน)
@@ -298,7 +299,7 @@ export const App: React.FC = () => {
       <main className={`flex-1 w-full pt-28 md:pt-20 flex flex-col ${userRole === 'technician' ? 'pb-28' : 'pb-10'}`}>
         {isLoading ? (
           <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] gap-3 text-primary">
-            <span className="material-symbols-outlined text-[48px] animate-spin">sync</span>
+            <RotateCw className="w-10 h-10 animate-spin text-primary" />
             <span className="font-label-lg font-semibold">กำลังโหลดข้อมูลระบบฟาร์ม...</span>
           </div>
         ) : (
@@ -464,7 +465,7 @@ export const App: React.FC = () => {
           <div className="w-full max-w-md rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-rose-200 animate-in zoom-in-95 duration-150" role="dialog" aria-modal="true">
             <div className="flex items-center gap-3 text-rose-700">
               <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[28px]">delete_forever</span>
+                <Trash2 className="w-6 h-6 text-rose-700" />
               </div>
               <div>
                 <h3 className="text-lg sm:text-xl font-bold">ยืนยันการลบรายการแจ้งซ่อม</h3>

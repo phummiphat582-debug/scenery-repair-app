@@ -3,6 +3,25 @@ import { Ticket, Department, Technician } from '../types';
 import { ConfirmModal } from './ConfirmModal';
 import { DivisionBadge } from './DivisionBadge';
 import { DivisionFilterTabs } from './DivisionFilterTabs';
+import {
+  Wrench,
+  AlertTriangle,
+  Clock,
+  UserPlus,
+  Search,
+  X,
+  QrCode,
+  BarChart2,
+  RotateCw,
+  Hammer,
+  Package,
+  AlertOctagon,
+  CheckCircle2,
+  SlidersHorizontal,
+  MapPin,
+  Phone,
+  Eye
+} from 'lucide-react';
 
 interface DashboardOverviewProps {
   tickets: Ticket[];
@@ -136,7 +155,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         </div>
         <div className="flex flex-col">
           <p className="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
-            <span className="material-symbols-outlined text-[16px] text-primary">engineering</span>
+            <Wrench className="w-4 h-4 text-primary shrink-0" />
             หัวหน้าฝ่ายซ่อมบำรุง • ฟาร์มเดอะซีนเนอรี่ สวนผึ้ง
           </p>
         </div>
@@ -149,7 +168,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <div className="absolute -right-4 -bottom-4 w-28 h-28 rounded-full bg-error/10 pointer-events-none"></div>
             <div className="flex items-start gap-space-sm relative z-10">
               <div className="w-10 h-10 rounded-lg bg-error text-on-error flex items-center justify-center shrink-0 shadow-sm animate-bounce">
-                <span className="material-symbols-outlined text-[24px]">priority_high</span>
+                <AlertTriangle className="w-6 h-6" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-space-xs flex-wrap mb-1">
@@ -157,7 +176,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     ด่วนที่สุด (Critical)
                   </span>
                   <span className="font-label-sm text-label-sm text-error font-medium flex items-center gap-0.5">
-                    <span className="material-symbols-outlined text-[13px]">schedule</span> 25 นาทีก่อน
+                    <Clock className="w-3.5 h-3.5 shrink-0" /> 25 นาทีก่อน
                   </span>
                 </div>
                 <h2 className="font-headline-sm text-headline-sm text-on-error-container font-bold leading-tight">
@@ -169,10 +188,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <div className="mt-space-sm flex items-center gap-space-xs">
                   <button
                     onClick={() => onQuickAssign(emergencyTicket)}
-                    className="flex items-center justify-center gap-1 bg-error text-on-error px-4 py-2 rounded-lg font-label-md text-label-md shadow active:scale-95 transition-transform min-h-[44px] cursor-pointer"
+                    className="flex items-center justify-center gap-1.5 bg-error text-on-error px-4 py-2 rounded-lg font-label-md text-label-md shadow active:scale-95 transition-transform min-h-[44px] cursor-pointer"
                     type="button"
                   >
-                    <span className="material-symbols-outlined text-[18px]">person_add</span>
+                    <UserPlus className="w-4 h-4 shrink-0" />
                     <span>มอบหมายทันที</span>
                   </button>
                   <button
@@ -193,7 +212,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       <section className="px-margin my-space-sm">
         <div className="flex items-center gap-space-xs">
           <div className="flex-1 flex items-center bg-surface-container-lowest rounded-xl px-3 py-2 shadow-sm min-h-[48px] border border-slate-200/50">
-            <span className="material-symbols-outlined text-outline text-[20px] mr-2">search</span>
+            <Search className="w-5 h-5 text-outline mr-2 shrink-0" />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -206,7 +225,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 onClick={() => setSearchQuery('')}
                 className="text-on-surface-variant hover:text-on-surface p-1"
               >
-                <span className="material-symbols-outlined text-[18px]">close</span>
+                <X className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -216,7 +235,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             className="w-12 h-12 rounded-xl bg-primary-container text-on-primary flex items-center justify-center shadow-sm active:scale-95 hover:bg-primary transition-transform shrink-0 cursor-pointer"
             type="button"
           >
-            <span className="material-symbols-outlined text-[22px]">qr_code_scanner</span>
+            <QrCode className="w-5 h-5" />
           </button>
         </div>
       </section>
@@ -225,14 +244,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       <section className="mt-space-xs mb-space-sm">
         <div className="flex items-center justify-between px-margin mb-2">
           <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-primary text-[20px]">analytics</span>
+            <BarChart2 className="w-5 h-5 text-primary shrink-0" />
             ตัวชี้วัดประจำวัน
           </h3>
           <button
             onClick={onRefresh}
-            className="font-label-sm text-label-sm text-secondary font-semibold flex items-center gap-0.5 cursor-pointer hover:underline bg-transparent border-none"
+            className="font-label-sm text-label-sm text-secondary font-semibold flex items-center gap-1 cursor-pointer hover:underline bg-transparent border-none"
           >
-            รีเฟรชล่าสุด <span className="material-symbols-outlined text-[14px] ml-0.5">sync</span>
+            รีเฟรชล่าสุด <RotateCw className="w-3.5 h-3.5 ml-0.5" />
           </button>
         </div>
         <div className="flex overflow-x-auto gap-space-sm px-margin pb-2 scroll-smooth no-scrollbar">
@@ -240,7 +259,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <div className="min-w-[130px] flex-shrink-0 bg-surface-container-lowest rounded-xl p-space-sm shadow-sm flex flex-col justify-between border border-slate-200/40">
             <div className="flex items-center justify-between text-on-surface-variant">
               <span className="font-label-sm text-label-sm font-medium">งานรอซ่อม</span>
-              <span className="material-symbols-outlined text-[18px]">engineering</span>
+              <Wrench className="w-4 h-4" />
             </div>
             <div className="mt-2">
               <span className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-bold">
@@ -254,7 +273,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <div className="min-w-[130px] flex-shrink-0 bg-surface-container-lowest rounded-xl p-space-sm shadow-sm flex flex-col justify-between border border-slate-200/40">
             <div className="flex items-center justify-between text-on-secondary-fixed-variant">
               <span className="font-label-sm text-label-sm font-medium">รอมอบหมาย</span>
-              <span className="material-symbols-outlined text-[18px] text-secondary">pending_actions</span>
+              <Clock className="w-4 h-4 text-secondary" />
             </div>
             <div className="mt-2 flex items-baseline gap-1">
               <span className="font-headline-lg-mobile text-headline-lg-mobile text-secondary font-bold">
@@ -268,7 +287,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <div className="min-w-[130px] flex-shrink-0 bg-surface-container-lowest rounded-xl p-space-sm shadow-sm flex flex-col justify-between border border-slate-200/40">
             <div className="flex items-center justify-between text-primary">
               <span className="font-label-sm text-label-sm font-medium">กำลังซ่อม</span>
-              <span className="material-symbols-outlined text-[18px] text-primary">construction</span>
+              <Hammer className="w-4 h-4 text-primary" />
             </div>
             <div className="mt-2 flex items-baseline gap-1">
               <span className="font-headline-lg-mobile text-headline-lg-mobile text-primary font-bold">
@@ -282,7 +301,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <div className="min-w-[130px] flex-shrink-0 bg-surface-container-lowest rounded-xl p-space-sm shadow-sm flex flex-col justify-between border border-slate-200/40">
             <div className="flex items-center justify-between text-on-secondary-container">
               <span className="font-label-sm text-label-sm font-medium">รออะไหล่</span>
-              <span className="material-symbols-outlined text-[18px] text-secondary-container">package_2</span>
+              <Package className="w-4 h-4 text-secondary-container" />
             </div>
             <div className="mt-2 flex items-baseline gap-1">
               <span className="font-headline-lg-mobile text-headline-lg-mobile text-on-secondary-container font-bold">
@@ -296,7 +315,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <div className="min-w-[130px] flex-shrink-0 bg-error-container/40 rounded-xl p-space-sm shadow-sm flex flex-col justify-between border border-error/20">
             <div className="flex items-center justify-between text-error">
               <span className="font-label-sm text-label-sm font-medium">เกิน SLA</span>
-              <span className="material-symbols-outlined text-[18px]">alarm_off</span>
+              <AlertOctagon className="w-4 h-4" />
             </div>
             <div className="mt-2 flex items-baseline gap-1">
               <span className="font-headline-lg-mobile text-headline-lg-mobile text-error font-bold">
@@ -310,7 +329,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <div className="min-w-[130px] flex-shrink-0 bg-surface-container-lowest rounded-xl p-space-sm shadow-sm flex flex-col justify-between border border-slate-200/40">
             <div className="flex items-center justify-between text-teal-700">
               <span className="font-label-sm text-label-sm font-medium">เสร็จสิ้นแล้ว</span>
-              <span className="material-symbols-outlined text-[18px]">check_circle</span>
+              <CheckCircle2 className="w-4 h-4" />
             </div>
             <div className="mt-2 flex items-baseline gap-1">
               <span className="font-headline-lg-mobile text-headline-lg-mobile text-teal-700 font-bold">
@@ -372,11 +391,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             const next = selectedZoneFilter === 'all' ? 'A' : selectedZoneFilter === 'A' ? 'B' : selectedZoneFilter === 'B' ? 'C' : 'all';
             setSelectedZoneFilter(next);
           }}
-          className="font-label-md text-label-md text-primary font-semibold flex items-center gap-0.5 cursor-pointer bg-transparent border-none"
+          className="font-label-md text-label-md text-primary font-semibold flex items-center gap-1 cursor-pointer bg-transparent border-none"
           type="button"
         >
           <span>{selectedZoneFilter === 'all' ? 'ทุกโซน' : `โซน ${selectedZoneFilter}`}</span>
-          <span className="material-symbols-outlined text-[18px]">tune</span>
+          <SlidersHorizontal className="w-4 h-4" />
         </button>
       </div>
 
@@ -385,7 +404,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         {filteredTickets.length === 0 ? (
           <div className="p-12 text-center bg-surface-container-lowest rounded-3xl border border-dashed border-slate-300 text-on-surface-variant flex flex-col items-center gap-3 my-2">
             <div className="w-14 h-14 rounded-2xl bg-primary-fixed/30 text-primary flex items-center justify-center">
-              <span className="material-symbols-outlined text-[28px]">assignment_turned_in</span>
+              <CheckCircle2 className="w-7 h-7" />
             </div>
             <h4 className="text-base font-bold text-on-surface">ไม่มีรายการแจ้งซ่อมในหมวดนี้</h4>
             <p className="text-xs text-on-surface-variant max-w-sm">
@@ -455,7 +474,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
                   {/* Location */}
                   <div className="flex items-center gap-1.5 text-on-surface-variant font-label-sm text-label-sm">
-                    <span className="material-symbols-outlined text-[16px] text-secondary">location_on</span>
+                    <MapPin className="w-4 h-4 text-secondary shrink-0" />
                     <span className="font-semibold text-on-surface">{ticket.department}</span>
                     <span className="text-outline">•</span>
                     <span>{ticket.location}</span>
@@ -469,9 +488,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   {/* Part info alert box if waiting parts */}
                   {isWaitingParts && (
                     <div className="p-2.5 rounded-lg bg-surface-container-low flex items-start gap-2 border border-secondary-container/20">
-                      <span className="material-symbols-outlined text-secondary-container text-[20px] shrink-0 mt-0.5">
-                        build_circle
-                      </span>
+                      <Wrench className="w-5 h-5 text-secondary-container shrink-0 mt-0.5" />
                       <div className="flex flex-col min-w-0">
                         <span className="font-label-sm text-label-sm text-on-surface font-semibold truncate">
                           สถานะอะไหล่: {ticket.remark || 'กำลังสั่งซื้อชิ้นส่วนทดแทน'}
@@ -494,7 +511,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     <div className="flex flex-col">
                       <span className="font-label-sm text-label-sm text-on-surface-variant">ช่างผู้รับผิดชอบ</span>
                       <span className="font-body-sm text-body-sm text-primary font-semibold truncate flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">handyman</span>
+                        <Wrench className="w-3.5 h-3.5 shrink-0" />
                         {ticket.technicianName || 'ยังไม่กำหนด'}
                       </span>
                     </div>
@@ -505,8 +522,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     <span className="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-medium">
                       ความเร่งด่วน: {getUrgencyText(ticket.priority)}
                     </span>
-                    <span className="flex items-center gap-0.5 text-outline font-medium">
-                      <span className="material-symbols-outlined text-[14px]">schedule</span> วันนี้
+                    <span className="flex items-center gap-1 text-outline font-medium">
+                      <Clock className="w-3.5 h-3.5 shrink-0" /> วันนี้
                     </span>
                   </div>
 
@@ -518,18 +535,18 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                         const targetPhone = ticket.technicianPhone || ticket.requesterPhone || '';
                         setCallConfirmTech({ name: targetName, phone: targetPhone });
                       }}
-                      className="flex-1 bg-surface-container-high hover:bg-surface-container text-on-surface rounded-lg py-2 font-label-md text-label-md font-semibold text-center min-h-[42px] flex items-center justify-center gap-1 cursor-pointer"
+                      className="flex-1 bg-surface-container-high hover:bg-surface-container text-on-surface rounded-lg py-2 font-label-md text-label-md font-semibold text-center min-h-[42px] flex items-center justify-center gap-1.5 cursor-pointer"
                       type="button"
                     >
-                      <span className="material-symbols-outlined text-[16px]">call</span>
+                      <Phone className="w-4 h-4 shrink-0" />
                       โทรหาช่าง
                     </button>
                     <button
                       onClick={() => onSelectTicket(ticket)}
-                      className="flex-1 bg-primary hover:bg-primary-container text-on-primary rounded-lg py-2 font-label-md text-label-md font-semibold text-center shadow active:scale-98 transition-transform min-h-[42px] flex items-center justify-center gap-1 cursor-pointer"
+                      className="flex-1 bg-primary hover:bg-primary-container text-on-primary rounded-lg py-2 font-label-md text-label-md font-semibold text-center shadow active:scale-98 transition-transform min-h-[42px] flex items-center justify-center gap-1.5 cursor-pointer"
                       type="button"
                     >
-                      <span className="material-symbols-outlined text-[16px]">visibility</span>
+                      <Eye className="w-4 h-4 shrink-0" />
                       ดูรายละเอียด
                     </button>
                   </div>

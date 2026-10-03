@@ -2,6 +2,20 @@ import React, { useState } from 'react';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { ConfirmModal } from './ConfirmModal';
 import { oneSignalService } from '../services/oneSignalService';
+import {
+  Cloud,
+  Bell,
+  RotateCw,
+  BellRing,
+  Send,
+  CheckCircle2,
+  AlertCircle,
+  Calendar,
+  ChevronRight,
+  Wrench,
+  Database,
+  Trash2
+} from 'lucide-react';
 
 interface SettingsViewProps {
   onOpenMigration: () => void;
@@ -85,7 +99,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {/* Cloud Status */}
         <div className="mt-4 p-3 rounded-xl bg-surface-container-low flex items-center justify-between border border-slate-200/40">
           <div className="flex items-center gap-2.5">
-            <span className="material-symbols-outlined text-primary text-[22px]">cloud_sync</span>
+            <Cloud className="w-5 h-5 text-primary shrink-0" />
             <div>
               <span className="font-label-md font-bold block text-on-surface">สถานะฐานข้อมูล</span>
               <span className="text-xs text-on-surface-variant">
@@ -105,7 +119,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="bg-surface-container-lowest rounded-2xl p-5 shadow-sm border border-slate-200/50 flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <span className="material-symbols-outlined text-primary text-[24px]">notifications_active</span>
+            <Bell className="w-6 h-6 text-primary shrink-0" />
             <div>
               <h3 className="font-label-lg font-bold text-on-surface">การแจ้งเตือนงานเข้า (มือถือช่าง)</h3>
               <p className="text-xs text-on-surface-variant">แจ้งเตือน Web Push เข้ามือถือทันทีเมื่อมีรายการใหม่</p>
@@ -140,9 +154,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               disabled={isEnablingNotif}
               className="flex-1 py-2.5 px-4 rounded-xl bg-primary text-on-primary font-bold text-xs flex items-center justify-center gap-2 shadow-sm hover:brightness-95 cursor-pointer disabled:opacity-60"
             >
-              <span className={`material-symbols-outlined text-[18px] ${isEnablingNotif ? 'animate-spin' : ''}`}>
-                {isEnablingNotif ? 'sync' : 'notification_add'}
-              </span>
+              {isEnablingNotif ? (
+                <RotateCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <BellRing className="w-4 h-4" />
+              )}
               <span>{isEnablingNotif ? 'กำลังดำเนินการ...' : 'เปิดแจ้งเตือนบนเครื่องนี้'}</span>
             </button>
           )}
@@ -152,9 +168,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             disabled={isTestingNotif}
             className="flex-1 py-2.5 px-4 rounded-xl bg-secondary-fixed text-on-secondary-fixed font-bold text-xs flex items-center justify-center gap-2 hover:brightness-95 cursor-pointer disabled:opacity-60"
           >
-            <span className={`material-symbols-outlined text-[18px] ${isTestingNotif ? 'animate-spin' : ''}`}>
-              {isTestingNotif ? 'sync' : 'send_and_archive'}
-            </span>
+            {isTestingNotif ? (
+              <RotateCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
             <span>{isTestingNotif ? 'กำลังยิงสัญญาณ...' : '🔔 ทดสอบส่งแจ้งเตือนเข้ามือถือ'}</span>
           </button>
         </div>
@@ -164,9 +182,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div className={`p-3 rounded-xl text-xs font-medium flex items-center gap-2 ${
             testFeedback.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'
           }`}>
-            <span className="material-symbols-outlined text-[18px] shrink-0">
-              {testFeedback.success ? 'check_circle' : 'error'}
-            </span>
+            {testFeedback.success ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
             <span>{testFeedback.message}</span>
           </div>
         )}
@@ -183,14 +203,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
-                <span className="material-symbols-outlined text-[20px]">calendar_month</span>
+                <Calendar className="w-5 h-5" />
               </div>
               <div>
                 <span className="font-label-lg font-bold block text-on-surface">จัดการเวรและเช็คชื่อช่างวันนี้</span>
                 <span className="text-xs text-on-surface-variant">กำหนดว่าวันนี้ช่างท่านไหนมาทำงาน / หยุดงาน</span>
               </div>
             </div>
-            <span className="material-symbols-outlined text-on-surface-variant text-[20px]">chevron_right</span>
+            <ChevronRight className="w-5 h-5 text-on-surface-variant" />
           </button>
         )}
 
@@ -201,14 +221,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">engineering</span>
+              <Wrench className="w-5 h-5" />
             </div>
             <div>
               <span className="font-label-lg font-bold block text-on-surface">จัดการรายชื่อและเบอร์โทรทีมช่าง</span>
               <span className="text-xs text-on-surface-variant">เพิ่ม/แก้ไขเบอร์โทรศัพท์ช่าง, กำหนดความเชี่ยวชาญ</span>
             </div>
           </div>
-          <span className="material-symbols-outlined text-on-surface-variant text-[20px]">chevron_right</span>
+          <ChevronRight className="w-5 h-5 text-on-surface-variant" />
         </button>
 
         {/* Migration / CSV */}
@@ -218,14 +238,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary-fixed text-on-primary-fixed flex items-center justify-center">
-              <span className="material-symbols-outlined text-[20px]">database</span>
+              <Database className="w-5 h-5" />
             </div>
             <div>
               <span className="font-label-lg font-bold block text-on-surface">ศูนย์จัดการและย้ายข้อมูลซ่อม</span>
               <span className="text-xs text-on-surface-variant">นำเข้า / ส่งออก CSV, สำรองข้อมูล JSON</span>
             </div>
           </div>
-          <span className="material-symbols-outlined text-on-surface-variant text-[20px]">chevron_right</span>
+          <ChevronRight className="w-5 h-5 text-on-surface-variant" />
         </button>
 
         {/* Clear Demo / Reset All Tickets */}
@@ -236,14 +256,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-red-100 text-red-700 flex items-center justify-center">
-                <span className="material-symbols-outlined text-[20px]">delete_sweep</span>
+                <Trash2 className="w-5 h-5" />
               </div>
               <div>
                 <span className="font-label-lg font-bold block text-red-700">ล้างข้อมูลรายการแจ้งซ่อมทั้งหมด</span>
                 <span className="text-xs text-red-500">ล้างงานทั้งหมดในระบบเพื่อเริ่มระบบแบบคลีน (0 รายการ)</span>
               </div>
             </div>
-            <span className="material-symbols-outlined text-red-500 text-[20px]">chevron_right</span>
+            <ChevronRight className="w-5 h-5 text-red-500" />
           </button>
         )}
 

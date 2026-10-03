@@ -40,7 +40,7 @@ export const DivisionFilterTabs: React.FC<DivisionFilterTabsProps> = ({
                 : 'bg-surface-container-high text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest'
             }`}
           >
-            <span className="material-symbols-outlined text-[16px]">{div.icon}</span>
+            <span className="text-sm shrink-0">{div.id === '84' ? '🛠️' : div.id === '85' ? '🏗️' : '🎨'}</span>
             <span>{div.name}</span>
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
               isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'

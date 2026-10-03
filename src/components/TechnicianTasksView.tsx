@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Ticket, Technician } from '../types';
 import { ConfirmModal } from './ConfirmModal';
-import { Phone, CheckCircle2, Clock, Wrench, AlertTriangle, AlertCircle, Eye, Check, ChevronRight, Package, RefreshCw } from 'lucide-react';
+import { Phone, CheckCircle2, Clock, Wrench, AlertTriangle, AlertCircle, Eye, Check, ChevronRight, Package, RefreshCw, MapPin } from 'lucide-react';
 
 interface TechnicianTasksViewProps {
   tickets: Ticket[];
@@ -363,7 +363,7 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
                     {ticket.title}
                   </h2>
                   <div className="flex items-center gap-1.5 text-on-surface-variant text-xs mt-1">
-                    <span className="material-symbols-outlined text-[16px] text-primary">pin_drop</span>
+                    <MapPin className="w-4 h-4 text-primary shrink-0" />
                     <span className="font-semibold text-on-surface">{ticket.location}</span>
                   </div>
                   {ticket.description && (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, LayoutGrid, ListFilter, ArrowUpDown, Clock, Zap } from 'lucide-react';
+import { Search, LayoutGrid, ListFilter, ArrowUpDown, Clock, Zap, Table } from 'lucide-react';
 import { ViewMode, SortOrder, TicketStatus } from '../types';
 
 interface QueueControlsProps {
@@ -69,7 +69,7 @@ export const QueueControls: React.FC<QueueControlsProps> = ({
                 }`}
                 title="มุมมองตารางคิวงาน (ดูง่ายเข้าใจง่าย)"
               >
-                <span className="material-symbols-outlined text-[15px]">table_rows</span>
+                <Table className="w-3.5 h-3.5" />
                 <span>ตารางคิวงาน</span>
               </button>
 

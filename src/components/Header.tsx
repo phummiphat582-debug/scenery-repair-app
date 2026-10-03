@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavTab, UserRole } from '../types';
 import { PwaInstallButton } from './PwaInstallPrompt';
+import { ArrowLeft, RotateCw, Lock, Building, Bell, Wrench } from 'lucide-react';
 
 interface HeaderProps {
   currentTab: NavTab;
@@ -67,7 +68,7 @@ export const Header: React.FC<HeaderProps> = ({
               aria-label="ย้อนกลับ"
               className="w-9 h-9 flex items-center justify-center text-on-surface rounded-full hover:bg-surface-container-high transition-colors shrink-0 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[22px]">arrow_back</span>
+              <ArrowLeft className="w-5 h-5" />
             </button>
           ) : null}
 
@@ -137,9 +138,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:text-primary hover:bg-surface-container-high transition-colors cursor-pointer"
               title="กดซิงค์ข้อมูลกับฐานข้อมูลกลางทันที (Sync Now)"
             >
-              <span className={`material-symbols-outlined text-[19px] ${isSyncing ? 'animate-spin text-primary' : ''}`}>
-                sync
-              </span>
+              <RotateCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-primary' : 'text-on-surface-variant'}`} />
             </button>
           )}
 
@@ -149,16 +148,14 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={() => handleSelectRole(userRole === 'requester' ? 'technician' : 'requester')}
             type="button"
-            className={`md:hidden px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-xs ${
+            className={`md:hidden px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
               userRole === 'requester'
                 ? 'bg-primary text-white'
                 : 'bg-surface-container-high text-on-surface'
             }`}
             title={userRole === 'requester' ? 'เข้าสู่ระบบช่าง' : 'สลับไปหน้าแผนกแจ้ง'}
           >
-            <span className="material-symbols-outlined text-[15px]">
-              {userRole === 'requester' ? 'lock' : 'business'}
-            </span>
+            {userRole === 'requester' ? <Lock className="w-3.5 h-3.5" /> : <Building className="w-3.5 h-3.5" />}
             <span>{userRole === 'requester' ? 'ระบบช่าง' : 'หน้าแผนก'}</span>
           </button>
 
@@ -170,7 +167,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="relative w-9 h-9 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
               type="button"
             >
-              <span className="material-symbols-outlined text-[20px]">notifications</span>
+              <Bell className="w-4 h-4 text-on-surface-variant" />
               {urgentCount > 0 && (
                 <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-error text-on-error font-label-sm text-[10px] ring-2 ring-surface font-bold">
                   {urgentCount}
@@ -186,9 +183,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
             title={userRole === 'requester' ? 'ผู้แจ้งซ่อม (แผนกในฟาร์ม)' : 'ฝ่ายซ่อมบำรุง (ทีมช่าง)'}
           >
-            <span className="material-symbols-outlined text-[17px]">
-              {userRole === 'requester' ? 'business' : 'engineering'}
-            </span>
+            {userRole === 'requester' ? <Building className="w-4 h-4 text-white" /> : <Wrench className="w-4 h-4 text-white" />}
           </div>
         </div>
 

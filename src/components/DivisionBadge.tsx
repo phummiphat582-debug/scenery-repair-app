@@ -29,8 +29,8 @@ export const DivisionBadge: React.FC<DivisionBadgeProps> = ({
       title={info.description}
     >
       {showIcon && (
-        <span className="material-symbols-outlined text-[14px]">
-          {info.icon}
+        <span className="text-xs shrink-0">
+          {info.id === '84' ? '🛠️' : info.id === '85' ? '🏗️' : '🎨'}
         </span>
       )}
       <span>{info.name}</span>

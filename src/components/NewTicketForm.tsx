@@ -4,6 +4,32 @@ import { ConfirmModal } from './ConfirmModal';
 import { compressImage } from '../lib/imageCompress';
 import { DIVISION_LIST, getDivisionInfo } from '../data/divisionData';
 import { DivisionBadge } from './DivisionBadge';
+import { 
+  Wrench, 
+  Check, 
+  User, 
+  ChevronUp, 
+  Edit3, 
+  ArrowLeft, 
+  ArrowRight, 
+  Users, 
+  CheckCircle2, 
+  MapPin, 
+  FileText, 
+  Camera, 
+  Plus, 
+  X, 
+  Clock, 
+  AlertTriangle, 
+  AlertOctagon, 
+  ShieldCheck, 
+  CheckSquare, 
+  Info, 
+  Loader2, 
+  Send, 
+  Bookmark,
+  Image as ImageIcon
+} from 'lucide-react';
 
 // Quick issue tags tailored per division
 const DIVISION_QUICK_TAGS: Record<DivisionId, string[]> = {
@@ -61,11 +87,11 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
 
   // Zone list
   const zones = [
-    { key: 'A', name: 'โซน A • โรงแกะ/สัตว์', icon: 'pets', dept: '91 ดูแลสัตว์' },
-    { key: 'B', name: 'โซน B • ลานกิจกรรม/โชว์', icon: 'festival', dept: '92 โชว์' },
-    { key: 'C', name: 'โซน C • ร้านอาหาร/คาเฟ่', icon: 'restaurant', dept: '22 ร้านอาหาร' },
-    { key: 'D', name: 'โซน D • บ้านพักวิลล่า', icon: 'cottage', dept: 'H0 บ้านพัก' },
-    { key: 'HQ', name: 'สำนักงานส่วนกลาง', icon: 'apartment', dept: '0 ฟร้อน' }
+    { key: 'A', name: 'โซน A • โรงแกะ/สัตว์', icon: '🐑', dept: '91 ดูแลสัตว์' },
+    { key: 'B', name: 'โซน B • ลานกิจกรรม/โชว์', icon: '🎪', dept: '92 โชว์' },
+    { key: 'C', name: 'โซน C • ร้านอาหาร/คาเฟ่', icon: '🍽️', dept: '22 ร้านอาหาร' },
+    { key: 'D', name: 'โซน D • บ้านพักวิลล่า', icon: '🏡', dept: 'H0 บ้านพัก' },
+    { key: 'HQ', name: 'สำนักงานส่วนกลาง', icon: '🏢', dept: '0 ฟร้อน' }
   ];
 
   const handleDivisionSelect = (divId: DivisionId) => {
@@ -217,8 +243,8 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
         <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm border border-slate-200/40">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-on-primary-fixed">
-                <span className="material-symbols-outlined text-[20px]">build_circle</span>
+              <div className="w-8 h-8 rounded-full bg-primary-fixed flex items-center justify-center text-primary">
+                <Wrench className="w-4 h-4" />
               </div>
               <div>
                 <h1 className="font-headline-sm text-headline-sm text-primary leading-tight font-bold">
@@ -248,7 +274,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
               className="relative z-10 flex flex-col items-center gap-1 cursor-pointer"
             >
               <div className="w-7 h-7 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-label-sm text-[12px] shadow-sm">
-                <span className="material-symbols-outlined text-[16px]">check</span>
+                <Check className="w-3.5 h-3.5" />
               </div>
               <span className="font-label-sm text-[10px] text-primary font-semibold">1. ผู้แจ้ง</span>
             </div>
@@ -283,7 +309,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-space-sm min-w-0">
               <div className="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-primary shrink-0">
-                <span className="material-symbols-outlined text-[22px]">badge</span>
+                <User className="w-5 h-5 text-primary" />
               </div>
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2">
@@ -305,9 +331,11 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
               onClick={() => setIsRequesterDrawerOpen(!isRequesterDrawerOpen)}
               type="button"
             >
-              <span className="material-symbols-outlined text-[18px]">
-                {isRequesterDrawerOpen ? 'expand_less' : 'edit'}
-              </span>
+              {isRequesterDrawerOpen ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <Edit3 className="w-4 h-4" />
+              )}
             </button>
           </div>
 
@@ -356,7 +384,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             className="min-h-[48px] px-5 rounded-xl bg-primary text-white font-bold text-sm flex items-center gap-2 shadow-md cursor-pointer active:scale-95"
           >
             ถัดไป: รายละเอียด
-            <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
         </>)}
@@ -367,7 +395,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <label className="font-label-lg text-label-lg text-on-surface flex items-center gap-2 font-bold">
-                <span className="material-symbols-outlined text-primary text-[22px]">diversity_3</span>
+                <Users className="w-5 h-5 text-primary" />
                 <span>เลือกสายงานที่รับผิดชอบ</span>
                 <span className="text-error font-bold">*</span>
               </label>
@@ -399,12 +427,12 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
                       <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
                         isSelected ? `${div.accentBg} text-white shadow-xs` : 'bg-surface-container-high text-on-surface-variant'
                       }`}>
-                        <span className="material-symbols-outlined text-[18px]">{div.icon}</span>
+                        <span className="text-base">{div.id === '84' ? '🛠️' : div.id === '85' ? '🏗️' : '🎨'}</span>
                       </div>
                       <span className="text-sm font-bold">{div.name}</span>
                     </div>
                     {isSelected && (
-                      <span className="material-symbols-outlined text-base">check_circle</span>
+                      <CheckCircle2 className="w-4 h-4 text-primary" />
                     )}
                   </div>
                   <p className="text-[11px] leading-relaxed opacity-85">
@@ -420,7 +448,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
         <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm border border-slate-200/40">
           <div className="flex items-center justify-between">
             <label className="font-label-lg text-label-lg text-on-surface flex items-center gap-1.5 font-bold">
-              <span className="material-symbols-outlined text-primary text-[20px]">pin_drop</span>
+              <MapPin className="w-5 h-5 text-primary" />
               เลือกโซนเกิดเหตุ <span className="text-error font-bold">*</span>
             </label>
             <span className="font-label-sm text-label-sm text-on-surface-variant">5 โซนหลัก</span>
@@ -441,11 +469,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
                   onClick={() => handleZoneSelect(z)}
                   type="button"
                 >
-                  <span
-                    className={`material-symbols-outlined text-[18px] ${
-                      isSelected ? 'text-tertiary-fixed' : 'text-on-surface-variant'
-                    }`}
-                  >
+                  <span className="text-base shrink-0">
                     {z.icon}
                   </span>
                   <span>{z.name}</span>
@@ -461,9 +485,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
                 ระบุจุด/ห้อง/ตำแหน่งเฉพาะ
               </label>
               <div className="relative flex items-center">
-                <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px]">
-                  storefront
-                </span>
+                <MapPin className="w-4 h-4 absolute left-3 text-on-surface-variant" />
                 <input
                   className="w-full h-12 pl-10 pr-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none border border-slate-200/50"
                   placeholder="เช่น ซุ้มกาแฟสด, คอกแกะอนุบาล"
@@ -482,7 +504,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
         <section className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm flex flex-col gap-space-sm border border-slate-200">
           <div className="flex items-center justify-between">
             <label className="font-label-lg text-label-lg text-on-surface flex items-center gap-1.5 font-bold">
-              <span className="material-symbols-outlined text-primary text-[20px]">notes</span>
+              <FileText className="w-5 h-5 text-primary" />
               รายละเอียดอาการผิดปกติ <span className="text-error font-bold">*</span>
             </label>
             <span className="font-label-sm text-label-sm text-on-surface-variant">
@@ -528,7 +550,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
         <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm border border-slate-200/40">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-primary text-[20px]">photo_library</span>
+              <ImageIcon className="w-5 h-5 text-primary" />
               <span className="font-label-lg text-label-lg text-on-surface font-bold">
                 ภาพถ่ายหน้างานจริง
               </span>
@@ -541,7 +563,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
           {/* Photo Action Buttons */}
           <div className="grid grid-cols-2 gap-2">
             <label className="h-12 rounded-xl bg-surface-container-high text-primary font-label-md text-label-md flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer">
-              <span className="material-symbols-outlined text-[20px]">photo_camera</span>
+              <Camera className="w-5 h-5" />
               <span>เปิดกล้องถ่ายสด</span>
               <input
                 type="file"
@@ -553,7 +575,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             </label>
 
             <label className="h-12 rounded-xl bg-surface-container-low text-on-surface-variant font-label-md text-label-md flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer">
-              <span className="material-symbols-outlined text-[20px]">add_photo_alternate</span>
+              <Plus className="w-5 h-5" />
               <span>เลือกจากอัลบั้ม</span>
               <input
                 type="file"
@@ -584,7 +606,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
                   aria-label="ลบรูปภาพ"
                   className="absolute top-1 right-1 w-6 h-6 rounded-full bg-error text-on-error flex items-center justify-center shadow-md active:scale-90 transition-transform cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[14px]">close</span>
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             ))}
@@ -592,7 +614,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             {photos.length < 4 && (
               <label className="rounded-lg aspect-square bg-surface-container-low flex flex-col items-center justify-center gap-1 text-on-surface-variant active:bg-surface-container transition-colors cursor-pointer border-2 border-dashed border-slate-300">
                 <div className="w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[20px]">add</span>
+                  <Plus className="w-5 h-5" />
                 </div>
                 <span className="font-label-sm text-[10px]">เพิ่มรูป</span>
                 <input
@@ -610,7 +632,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
         <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm border border-slate-200/40">
           <div className="flex items-center justify-between">
             <label className="font-label-lg text-label-lg text-on-surface flex items-center gap-1.5 font-bold">
-              <span className="material-symbols-outlined text-primary text-[20px]">alarm</span>
+              <AlertTriangle className="w-5 h-5 text-primary" />
               ระดับความเร่งด่วน <span className="text-error font-bold">*</span>
             </label>
             <span className="font-label-sm text-label-sm text-error font-semibold flex items-center gap-0.5">
@@ -630,7 +652,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant">
-                  <span className="material-symbols-outlined text-[20px]">schedule</span>
+                  <Clock className="w-5 h-5 text-slate-600" />
                 </div>
                 <div className="flex flex-col">
                   <span className="font-label-md text-label-md text-on-surface font-semibold">
@@ -661,7 +683,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed">
-                  <span className="material-symbols-outlined text-[20px]">priority_high</span>
+                  <AlertTriangle className="w-5 h-5 text-amber-700" />
                 </div>
                 <div className="flex flex-col">
                   <span className="font-label-md text-label-md text-on-surface font-semibold">
@@ -692,7 +714,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-error text-on-error flex items-center justify-center shadow-sm">
-                  <span className="material-symbols-outlined text-[20px]">e911_emergency</span>
+                  <AlertOctagon className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex flex-col">
                   <div className="flex items-center gap-1.5">
@@ -725,7 +747,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             <span className="font-label-md text-label-md text-on-surface font-bold">
               ข้อกำหนดเพิ่มเติมเพื่อความปลอดภัย
             </span>
-            <span className="material-symbols-outlined text-on-surface-variant text-[18px]">verified_user</span>
+            <ShieldCheck className="w-4 h-4 text-on-surface-variant" />
           </div>
 
           <label className="flex items-center gap-3 py-1 cursor-pointer">
@@ -758,7 +780,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             onClick={() => setStep(1)}
             className="min-h-[48px] px-4 rounded-xl bg-surface-container text-primary font-bold text-sm flex items-center gap-2 cursor-pointer active:scale-95"
           >
-            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+            <ArrowLeft className="w-4 h-4" />
             ผู้แจ้ง
           </button>
           <button
@@ -767,7 +789,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             className="min-h-[48px] px-5 rounded-xl bg-primary text-white font-bold text-sm flex items-center gap-2 shadow-md cursor-pointer active:scale-95"
           >
             ตรวจสอบงาน
-            <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
         </>)}
@@ -775,7 +797,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
         {step === 3 && (<>
         <section className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm border border-slate-200 flex flex-col gap-3">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-[24px]">fact_check</span>
+            <CheckSquare className="w-6 h-6 text-primary" />
             <div>
               <h2 className="font-headline-sm text-headline-sm text-primary font-bold">ตรวจสอบและยืนยันงาน</h2>
               <p className="text-xs text-on-surface-variant">ตรวจข้อมูลให้ถูกต้องก่อนส่งเข้าคิวซ่อม</p>
@@ -792,7 +814,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             <div className="rounded-xl bg-surface-container-low p-3"><span className="text-xs text-on-surface-variant block">ความเร่งด่วน</span><strong>{priority === 'critical' ? 'ด่วนที่สุด / ฉุกเฉิน' : priority === 'high' ? 'ด่วน' : 'ปกติ'}</strong></div>
           </div>
           <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800">
-            <span className="material-symbols-outlined text-[18px]">info</span>
+            <Info className="w-4 h-4 text-emerald-700 shrink-0" />
             เมื่อยืนยัน ระบบจะออกเลขที่ใบแจ้งและจัดคิวให้แผนกที่เลือกทันที
           </div>
         </section>
@@ -804,7 +826,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             onClick={() => setStep(2)}
             className="min-h-[48px] w-full rounded-xl bg-surface-container text-primary font-bold text-sm flex items-center justify-center gap-2 cursor-pointer active:scale-95"
           >
-            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+            <ArrowLeft className="w-4 h-4" />
             กลับไปแก้ไขรายละเอียด
           </button>
           <button
@@ -815,12 +837,12 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
           >
             {isSubmitting ? (
               <>
-                <span className="material-symbols-outlined animate-spin text-[24px]">progress_activity</span>
+                <Loader2 className="w-5 h-5 animate-spin" />
                 <span>กำลังนำส่งข้อมูล...</span>
               </>
             ) : (
               <>
-                <span className="material-symbols-outlined text-[24px]">send</span>
+                <Send className="w-5 h-5" />
                 <span>บันทึกและส่งใบแจ้งซ่อม</span>
               </>
             )}
@@ -831,7 +853,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             onClick={handleSaveDraft}
             className="min-h-[48px] w-full rounded-xl bg-surface-container text-primary font-label-lg text-label-lg flex items-center justify-center gap-2 active:bg-surface-container-high transition-colors cursor-pointer font-semibold"
           >
-            <span className="material-symbols-outlined text-[20px]">save_as</span>
+            <Bookmark className="w-4 h-4" />
             <span>บันทึกร่างไว้ก่อน</span>
           </button>
 
@@ -847,7 +869,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
         <div className="fixed inset-x-4 bottom-24 z-50 transition-all duration-300">
           <div className="bg-primary text-on-primary rounded-xl p-4 shadow-2xl flex items-center gap-3 border border-emerald-400/40">
             <div className="w-10 h-10 rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center shrink-0">
-              <span className="material-symbols-outlined text-[24px]">check_circle</span>
+              <CheckCircle2 className="w-6 h-6 text-emerald-200" />
             </div>
             <div className="flex flex-col min-w-0 flex-1">
               <span className="font-headline-sm text-[16px] font-bold">ส่งใบแจ้งซ่อมสำเร็จ!</span>
@@ -859,7 +881,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
               onClick={() => setShowSuccessToast(false)}
               className="text-on-primary p-1 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[20px]">close</span>
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
