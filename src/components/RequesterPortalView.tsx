@@ -58,6 +58,22 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
     return myDepartment ? tickets.filter(t => t.department === myDepartment) : [];
   }, [tickets, myDepartment]);
 
+  const myDeptActiveTickets = useMemo(() => {
+    if (!myDepartment) return [];
+    return tickets
+      .filter(t => t.department === myDepartment && t.status !== 'completed' && t.status !== 'cancelled')
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }, [tickets, myDepartment]);
+
+  const myDeptFilteredQueueTickets = useMemo(() => {
+    return myDeptActiveTickets.filter(t => {
+      if (selectedDivisionFilter !== 'all' && (t.division || '84') !== selectedDivisionFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [myDeptActiveTickets, selectedDivisionFilter]);
+
   // Technicians on duty today
   const onDutyTechs = useMemo(() => {
     return technicians.filter(t => t.isOnDutyToday !== false && t.status === 'active');
@@ -359,7 +375,14 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
           }`}
         >
           <ListOrdered className="w-4 h-4" />
-          <span>คิวแต่ละแผนก</span>
+          <span>คิวงานแต่ละแผนก</span>
+          {myDepartment && (
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+              activeSubTab === 'queue' ? 'bg-white text-primary' : 'bg-surface-container-highest text-on-surface'
+            }`}>
+              {myDeptActiveTickets.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -403,78 +426,365 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       {/* 5. Sub-Tab 2: Department Queues */}
       {activeSubTab === 'queue' && (
         <div className="space-y-4">
-          <div className="bg-surface-container-lowest rounded-3xl border border-slate-200 p-4 sm:p-5 shadow-xs flex items-start gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-primary-fixed text-primary flex items-center justify-center shrink-0">
-              <ClipboardList className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="font-bold text-base text-on-surface">คิวงานซ่อมแยกตามแผนก</h2>
-              <p className="text-xs text-on-surface-variant mt-1">ดูงานที่กำลังรอรับงานหรือกำลังดำเนินการของแต่ละแผนกได้ทันที</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {departmentQueues.map(({ department, tickets: queueTickets }) => (
-              <div key={department.id} className="bg-surface-container-lowest rounded-3xl border border-slate-200 p-4 shadow-xs">
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-9 h-9 rounded-xl flex items-center justify-center text-lg" style={{ backgroundColor: `${department.color}18` }}>
-                      {department.icon}
-                    </span>
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-sm truncate">{department.name}</h3>
-                      <p className="text-[11px] text-on-surface-variant">คิวที่กำลังดำเนินการ</p>
-                    </div>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-full bg-primary-fixed text-primary text-xs font-extrabold shrink-0">
-                    {queueTickets.length} งาน
-                  </span>
+          {(!myDepartment || isChangingDept) ? (
+            /* Department Selection Picker for Queue */
+            <div className="bg-surface-container-lowest rounded-3xl border border-slate-200 p-5 sm:p-7 shadow-xs space-y-5">
+              <div className="text-center max-w-md mx-auto space-y-2">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-2xl shadow-inner border border-primary/20">
+                  <ClipboardList className="w-7 h-7" />
                 </div>
-
-                {queueTickets.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-xs text-slate-500">
-                    ยังไม่มีงานค้างในคิวแผนกนี้
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {queueTickets.slice(0, 4).map(ticket => {
-                      const badge = statusLabel(ticket.status);
-                      return (
-                        <button
-                          key={ticket.id}
-                          type="button"
-                          onClick={() => {
-                            handleSelectDepartment(ticket.department);
-                            setActiveSubTab('track');
-                          }}
-                          className="w-full text-left rounded-2xl bg-surface-container-low hover:bg-surface-container p-3 transition-colors cursor-pointer"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-[11px] font-extrabold text-primary">คิว #{departmentQueueNumbers.get(ticket.id) || '-'}</span>
-                            <span className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${badge.color}`}>{badge.text}</span>
-                          </div>
-                          <p className="font-bold text-xs mt-1 line-clamp-1">{ticket.title}</p>
-                          <p className="text-[11px] text-on-surface-variant mt-0.5 line-clamp-1">{ticket.location}</p>
-                        </button>
-                      );
-                    })}
-                    {queueTickets.length > 4 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleSelectDepartment(department.name);
-                          setActiveSubTab('track');
-                        }}
-                        className="w-full text-center text-xs text-primary font-bold py-1 cursor-pointer"
-                      >
-                        ดูอีก {queueTickets.length - 4} งานในแผนกนี้ →
-                      </button>
-                    )}
-                  </div>
+                <h3 className="font-extrabold text-base sm:text-lg text-on-surface">
+                  เลือกแผนกเพื่อดูคิวงานซ่อม
+                </h3>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  เลือกแผนกของคุณเพื่อดูคิวงานแจ้งซ่อมที่กำลังรอรับงานหรือกำลังดำเนินการของแผนกตนเอง
+                </p>
+                {isChangingDept && myDepartment && (
+                  <button
+                    type="button"
+                    onClick={() => setIsChangingDept(false)}
+                    className="text-xs text-primary hover:underline font-bold cursor-pointer inline-flex items-center gap-1 mt-1"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>ยกเลิก (คงไว้ที่ "{myDepartment}")</span>
+                  </button>
                 )}
               </div>
-            ))}
-          </div>
+
+              {/* Department Search Input */}
+              <div className="relative max-w-md mx-auto">
+                <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-on-surface-variant" />
+                <input
+                  type="text"
+                  value={deptSearchText}
+                  onChange={(e) => setDeptSearchText(e.target.value)}
+                  placeholder="พิมพ์ค้นหาชื่อแผนก เช่น ฟร้อน, อาหาร, แม่บ้าน, สโตร์..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-surface-container-low border border-slate-200 rounded-2xl text-xs sm:text-sm text-on-surface outline-none focus:border-primary focus:bg-surface-container-lowest focus:ring-1 focus:ring-primary shadow-xs"
+                />
+              </div>
+
+              {/* Department Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
+                {departments
+                  .filter(d =>
+                    !deptSearchText.trim() ||
+                    d.name.toLowerCase().includes(deptSearchText.toLowerCase()) ||
+                    d.id.toLowerCase().includes(deptSearchText.toLowerCase())
+                  )
+                  .map(dept => {
+                    const deptActiveCount = tickets.filter(
+                      t => t.department === dept.name && t.status !== 'completed' && t.status !== 'cancelled'
+                    ).length;
+                    const isSelected = dept.name === myDepartment;
+
+                    return (
+                      <button
+                        key={dept.id}
+                        type="button"
+                        onClick={() => handleSelectDepartment(dept.name)}
+                        className={`p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                          isSelected
+                            ? 'border-primary bg-primary/10 ring-2 ring-primary/30 shadow-xs'
+                            : 'border-slate-200 bg-surface-container-low hover:border-primary/50 hover:bg-surface-container shadow-xs active:scale-[0.98]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span
+                            className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 border border-slate-200/50"
+                            style={{ backgroundColor: `${dept.color}18` }}
+                          >
+                            {dept.icon}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="font-bold text-xs sm:text-sm text-on-surface truncate">
+                              {dept.name}
+                            </div>
+                            <div className="text-[11px] text-on-surface-variant">
+                              {deptActiveCount > 0 ? (
+                                <span className="text-amber-600 font-semibold">{deptActiveCount} คิวที่กำลังดำเนินการ</span>
+                              ) : (
+                                'ไม่มีงานค้าง'
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <ChevronRight className={`w-4 h-4 shrink-0 ${isSelected ? 'text-primary' : 'text-slate-400'}`} />
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          ) : (
+            /* Selected Department Queues View */
+            <div className="space-y-4">
+              {/* Department Header & Quick Switcher */}
+              <div className="bg-surface-container-lowest p-4 rounded-3xl border border-slate-200 shadow-xs flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl shrink-0"
+                    style={{ backgroundColor: `${currentDeptObj?.color || '#3b82f6'}18` }}
+                  >
+                    {currentDeptObj?.icon || '🏢'}
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="font-extrabold text-sm sm:text-base text-on-surface truncate">
+                      คิวงานแจ้งซ่อมของ "{myDepartment}"
+                    </h2>
+                    <p className="text-[11px] text-on-surface-variant">
+                      มีคิวงานที่กำลังรอ/ดำเนินการ {myDeptActiveTickets.length} รายการ
+                    </p>
+                  </div>
+                </div>
+
+                {/* Quick Switch Dropdown & Change Button */}
+                <div className="flex items-center gap-2">
+                  <select
+                    value={myDepartment}
+                    onChange={(e) => handleSelectDepartment(e.target.value)}
+                    className="h-[38px] px-3 bg-surface-container-low border border-slate-200 rounded-xl text-xs font-bold text-on-surface outline-none focus:border-primary shadow-xs cursor-pointer"
+                  >
+                    {departments.map(d => (
+                      <option key={d.id} value={d.name}>{d.name}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsChangingDept(true)}
+                    className="h-[38px] px-3 bg-surface-container-low hover:bg-surface-container text-on-surface-variant rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5"
+                    title="เลือกดูแผนกอื่น"
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">เปลี่ยนแผนก</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Horizontal Scrollable Department Switcher Pills */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar touch-pan-x">
+                {departments.map(dept => {
+                  const deptCount = tickets.filter(
+                    t => t.department === dept.name && t.status !== 'completed' && t.status !== 'cancelled'
+                  ).length;
+                  const isCurrent = dept.name === myDepartment;
+
+                  return (
+                    <button
+                      key={dept.id}
+                      type="button"
+                      onClick={() => handleSelectDepartment(dept.name)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                        isCurrent
+                          ? 'bg-primary text-white shadow-xs'
+                          : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant'
+                      }`}
+                    >
+                      <span>{dept.icon}</span>
+                      <span>{dept.name}</span>
+                      {deptCount > 0 && (
+                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                          isCurrent ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {deptCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Division Filter Tabs for Queue */}
+              <div className="bg-surface-container-lowest p-2 rounded-2xl border border-slate-200 shadow-xs">
+                <DivisionFilterTabs
+                  selectedDivision={selectedDivisionFilter}
+                  onSelectDivision={setSelectedDivisionFilter}
+                  tickets={myDeptActiveTickets}
+                />
+              </div>
+
+              {/* Queue Ticket Cards List */}
+              {myDeptFilteredQueueTickets.length === 0 ? (
+                <div className="p-12 text-center bg-surface-container-lowest rounded-3xl border border-dashed border-slate-200 text-on-surface-variant flex flex-col items-center gap-3">
+                  <ClipboardList className="w-10 h-10 text-slate-300" />
+                  <span className="text-sm font-semibold">
+                    แผนก "{myDepartment}" ยังไม่มีงานค้างในคิว
+                  </span>
+                  <p className="text-xs text-slate-400 max-w-sm">
+                    คิวงานทั้งหมดของแผนกนี้เสร็จสิ้นแล้ว หรือยังไม่มีการส่งใบแจ้งซ่อมใหม่
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSubTab('create')}
+                    className="mt-2 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary-container cursor-pointer shadow-xs"
+                  >
+                    + แจ้งซ่อมงานใหม่
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3.5">
+                  {myDeptFilteredQueueTickets.map((ticket) => {
+                    const sBadge = statusLabel(ticket.status);
+                    const techPhone = getTechPhone(ticket);
+                    const isAssigned = !!ticket.technicianName;
+                    const assignedTech = isAssigned
+                      ? technicians.find(t => t.name.toLowerCase() === ticket.technicianName?.toLowerCase())
+                      : null;
+                    const queueNum = departmentQueueNumbers.get(ticket.id) || 1;
+                    const progressIndex = statusStepIndex(ticket.status);
+
+                    return (
+                      <div
+                        key={ticket.id}
+                        className="p-4 sm:p-5 bg-surface-container-lowest rounded-3xl border border-slate-200/80 shadow-xs hover:shadow-md transition-all flex flex-col gap-3.5"
+                      >
+                        {/* Top Row: Queue Badge, Request ID, Division, Status */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-primary text-white shadow-xs">
+                              คิวที่ #{queueNum}
+                            </span>
+                            <span className="font-mono text-xs font-bold text-primary bg-primary-fixed/40 px-2.5 py-1 rounded-full">
+                              #{ticket.requestId}
+                            </span>
+                            <DivisionBadge division={ticket.division} size="sm" />
+                            {ticket.category && (
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary-fixed/30 text-primary border border-primary/20">
+                                {ticket.category}
+                              </span>
+                            )}
+                            <span className="text-[11px] text-on-surface-variant">
+                              {new Date(ticket.createdAt).toLocaleDateString('th-TH', {
+                                day: 'numeric',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${sBadge.color}`}>
+                              {sBadge.text}
+                            </span>
+                            {ticket.priority === 'critical' && (
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 animate-pulse">
+                                วิกฤต
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Middle Row: Title and Location */}
+                        <div>
+                          <h3 className="font-bold text-sm sm:text-base text-on-surface">
+                            {ticket.title}
+                          </h3>
+                          {ticket.description && (
+                            <p className="text-xs text-on-surface-variant mt-1 line-clamp-2">
+                              {ticket.description}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 mt-2 text-xs text-on-surface-variant flex-wrap">
+                            <span className="flex items-center gap-1 font-semibold text-on-surface">
+                              <MapPin className="w-3.5 h-3.5 text-primary" />
+                              {ticket.location}
+                            </span>
+                            <span>•</span>
+                            <span className="font-medium text-primary">{ticket.department}</span>
+                            <span>•</span>
+                            <span>ผู้แจ้ง: {ticket.requesterName}</span>
+                          </div>
+                        </div>
+
+                        {/* Repair Progress Timeline */}
+                        <div className="rounded-2xl bg-surface-container-low p-4 border border-slate-200/60 overflow-x-auto overflow-y-hidden overscroll-y-none touch-pan-x" style={{ touchAction: 'pan-x' }}>
+                          <div className="flex items-center justify-between gap-1.5">
+                            {statusFlow.map((flow, flowIndex) => (
+                              <React.Fragment key={flow.key}>
+                                <div className="flex flex-col items-center gap-1 min-w-0">
+                                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold ${
+                                    flowIndex <= progressIndex ? 'bg-primary text-white' : 'bg-slate-200 text-slate-500'
+                                  }`}>
+                                    {flowIndex < progressIndex ? '✓' : flowIndex + 1}
+                                  </span>
+                                  <span className={`text-[11px] sm:text-xs text-center leading-tight whitespace-nowrap ${flowIndex <= progressIndex ? 'text-primary font-bold' : 'text-slate-500'}`}>
+                                    {flow.label}
+                                  </span>
+                                </div>
+                                {flowIndex < statusFlow.length - 1 && (
+                                  <span className={`h-1 flex-1 rounded-full mb-4 ${flowIndex < progressIndex ? 'bg-primary' : 'bg-slate-200'}`} />
+                                )}
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Technician Contact Box */}
+                        <div className="p-3 bg-surface-container-low rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-slate-200/60">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {assignedTech?.avatarUrl ? (
+                              <img 
+                                src={assignedTech.avatarUrl} 
+                                alt={ticket.technicianName || ''} 
+                                className="w-10 h-10 rounded-xl object-cover border-2 border-primary/40 shrink-0 shadow-xs" 
+                              />
+                            ) : (
+                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${
+                                isAssigned ? 'bg-primary text-white shadow-xs' : 'bg-slate-200 text-slate-500'
+                              }`}>
+                                <Wrench className="w-4 h-4" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold text-on-surface truncate">
+                                {isAssigned ? (
+                                  <span>ช่างผู้รับผิดชอบ: <strong className="text-primary">{ticket.technicianName}</strong></span>
+                                ) : (
+                                  <span className="text-amber-700">กำลังรอศูนย์ซ่อมจัดคิวช่าง</span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-on-surface-variant truncate">
+                                {isAssigned 
+                                  ? `เบอร์ติดต่อตรง: ${techPhone}` 
+                                  : 'ศูนย์ซ่อมบำรุงส่วนกลาง The Scenery Farm'}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Direct Phone Call Button with Confirmation */}
+                          {techPhone ? (
+                            <button
+                              type="button"
+                              onClick={(e) => handleCallClick(e, ticket.technicianName || 'ศูนย์ซ่อมส่วนกลาง', techPhone)}
+                              className="self-start sm:self-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-primary hover:bg-primary-container text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer active:scale-95"
+                              title="กดเพื่อโทรออกทันที"
+                            >
+                              <Phone className="w-3.5 h-3.5" />
+                              <span>โทรหาช่าง: {techPhone}</span>
+                            </button>
+                          ) : (
+                            <span className="self-start sm:self-auto text-xs font-semibold text-slate-400">ยังไม่มีเบอร์โทรช่าง</span>
+                          )}
+                        </div>
+
+                        {/* Repair Remarks */}
+                        {ticket.repairResult && (
+                          <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex flex-col gap-1">
+                            <span className="font-bold flex items-center gap-1 text-emerald-800">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              บันทึกความคืบหน้าการซ่อม:
+                            </span>
+                            <p className="text-slate-700">{ticket.repairResult}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
