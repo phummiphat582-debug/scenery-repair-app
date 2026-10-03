@@ -94,13 +94,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 <span>ออนไลน์</span>
               </span>
-              
-              {/* Role Indicator Pill */}
-              {userRole === 'technician' && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-[10px] shrink-0 font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
-                  🛠️ ระบบช่างรับงาน
-                </span>
-              )}
             </div>
             <span className="font-label-sm text-[11px] text-on-surface-variant truncate">
               {getSubtext()}
@@ -131,7 +124,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
             }`}
           >
-            <span>🛠️ หน้าระบบช่างรับงาน 🔒</span>
+            <span>ระบบช่าง 🔒</span>
           </button>
         </div>
 
@@ -224,7 +217,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'text-on-surface-variant hover:text-on-surface'
             }`}
           >
-            <span>🛠️ ระบบช่างรับงาน 🔒</span>
+            <span>ระบบช่าง 🔒</span>
           </button>
         </div>
       </div>

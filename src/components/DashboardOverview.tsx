@@ -24,8 +24,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onRefresh
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDivisionFilter, setSelectedDivisionFilter] = useState<string>('all');
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
+  const [selectedDivisionFilter, setSelectedDivisionFilter] = useState<string>('84');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('active');
   const [selectedZoneFilter, setSelectedZoneFilter] = useState<string>('all');
   const [callConfirmTech, setCallConfirmTech] = useState<{ name: string; phone: string } | null>(null);
 
@@ -47,18 +47,21 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     );
   }, [tickets]);
 
-  // Counts for KPIs - purely dynamic from real tickets
+  // Counts for KPIs - calculated by selected division
   const kpis = useMemo(() => {
-    const total = tickets.length;
-    const pending = tickets.filter(t => t.status === 'pending' || t.status === 'assigned').length;
-    const inProgress = tickets.filter(t => t.status === 'in_progress').length;
-    const waitingParts = tickets.filter(t => t.status === 'waiting_parts').length;
-    const waitingInspect = tickets.filter(t => t.status === 'waiting_inspect').length;
-    const completed = tickets.filter(t => t.status === 'completed').length;
-    const overdue = tickets.filter(t => t.isOverdue || (t.priority === 'critical' && t.status !== 'completed')).length;
+    const divTickets = selectedDivisionFilter === 'all'
+      ? tickets
+      : tickets.filter(t => (t.division || '84') === selectedDivisionFilter);
+    const total = divTickets.length;
+    const pending = divTickets.filter(t => t.status === 'pending' || t.status === 'assigned').length;
+    const inProgress = divTickets.filter(t => t.status === 'in_progress').length;
+    const waitingParts = divTickets.filter(t => t.status === 'waiting_parts').length;
+    const completed = divTickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length;
+    const active = divTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length;
+    const overdue = divTickets.filter(t => (t.isOverdue || (t.priority === 'critical')) && t.status !== 'completed' && t.status !== 'cancelled').length;
     
-    return { total, pending, inProgress, waitingParts, waitingInspect, completed, overdue };
-  }, [tickets]);
+    return { total, pending, inProgress, waitingParts, completed, active, overdue };
+  }, [tickets, selectedDivisionFilter]);
 
   // Filtered tickets for feed
   const filteredTickets = useMemo(() => {
@@ -75,16 +78,22 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         if (!match) return false;
       }
 
-      // Status
-      if (selectedStatusFilter === 'pending' && ticket.status !== 'pending') return false;
-      if (selectedStatusFilter === 'in_progress' && ticket.status !== 'in_progress') return false;
-      if (selectedStatusFilter === 'waiting_parts' && ticket.status !== 'waiting_parts') return false;
-      if (selectedStatusFilter === 'waiting_inspect' && ticket.status !== 'waiting_inspect') return false;
-      if (selectedStatusFilter === 'completed' && ticket.status !== 'completed') return false;
-
-      // Division
+      // Division (strict separation per division)
       if (selectedDivisionFilter !== 'all' && (ticket.division || '84') !== selectedDivisionFilter) {
         return false;
+      }
+
+      // Status: active excludes completed & cancelled; completed only shows completed
+      if (selectedStatusFilter === 'active' || selectedStatusFilter === 'all') {
+        if (ticket.status === 'completed' || ticket.status === 'cancelled') return false;
+      } else if (selectedStatusFilter === 'pending') {
+        if (ticket.status !== 'pending' && ticket.status !== 'assigned') return false;
+      } else if (selectedStatusFilter === 'in_progress') {
+        if (ticket.status !== 'in_progress') return false;
+      } else if (selectedStatusFilter === 'waiting_parts') {
+        if (ticket.status !== 'waiting_parts') return false;
+      } else if (selectedStatusFilter === 'completed') {
+        if (ticket.status !== 'completed' && ticket.status !== 'waiting_inspect') return false;
       }
 
       // Zone
@@ -227,15 +236,15 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </button>
         </div>
         <div className="flex overflow-x-auto gap-space-sm px-margin pb-2 scroll-smooth no-scrollbar">
-          {/* Card: Total */}
+          {/* Card: Active Pending */}
           <div className="min-w-[130px] flex-shrink-0 bg-surface-container-lowest rounded-xl p-space-sm shadow-sm flex flex-col justify-between border border-slate-200/40">
             <div className="flex items-center justify-between text-on-surface-variant">
-              <span className="font-label-sm text-label-sm font-medium">งานทั้งหมด</span>
-              <span className="material-symbols-outlined text-[18px]">inventory_2</span>
+              <span className="font-label-sm text-label-sm font-medium">งานรอซ่อม</span>
+              <span className="material-symbols-outlined text-[18px]">engineering</span>
             </div>
             <div className="mt-2">
               <span className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-bold">
-                {kpis.total}
+                {kpis.active}
               </span>
               <span className="font-label-sm text-label-sm text-on-surface-variant ml-1">รายการ</span>
             </div>
@@ -326,11 +335,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       <section className="px-margin my-space-xs">
         <div className="flex items-center gap-1.5 overflow-x-auto py-1 scroll-smooth no-scrollbar">
           {[
-            { id: 'all', label: `ทั้งหมด (${tickets.length})` },
-            { id: 'pending', label: `รอตรวจสอบ (${kpis.pending})` },
+            { id: 'active', label: `งานรอซ่อม (${kpis.active})` },
+            { id: 'pending', label: `รอรับงาน (${kpis.pending})` },
             { id: 'in_progress', label: `กำลังทำ (${kpis.inProgress})` },
             { id: 'waiting_parts', label: `รออะไหล่ (${kpis.waitingParts})` },
-            { id: 'waiting_inspect', label: `รอตรวจรับ (${kpis.waitingInspect})` },
             { id: 'completed', label: `เสร็จสิ้น (${kpis.completed})` }
           ].map(pill => (
             <button

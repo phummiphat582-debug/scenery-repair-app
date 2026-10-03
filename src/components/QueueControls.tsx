@@ -124,7 +124,7 @@ export const QueueControls: React.FC<QueueControlsProps> = ({
                 : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
             }`}
           >
-            <span>🔥 งานค้างทั้งหมด</span>
+            <span>🔥 งานรอซ่อม</span>
             {statusCounts?.active !== undefined && (
               <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
                 statusFilter === 'active' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
@@ -220,24 +220,6 @@ export const QueueControls: React.FC<QueueControlsProps> = ({
                 statusFilter === 'cancelled' ? 'bg-white/20 text-white' : 'bg-rose-200 text-rose-900'
               }`}>
                 {statusCounts.cancelled}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => onStatusFilterChange('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex-none flex items-center gap-1.5 ${
-              statusFilter === 'all'
-                ? 'bg-slate-800 text-white shadow-xs'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <span>📋 ทุกรายการ</span>
-            {statusCounts?.all !== undefined && (
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
-                statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
-              }`}>
-                {statusCounts.all}
               </span>
             )}
           </button>

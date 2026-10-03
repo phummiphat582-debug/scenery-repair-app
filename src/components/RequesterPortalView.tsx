@@ -30,8 +30,8 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'create' | 'queue' | 'track'>('create');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDivisionFilter, setSelectedDivisionFilter] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [selectedDivisionFilter, setSelectedDivisionFilter] = useState<string>('84');
+  const [filterStatus, setFilterStatus] = useState<string>('active');
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('all');
   const [isDutyModalOpen, setIsDutyModalOpen] = useState(false);
 
@@ -62,11 +62,14 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
       if (!matchSearch) return false;
 
+      if (filterStatus === 'active' || filterStatus === 'all') {
+        return t.status !== 'completed' && t.status !== 'cancelled';
+      }
       if (filterStatus === 'pending') return t.status === 'pending' || t.status === 'assigned';
       if (filterStatus === 'in_progress') return t.status === 'in_progress' || t.status === 'waiting_parts';
       if (filterStatus === 'completed') return t.status === 'completed' || t.status === 'waiting_inspect';
       if (filterStatus === 'cancelled') return t.status === 'cancelled';
-      return true;
+      return t.status !== 'completed' && t.status !== 'cancelled';
     });
   }, [tickets, searchQuery, filterStatus, selectedDivisionFilter, selectedDeptFilter]);
 
@@ -178,7 +181,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
               className="self-start sm:self-auto px-4 py-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 border border-white/25 shadow-sm cursor-pointer active:scale-95"
             >
               <Shield className="w-4 h-4 text-secondary-fixed" />
-              <span>หน้าระบบช่างรับงาน 🛠️</span>
+              <span>ระบบช่าง 🔒</span>
             </button>
             <span className="text-[11px] text-primary-fixed/80">
               *หน้ารับงานของทีมช่างแยกอยู่อีกส่วน
@@ -457,7 +460,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
               {[
-                { id: 'all', label: 'ทั้งหมด', count: tickets.length },
+                { id: 'active', label: 'งานรอซ่อม', count: tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length },
                 { id: 'pending', label: 'รอรับงาน', count: tickets.filter(t => t.status === 'pending' || t.status === 'assigned').length },
                 { id: 'in_progress', label: 'กำลังซ่อม', count: tickets.filter(t => t.status === 'in_progress' || t.status === 'waiting_parts').length },
                 { id: 'completed', label: 'เสร็จสิ้น', count: tickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length },

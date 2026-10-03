@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { Ticket, Department, ViewMode, SortOrder, Technician } from '../types';
-import { DepartmentTabs } from './DepartmentTabs';
 import { QueueControls } from './QueueControls';
 import { TicketList } from './TicketList';
 import { DepartmentBoard } from './DepartmentBoard';
@@ -25,7 +24,7 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
   onQuickAccept,
   onDeleteTicket
 }) => {
-  const [selectedDivision, setSelectedDivision] = useState<string>('all');
+  const [selectedDivision, setSelectedDivision] = useState<string>('84');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('active');
   const [onlyUrgent, setOnlyUrgent] = useState<boolean>(false);
@@ -33,49 +32,31 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
   const [sortOrder, setSortOrder] = useState<SortOrder>('fifo');
   const [viewMode, setViewMode] = useState<ViewMode>('table');
 
-  // Urgent tickets for banner
+  // Urgent tickets for banner (scoped to current division)
   const urgentTickets = useMemo(() => {
     return tickets.filter(t => 
+      (selectedDivision === 'all' || (t.division || '84') === selectedDivision) &&
       (t.priority === 'critical' || t.priority === 'high' || t.isOverdue) &&
       t.status !== 'completed' && 
       t.status !== 'cancelled'
     );
-  }, [tickets]);
+  }, [tickets, selectedDivision]);
 
-  // Department counts
-  const departmentCounts = useMemo(() => {
-    const map: Record<string, { total: number; urgent: number }> = {};
-    departments.forEach(d => { map[d.name] = { total: 0, urgent: 0 }; });
-
-    tickets.forEach(t => {
-      if (t.status !== 'completed' && t.status !== 'cancelled') {
-        if (!map[t.department]) map[t.department] = { total: 0, urgent: 0 };
-        map[t.department].total++;
-        if (t.priority === 'critical' || t.priority === 'high' || t.isOverdue) {
-          map[t.department].urgent++;
-        }
-      }
-    });
-
-    return map;
-  }, [tickets, departments]);
-
-  const totalActiveCount = useMemo(() => {
-    return tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length;
-  }, [tickets]);
-
-  // Status counts for QueueControls pills
+  // Status counts for QueueControls pills (scoped to selected division)
   const statusCounts = useMemo(() => {
+    const divTickets = selectedDivision === 'all'
+      ? tickets
+      : tickets.filter(t => (t.division || '84') === selectedDivision);
+
     return {
-      active: tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length,
-      pending: tickets.filter(t => t.status === 'pending' || t.status === 'assigned').length,
-      in_progress: tickets.filter(t => t.status === 'in_progress').length,
-      waiting_parts: tickets.filter(t => t.status === 'waiting_parts').length,
-      completed: tickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length,
-      cancelled: tickets.filter(t => t.status === 'cancelled').length,
-      all: tickets.length
+      active: divTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length,
+      pending: divTickets.filter(t => t.status === 'pending' || t.status === 'assigned').length,
+      in_progress: divTickets.filter(t => t.status === 'in_progress').length,
+      waiting_parts: divTickets.filter(t => t.status === 'waiting_parts').length,
+      completed: divTickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length,
+      cancelled: divTickets.filter(t => t.status === 'cancelled').length
     };
-  }, [tickets]);
+  }, [tickets, selectedDivision]);
 
   // Filtered & Sorted tickets
   const filteredTickets = useMemo(() => {
@@ -148,16 +129,7 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
         />
       </div>
 
-      {/* 1. Department Tabs */}
-      <DepartmentTabs
-        departments={departments}
-        selectedDepartment={selectedDepartment}
-        onSelectDepartment={setSelectedDepartment}
-        departmentCounts={departmentCounts}
-        totalActiveCount={totalActiveCount}
-      />
-
-      {/* 2. Urgent Task Alert Ribbon */}
+      {/* 1. Urgent Task Alert Ribbon */}
       <UrgentAlertBanner
         urgentTickets={urgentTickets}
         onViewUrgent={() => setOnlyUrgent(!onlyUrgent)}
