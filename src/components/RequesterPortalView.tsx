@@ -316,40 +316,6 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
         )}
       </div>
 
-      {/* 2.5 Active Department Banner */}
-      <div className="bg-surface-container-lowest rounded-2xl border border-slate-200/90 p-3 sm:p-3.5 shadow-xs flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-base shrink-0 border border-primary/20">
-            {currentDeptObj?.icon || '🏢'}
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
-              {myDepartment ? 'แผนกของคุณ' : 'ยังไม่ได้เลือกแผนก'}
-            </div>
-            <div className="font-extrabold text-xs sm:text-sm text-on-surface truncate flex items-center gap-2">
-              <span className="truncate">{myDepartment || 'แตะเพื่อระบุแผนกของคุณ'}</span>
-              {myDepartment && (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
-                  {myDeptTickets.length} งาน
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            setIsChangingDept(true);
-            setActiveSubTab('track');
-          }}
-          className="px-3 py-1.5 bg-surface-container hover:bg-primary hover:text-white text-on-surface-variant rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer shadow-xs active:scale-95 flex items-center gap-1.5"
-        >
-          <ArrowRightLeft className="w-3.5 h-3.5" />
-          <span>{myDepartment ? 'เปลี่ยนแผนก' : 'เลือกแผนก'}</span>
-        </button>
-      </div>
-
       {/* 3. Top Segmented Tabs: create, department queues, tracking */}
       <div className="grid grid-cols-3 gap-1.5 bg-surface-container-low p-1.5 rounded-2xl border border-slate-200 shadow-xs">
         <button
