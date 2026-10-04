@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Ticket, Technician } from '../types';
+import { Ticket, Technician, PartItem } from '../types';
 import { AssignTechnicianModal } from './AssignTechnicianModal';
 import { ConfirmModal } from './ConfirmModal';
+import { AcceptWorkModal } from './AcceptWorkModal';
+import { CompleteWorkModal } from './CompleteWorkModal';
 import { DivisionBadge } from './DivisionBadge';
 import { getDivisionInfo } from '../data/divisionData';
 import { Clock } from 'lucide-react';
@@ -32,6 +34,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     technician => technician.name.toLowerCase() === (ticket.technicianName || '').toLowerCase()
   );
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false);
+  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [currentTechName, setCurrentTechName] = useState(assignedTechnician?.name || '');
   const [currentTechPhone, setCurrentTechPhone] = useState(
     assignedTechnician?.phone || ''
@@ -40,6 +44,40 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmAcceptWork = async (ticketId: string, technicianName: string, technicianPhone?: string) => {
+    setCurrentTechName(technicianName);
+    if (technicianPhone) setCurrentTechPhone(technicianPhone);
+    await onUpdateTicket(ticketId, {
+      status: 'in_progress',
+      technicianName,
+      technicianPhone: technicianPhone || '',
+      remark: `ช่าง ${technicianName} กดรับงานแล้ว กำลังดำเนินการ`
+    });
+  };
+
+  const handleConfirmCompleteWork = async (
+    ticketId: string,
+    data: {
+      diagnosticReason: string;
+      actionSteps: string;
+      repairResult: string;
+      parts: PartItem[];
+      resultImageUrl?: string;
+    }
+  ) => {
+    await onUpdateTicket(ticketId, {
+      status: 'completed',
+      diagnosticReason: data.diagnosticReason,
+      actionSteps: data.actionSteps,
+      repairResult: data.repairResult,
+      parts: data.parts,
+      resultImageUrl: data.resultImageUrl,
+      completedAt: new Date().toISOString(),
+      remark: 'ช่างบันทึกจบงานซ่อมเรียบร้อย'
+    });
+    onClose();
+  };
 
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
@@ -361,6 +399,31 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
             )}
           </div>
 
+          {/* Section 2.1: After-Repair Photo (ภาพถ่ายหลังการแก้ไข) */}
+          {ticket.resultImageUrl && (
+            <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-3 border border-emerald-300">
+              <div className="flex items-center justify-between">
+                <span className="font-label-lg text-label-lg text-emerald-800 flex items-center gap-2 font-bold">
+                  <span className="material-symbols-outlined text-[20px] text-emerald-600">check_circle</span>
+                  ภาพถ่ายหลังการซ่อม / แก้ไข
+                </span>
+                <span className="font-label-sm text-label-sm text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full font-bold">
+                  ซ่อมเสร็จสมบูรณ์
+                </span>
+              </div>
+              <div className="relative rounded-lg overflow-hidden bg-surface-container shadow-sm group">
+                <img
+                  alt="ภาพหลังการซ่อมแก้ไข"
+                  className="w-full max-h-72 object-contain bg-surface-container transition-transform duration-300 group-hover:scale-105"
+                  src={ticket.resultImageUrl}
+                />
+                <div className="absolute bottom-0 inset-x-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
+                  <p className="font-label-sm text-label-sm text-white font-medium truncate">ภาพยืนยันหลังการซ่อมเสร็จสิ้น</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Section 3: Technician Assignment */}
           <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-3 border border-slate-200/40">
             <div className="flex items-center justify-between">
@@ -444,12 +507,41 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   รายการอะไหล่และอุปกรณ์ที่ใช้
                 </span>
               </div>
+              {ticket.parts && ticket.parts.length > 0 && (
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                  {ticket.parts.length} รายการ
+                </span>
+              )}
             </div>
 
-            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
-              <span className="material-symbols-outlined text-[30px] text-slate-400">inventory_2</span>
-              <p className="mt-1 font-semibold">ยังไม่มีรายการอะไหล่ที่บันทึก</p>
-            </div>
+            {ticket.parts && ticket.parts.length > 0 ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3 space-y-2">
+                <div className="text-xs font-bold text-emerald-800 mb-1">
+                  อะไหล่ที่เปลี่ยนในงานนี้:
+                </div>
+                <div className="divide-y divide-emerald-100">
+                  {ticket.parts.map((p, idx) => (
+                    <div key={idx} className="py-2 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-emerald-200 text-emerald-800 font-bold flex items-center justify-center text-[10px]">
+                          {idx + 1}
+                        </span>
+                        <span className="font-semibold text-slate-800">{p.name}</span>
+                      </div>
+                      <div className="font-bold text-emerald-700">
+                        {p.quantity} {p.unit || 'ชิ้น'}
+                        {p.cost ? ` (${p.cost.toLocaleString()} บ.)` : ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+                <span className="material-symbols-outlined text-[30px] text-slate-400">inventory_2</span>
+                <p className="mt-1 font-semibold">ยังไม่มีรายการอะไหล่ที่บันทึก</p>
+              </div>
+            )}
 
             <button
               onClick={() => {
@@ -473,19 +565,19 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
             <div className="flex flex-col gap-1">
               <label className="font-label-md text-label-md text-on-surface-variant font-semibold">
-                สาเหตุข้อบกพร่องที่พบ
+                สาเหตุของปัญหาที่ตรวจพบ
               </label>
               <div className="p-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md">
-                {ticket.description || 'ยังไม่มีรายละเอียดอาการที่บันทึก'}
+                {ticket.diagnosticReason || ticket.description || 'ยังไม่มีรายละเอียดอาการที่บันทึก'}
               </div>
             </div>
 
             <div className="flex flex-col gap-1">
               <label className="font-label-md text-label-md text-on-surface-variant font-semibold">
-                ขั้นตอนดำเนินการแก้ไข
+                ขั้นตอนและวิธีดำเนินการแก้ไข
               </label>
-              <div className="p-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md">
-                {ticket.repairResult || 'ยังไม่มีบันทึกขั้นตอนการแก้ไข'}
+              <div className="p-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md whitespace-pre-line">
+                {ticket.actionSteps || ticket.repairResult || 'ยังไม่มีบันทึกขั้นตอนการแก้ไข'}
               </div>
             </div>
           </div>
@@ -494,23 +586,23 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
           <div className="flex flex-col gap-2.5 pt-2">
             {ticket.status === 'pending' && (
               <button
-                onClick={() => handleStatusChange('in_progress', 'รับงานซ่อมและเริ่มดำเนินการ')}
+                onClick={() => setIsAcceptModalOpen(true)}
                 className="w-full h-12 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer font-bold"
                 type="button"
               >
                 <span className="material-symbols-outlined text-[20px]">play_circle</span>
-                กดรับงานซ่อม (เริ่มดำเนินการ)
+                กดรับงานซ่อม (ลงชื่อช่าง / เริ่มดำเนินการ)
               </button>
             )}
 
             {ticket.status !== 'completed' && ticket.status !== 'cancelled' && (
               <button
-                onClick={() => handleStatusChange('completed', 'บันทึกปิดงานซ่อมเรียบร้อย')}
+                onClick={() => setIsCompleteModalOpen(true)}
                 className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer font-bold"
                 type="button"
               >
                 <span className="material-symbols-outlined text-[20px]">check_circle</span>
-                ปิดงานซ่อม / เสร็จสิ้นสมบูรณ์ (Completed)
+                บันทึกซ่อมเสร็จ / จบงาน (ลงสาเหตุ, วิธีแก้, อะไหล่, รูป)
               </button>
             )}
 
@@ -632,6 +724,23 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* Self-Service Accept Work Modal */}
+      <AcceptWorkModal
+        isOpen={isAcceptModalOpen}
+        onClose={() => setIsAcceptModalOpen(false)}
+        ticket={ticket}
+        technicians={technicians}
+        onConfirmAccept={handleConfirmAcceptWork}
+      />
+
+      {/* Detailed Completion Record Modal */}
+      <CompleteWorkModal
+        isOpen={isCompleteModalOpen}
+        onClose={() => setIsCompleteModalOpen(false)}
+        ticket={ticket}
+        onConfirmComplete={handleConfirmCompleteWork}
+      />
     </div>
   );
 };

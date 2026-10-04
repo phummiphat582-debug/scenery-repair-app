@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Ticket, Technician } from '../types';
+import { Ticket, Technician, PartItem } from '../types';
 import { ConfirmModal } from './ConfirmModal';
-import { Phone, CheckCircle2, Clock, Wrench, AlertTriangle, AlertCircle, Eye, Check, ChevronRight, Package, RefreshCw, MapPin } from 'lucide-react';
+import { AcceptWorkModal } from './AcceptWorkModal';
+import { CompleteWorkModal } from './CompleteWorkModal';
+import { Phone, CheckCircle2, Clock, Wrench, AlertTriangle, AlertCircle, Eye, Check, ChevronRight, Package, RefreshCw, MapPin, Image as ImageIcon } from 'lucide-react';
 import { getTicketAgingInfo } from '../lib/ticketAging';
 
 interface TechnicianTasksViewProps {
@@ -24,6 +26,8 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
   const [activeTab, setActiveTab] = useState<'today' | 'waiting' | 'history'>('today');
   const [selectedZone, setSelectedZone] = useState<string>('all');
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [acceptModalTicket, setAcceptModalTicket] = useState<Ticket | null>(null);
+  const [completeModalTicket, setCompleteModalTicket] = useState<Ticket | null>(null);
 
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
@@ -93,46 +97,47 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
     return tabFilteredTasks.filter(t => t.department === selectedZone);
   }, [tabFilteredTasks, selectedZone]);
 
-  const handleAcceptWork = (ticket: Ticket) => {
-    setConfirmConfig({
-      isOpen: true,
-      title: 'ยืนยันการรับงานซ่อม',
-      message: `คุณต้องการรับงาน #${ticket.requestId} ("${ticket.title}") เข้าสู่สถานะกำลังดำเนินการ ใช่หรือไม่?`,
-      confirmText: 'ยืนยันรับงาน',
-      cancelText: 'ยกเลิก',
-      confirmVariant: 'primary',
-      onConfirm: async () => {
-        setAcceptingId(ticket.id);
-        setConfirmConfig(null);
-        try {
-          await onUpdateTicketStatus(ticket.id, {
-            status: 'in_progress',
-            technicianName: currentTech.name,
-            technicianPhone: currentTech.phone || '',
-            remark: 'ช่างกดรับงานแล้ว กำลังเข้าตรวจสอบหน้างาน'
-          });
-        } finally {
-          setAcceptingId(null);
-        }
-      }
-    });
+  const handleOpenAcceptModal = (ticket: Ticket) => {
+    setAcceptModalTicket(ticket);
   };
 
-  const handleCompleteWork = (ticket: Ticket) => {
-    setConfirmConfig({
-      isOpen: true,
-      title: 'ยืนยันส่งตรวจรับงานซ่อม',
-      message: `ยืนยันว่าการซ่อมใบงาน #${ticket.requestId} เสร็จสิ้นแล้ว และส่งมอบให้ผู้ตรวจรับ ใช่หรือไม่?`,
-      confirmText: 'ส่งตรวจรับงาน',
-      cancelText: 'ยกเลิก',
-      confirmVariant: 'success',
-      onConfirm: async () => {
-        setConfirmConfig(null);
-        await onUpdateTicketStatus(ticket.id, {
-          status: 'waiting_inspect',
-          repairResult: ticket.repairResult || 'ดำเนินการแก้ไขเสร็จสิ้น ทดสอบการใช้งานปกติ'
-        });
-      }
+  const handleConfirmAcceptModal = async (ticketId: string, technicianName: string, technicianPhone?: string) => {
+    setAcceptingId(ticketId);
+    try {
+      await onUpdateTicketStatus(ticketId, {
+        status: 'in_progress',
+        technicianName,
+        technicianPhone: technicianPhone || '',
+        remark: `ช่าง ${technicianName} กดรับงานแล้ว กำลังเข้าดำเนินการ`
+      });
+    } finally {
+      setAcceptingId(null);
+    }
+  };
+
+  const handleOpenCompleteModal = (ticket: Ticket) => {
+    setCompleteModalTicket(ticket);
+  };
+
+  const handleConfirmCompleteModal = async (
+    ticketId: string,
+    data: {
+      diagnosticReason: string;
+      actionSteps: string;
+      repairResult: string;
+      parts: PartItem[];
+      resultImageUrl?: string;
+    }
+  ) => {
+    await onUpdateTicketStatus(ticketId, {
+      status: 'completed',
+      diagnosticReason: data.diagnosticReason,
+      actionSteps: data.actionSteps,
+      repairResult: data.repairResult,
+      parts: data.parts,
+      resultImageUrl: data.resultImageUrl,
+      completedAt: new Date().toISOString(),
+      remark: 'ช่างบันทึกจบงานซ่อมเรียบร้อย'
     });
   };
 
@@ -434,17 +439,98 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
                   )}
                 </div>
 
+                {/* Completed Details: Root Cause, Solution, Replaced Parts, After-Repair Image */}
+                {ticket.status === 'completed' && (
+                  <div className="pl-1.5 pt-2 border-t border-emerald-100">
+                    <div className="p-3 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 text-xs flex flex-col gap-2">
+                      <div className="flex items-center gap-1.5 font-bold text-emerald-800">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>บันทึกการซ่อมเสร็จสิ้น</span>
+                        {ticket.completedAt && (
+                          <span className="text-[10px] text-emerald-700 font-normal ml-auto">
+                            {new Date(ticket.completedAt).toLocaleDateString('th-TH', {
+                              day: 'numeric',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        )}
+                      </div>
+
+                      {ticket.diagnosticReason && (
+                        <div>
+                          <span className="font-bold text-slate-800">สาเหตุของปัญหา: </span>
+                          <span className="text-slate-700">{ticket.diagnosticReason}</span>
+                        </div>
+                      )}
+
+                      {ticket.actionSteps && (
+                        <div>
+                          <span className="font-bold text-slate-800">วิธีแก้ไข / การซ่อม: </span>
+                          <span className="text-slate-700">{ticket.actionSteps}</span>
+                        </div>
+                      )}
+
+                      {!ticket.diagnosticReason && !ticket.actionSteps && ticket.repairResult && (
+                        <div>
+                          <span className="font-bold text-slate-800">ผลการดำเนินการ: </span>
+                          <p className="text-slate-700 whitespace-pre-line mt-0.5">{ticket.repairResult}</p>
+                        </div>
+                      )}
+
+                      {ticket.parts && ticket.parts.length > 0 && (
+                        <div>
+                          <span className="font-bold text-slate-800">อะไหล่ที่เปลี่ยน: </span>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {ticket.parts.map((p, pIdx) => (
+                              <span key={pIdx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-emerald-200 text-slate-700 font-medium text-[11px]">
+                                <Package className="w-3 h-3 text-emerald-600" />
+                                <span>{p.name}</span>
+                                <span className="font-bold text-emerald-700">x{p.quantity}</span>
+                                {p.unit && <span className="text-slate-500">{p.unit}</span>}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {ticket.resultImageUrl && (
+                        <div className="pt-1">
+                          <span className="block font-bold text-slate-800 mb-1">รูปภาพหลังแก้ไข:</span>
+                          <a
+                            href={ticket.resultImageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block relative rounded-xl overflow-hidden border border-emerald-300 shadow-xs max-h-36 hover:opacity-95 transition-opacity"
+                          >
+                            <img
+                              src={ticket.resultImageUrl}
+                              alt="รูปหลังแก้ไข"
+                              className="max-h-36 w-auto object-cover rounded-xl"
+                            />
+                            <div className="absolute bottom-1 right-1 px-2 py-0.5 bg-black/60 text-white text-[10px] font-bold rounded-md flex items-center gap-1">
+                              <ImageIcon className="w-3 h-3" />
+                              <span>แตะเพื่อดูภาพใหญ่</span>
+                            </div>
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Action Buttons */}
                 <div className="pl-1.5 grid grid-cols-2 gap-2 pt-1">
                   {isPending ? (
                     <button
                       type="button"
                       disabled={acceptingId === ticket.id}
-                      onClick={() => handleAcceptWork(ticket)}
+                      onClick={() => handleOpenAcceptModal(ticket)}
                       className="col-span-2 py-3 bg-primary hover:bg-primary-container text-white rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                     >
                       <Check className="w-4 h-4" />
-                      <span>{acceptingId === ticket.id ? 'กำลังบันทึก...' : 'แตะเพื่อรับงาน (Accept Work)'}</span>
+                      <span>{acceptingId === ticket.id ? 'กำลังบันทึก...' : 'แตะเพื่อรับงาน (ลงชื่อช่าง)'}</span>
                     </button>
                   ) : isInProgress ? (
                     <>
@@ -454,15 +540,39 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
                         className="py-2.5 bg-surface-container hover:bg-surface-container-high text-primary rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         <Package className="w-4 h-4" />
-                        <span>เบิกอะไหล่ / บันทึกผล</span>
+                        <span>เบิกอะไหล่</span>
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleCompleteWork(ticket)}
+                        onClick={() => handleOpenCompleteModal(ticket)}
                         className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer active:scale-98"
                       >
                         <CheckCircle2 className="w-4 h-4" />
-                        <span>ส่งตรวจรับงาน</span>
+                        <span>บันทึกจบงานซ่อม</span>
+                      </button>
+                    </>
+                  ) : ticket.status === 'waiting_parts' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await onUpdateTicketStatus(ticket.id, {
+                            status: 'in_progress',
+                            remark: 'ได้รับอะไหล่แล้ว เริ่มดำเนินการซ่อมต่อ'
+                          });
+                        }}
+                        className="py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer active:scale-98"
+                      >
+                        <Wrench className="w-4 h-4" />
+                        <span>เริ่มซ่อมต่อ</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCompleteModal(ticket)}
+                        className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer active:scale-98"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>บันทึกจบงานซ่อม</span>
                       </button>
                     </>
                   ) : null}
@@ -508,6 +618,23 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
           onCancel={() => setConfirmConfig(null)}
         />
       )}
+
+      {/* Self-Service Accept Work Modal */}
+      <AcceptWorkModal
+        isOpen={!!acceptModalTicket}
+        onClose={() => setAcceptModalTicket(null)}
+        ticket={acceptModalTicket}
+        technicians={technicians}
+        onConfirmAccept={handleConfirmAcceptModal}
+      />
+
+      {/* Detailed Completion Record Modal */}
+      <CompleteWorkModal
+        isOpen={!!completeModalTicket}
+        onClose={() => setCompleteModalTicket(null)}
+        ticket={completeModalTicket}
+        onConfirmComplete={handleConfirmCompleteModal}
+      />
 
     </div>
   );

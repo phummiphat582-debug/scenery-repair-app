@@ -53,6 +53,7 @@ export interface PartItem {
   code: string;
   quantity: number;
   cost: number;
+  unit?: string;
   status?: string;
 }
 

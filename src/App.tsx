@@ -9,6 +9,7 @@ import { RequesterPortalView } from './components/RequesterPortalView';
 import { RoleLoginModal } from './components/RoleLoginModal';
 import { DailyDutyModal } from './components/DailyDutyModal';
 import { ConfirmModal } from './components/ConfirmModal';
+import { AcceptWorkModal } from './components/AcceptWorkModal';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { MigrationModal } from './components/MigrationModal';
 import { TechnicianRosterModal } from './components/TechnicianRosterModal';
@@ -436,26 +437,22 @@ export const App: React.FC = () => {
         onScanResult={handleQRScanResult}
       />
 
-      {/* Quick Accept Confirmation Modal */}
+      {/* Quick Accept Technician Modal (ใครก็กดรับงานได้ / ลงชื่อช่าง) */}
       {quickAcceptTicket && (
-        <ConfirmModal
+        <AcceptWorkModal
           isOpen={!!quickAcceptTicket}
-          title="ยืนยันการรับงานซ่อม"
-          message={`คุณต้องการรับงาน #${quickAcceptTicket.requestId} ("${quickAcceptTicket.title}") เข้าสู่สถานะกำลังดำเนินการ ใช่หรือไม่?`}
-          confirmText="ยืนยันรับงาน"
-          cancelText="ยกเลิก"
-          confirmVariant="primary"
-          onConfirm={async () => {
-            const activeTech = technicians.find(t => t.isOnDutyToday)?.name || technicians[0]?.name || '';
-            const activePhone = technicians.find(t => t.isOnDutyToday)?.phone || technicians[0]?.phone || '';
-            await handleUpdateTicket(quickAcceptTicket.id, {
+          onClose={() => setQuickAcceptTicket(null)}
+          ticket={quickAcceptTicket}
+          technicians={technicians}
+          onConfirmAccept={async (ticketId, technicianName, technicianPhone) => {
+            await handleUpdateTicket(ticketId, {
               status: 'in_progress',
-              technicianName: activeTech,
-              technicianPhone: activePhone
+              technicianName,
+              technicianPhone: technicianPhone || '',
+              remark: `ช่าง ${technicianName} กดรับงานแล้ว กำลังดำเนินการ`
             });
             setQuickAcceptTicket(null);
           }}
-          onCancel={() => setQuickAcceptTicket(null)}
         />
       )}
 

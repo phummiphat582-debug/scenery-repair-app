@@ -31,6 +31,21 @@ function removeLegacyDemoTechnicians(technicians: Technician[]): Technician[] {
 
 // Database mapping utilities (PostgreSQL snake_case <-> Frontend camelCase)
 function dbToTicket(row: any): Ticket {
+  let diagnosticReason = row.diagnostic_reason || row.diagnosticReason;
+  let actionSteps = row.action_steps || row.actionSteps;
+  const parts = row.parts;
+  const repairResult = row.repair_result || row.repairResult || '';
+
+  // Extract from combined repairResult if not directly present in columns
+  if (!diagnosticReason && repairResult) {
+    const diagMatch = repairResult.match(/สาเหตุ(?:ของปัญหา)?:\s*([^\n\r]+)/);
+    if (diagMatch) diagnosticReason = diagMatch[1].trim();
+  }
+  if (!actionSteps && repairResult) {
+    const actionMatch = repairResult.match(/วิธีแก้ไข(?:[^:\n\r]+)?:\s*([^\n\r]+)/);
+    if (actionMatch) actionSteps = actionMatch[1].trim();
+  }
+
   return {
     id: String(row.id),
     requestId: row.request_id || row.requestId || String(row.id),
@@ -44,14 +59,17 @@ function dbToTicket(row: any): Ticket {
     status: row.status || 'pending',
     technicianName: row.technician_name || row.technicianName || '',
     technicianPhone: row.technician_phone || row.technicianPhone || '',
-    repairResult: row.repair_result || row.repairResult || '',
+    repairResult,
     remark: row.remark || '',
     requestImageUrl: row.request_image_url || row.requestImageUrl || '',
     resultImageUrl: row.result_image_url || row.resultImageUrl || '',
     division: (row.division as DivisionId) || '84',
     createdAt: row.created_at || row.createdAt || new Date().toISOString(),
     updatedAt: row.updated_at || row.updatedAt || new Date().toISOString(),
-    completedAt: row.completed_at || row.completedAt || undefined
+    completedAt: row.completed_at || row.completedAt || undefined,
+    diagnosticReason,
+    actionSteps,
+    parts: Array.isArray(parts) ? parts : undefined
   };
 }
 
