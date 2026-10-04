@@ -2,6 +2,7 @@ import React from 'react';
 import { Clock, MapPin, User, CheckCircle, AlertTriangle, Zap, Wrench, ChevronRight, Trash2, Image as ImageIcon } from 'lucide-react';
 import { Ticket, Department } from '../types';
 import { DivisionBadge } from './DivisionBadge';
+import { getTicketAgingInfo } from '../lib/ticketAging';
 
 interface TicketCardProps {
   ticket: Ticket;
@@ -18,6 +19,8 @@ export const TicketCard: React.FC<TicketCardProps> = ({
   onQuickAccept,
   onDeleteTicket
 }) => {
+  const aging = getTicketAgingInfo(ticket);
+
   // Priority styles
   const priorityConfig = {
     critical: { label: '🚨 ด่วนที่สุด', bg: 'bg-rose-100 text-rose-800 border-rose-200' },
@@ -57,15 +60,10 @@ export const TicketCard: React.FC<TicketCardProps> = ({
               </span>
             )}
 
-            {/* Waiting Time Badge */}
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium ${
-              ticket.isOverdue
-                ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200'
-                : 'bg-slate-100 text-slate-600'
-            }`}>
+            {/* Waiting Time / Aging Badge */}
+            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[11px] font-semibold ${aging.badgeClass}`} title={aging.label}>
               <Clock className="w-3 h-3" />
-              <span>{ticket.waitingDurationText}</span>
-              {ticket.isOverdue && <span className="text-rose-600">(ค้างเกิน 3 วัน)</span>}
+              <span>{aging.label}</span>
             </span>
           </div>
 

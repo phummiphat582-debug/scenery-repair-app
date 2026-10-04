@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Ticket, Technician } from '../types';
 import { ConfirmModal } from './ConfirmModal';
 import { Phone, CheckCircle2, Clock, Wrench, AlertTriangle, AlertCircle, Eye, Check, ChevronRight, Package, RefreshCw, MapPin } from 'lucide-react';
+import { getTicketAgingInfo } from '../lib/ticketAging';
 
 interface TechnicianTasksViewProps {
   tickets: Ticket[];
@@ -64,6 +65,21 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
       return tickets.filter(t => t.status === 'completed' || t.status === 'cancelled');
     }
   }, [tickets, activeTab]);
+
+  // Sequential department queue numbers for active tickets
+  const departmentQueueNumbers = useMemo(() => {
+    const counters = new Map<string, number>();
+    const numbers = new Map<string, number>();
+    [...tickets]
+      .filter(t => t.status !== 'completed' && t.status !== 'cancelled')
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .forEach(ticket => {
+        const next = (counters.get(ticket.department) || 0) + 1;
+        counters.set(ticket.department, next);
+        numbers.set(ticket.id, next);
+      });
+    return numbers;
+  }, [tickets]);
 
   // Distinct departments in tickets for filter
   const availableDepts = useMemo(() => {
@@ -319,6 +335,9 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
             const isInProgress = ticket.status === 'in_progress';
             const isWaitingParts = ticket.status === 'waiting_parts';
             const isCritical = ticket.priority === 'critical' || ticket.priority === 'high';
+            const queueNum = departmentQueueNumbers.get(ticket.id);
+            const aging = getTicketAgingInfo(ticket);
+            const isActive = ticket.status !== 'completed' && ticket.status !== 'cancelled';
 
             return (
               <article 
@@ -330,20 +349,36 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
                   isCritical ? 'bg-red-500' : isInProgress ? 'bg-emerald-500' : 'bg-amber-500'
                 }`}></div>
 
-                {/* Card Top: Request ID, Priority, Date */}
+                {/* Card Top: Request ID, Queue, Priority, Aging, Date */}
                 <div className="pl-1.5 flex items-start justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {isActive && queueNum ? (
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold shadow-2xs ${
+                        queueNum === 1 ? 'bg-amber-500 text-white ring-2 ring-amber-300' : 'bg-primary text-white'
+                      }`}>
+                        คิวที่ #{queueNum}
+                      </span>
+                    ) : null}
+
                     <span className="font-mono text-xs font-extrabold text-primary bg-primary-fixed/40 px-2.5 py-1 rounded-full">
                       #{ticket.requestId}
                     </span>
+
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface">
+                      {ticket.department}
+                    </span>
+
+                    {/* Aging Badge (งานค้างกี่วัน) */}
+                    <span className={`text-[11px] px-2.5 py-0.5 rounded-full flex items-center gap-1 ${aging.badgeClass}`} title={aging.label}>
+                      <Clock className="w-3 h-3 shrink-0" />
+                      <span>{aging.badgeText}</span>
+                    </span>
+
                     {isCritical && (
                       <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold text-[11px] border border-red-200 animate-pulse">
                         ด่วนมาก
                       </span>
                     )}
-                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface">
-                      {ticket.department}
-                    </span>
                   </div>
 
                   <span className="text-[11px] text-on-surface-variant flex items-center gap-1 shrink-0">

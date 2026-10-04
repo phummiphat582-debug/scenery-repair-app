@@ -1,6 +1,7 @@
 import { Ticket, Department, Technician, SortOrder, DivisionId } from '../types';
 import { INITIAL_DEPARTMENTS } from '../data/mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { getTicketAgingInfo } from '../lib/ticketAging';
 
 const LOCAL_STORAGE_TICKETS = 'scenery_repair_v5_tickets';
 const LOCAL_STORAGE_DEPTS = 'scenery_repair_v5_departments';
@@ -822,23 +823,12 @@ class TicketService {
     let list: Ticket[] = [...this.tickets];
     const now = Date.now();
 
-    // Compute UI fields: ageDays, waitingDurationText, isOverdue
+    // Compute UI fields: ageDays, waitingDurationText, isOverdue using unified aging utility
     list.forEach(ticket => {
-      const createdMs = new Date(ticket.createdAt).getTime();
-      const diffMs = Math.max(0, now - createdMs);
-      const ageDays = Math.floor(diffMs / 86400000);
-      const hours = Math.floor((diffMs % 86400000) / 3600000);
-
-      ticket.ageDays = ageDays;
-      ticket.isOverdue = ageDays >= 3 && ticket.status !== 'completed' && ticket.status !== 'cancelled';
-
-      if (ageDays > 0) {
-        ticket.waitingDurationText = `รอมาแล้ว ${ageDays} วัน ${hours > 0 ? hours + ' ชม.' : ''}`.trim();
-      } else if (hours > 0) {
-        ticket.waitingDurationText = `รอมาแล้ว ${hours} ชม.`;
-      } else {
-        ticket.waitingDurationText = 'เพิ่งแจ้งเมื่อสักครู่';
-      }
+      const aging = getTicketAgingInfo(ticket);
+      ticket.ageDays = aging.days;
+      ticket.isOverdue = aging.isOverdue;
+      ticket.waitingDurationText = aging.label;
 
       // Auto-resolve technician phone number if missing
       if (ticket.technicianName && !ticket.technicianPhone) {

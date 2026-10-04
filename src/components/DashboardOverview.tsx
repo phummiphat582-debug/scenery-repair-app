@@ -3,6 +3,7 @@ import { Ticket, Department, Technician } from '../types';
 import { ConfirmModal } from './ConfirmModal';
 import { DivisionBadge } from './DivisionBadge';
 import { DivisionFilterTabs } from './DivisionFilterTabs';
+import { getTicketAgingInfo } from '../lib/ticketAging';
 import {
   Wrench,
   AlertTriangle,
@@ -416,6 +417,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             const isWaitingParts = ticket.status === 'waiting_parts';
             const isCompleted = ticket.status === 'completed' || ticket.status === 'waiting_inspect';
             const isEmergency = ticket.priority === 'critical' || ticket.priority === 'high';
+            const aging = getTicketAgingInfo(ticket);
 
             // Accent strip color
             let stripColor = 'bg-primary-container';
@@ -439,6 +441,13 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                         #{ticket.requestId}
                       </span>
                       <DivisionBadge division={ticket.division} size="sm" />
+                      
+                      {/* Aging Badge (งานค้างกี่วัน) */}
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 ${aging.badgeClass}`} title={aging.label}>
+                        <Clock className="w-3 h-3" />
+                        <span>{aging.badgeText}</span>
+                      </span>
+
                       {ticket.category && (
                         <span className="px-2 py-0.5 rounded-full bg-primary-fixed/40 text-primary font-bold text-[10px]">
                           {ticket.category}

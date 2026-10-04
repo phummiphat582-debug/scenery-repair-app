@@ -4,6 +4,8 @@ import { AssignTechnicianModal } from './AssignTechnicianModal';
 import { ConfirmModal } from './ConfirmModal';
 import { DivisionBadge } from './DivisionBadge';
 import { getDivisionInfo } from '../data/divisionData';
+import { Clock } from 'lucide-react';
+import { getTicketAgingInfo } from '../lib/ticketAging';
 
 interface TaskDetailsModalProps {
   ticket: Ticket | null;
@@ -50,6 +52,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   } | null>(null);
 
   const isEmergency = ticket.priority === 'critical' || ticket.priority === 'high';
+  const aging = getTicketAgingInfo(ticket);
   const requestImageUrl = ticket.requestImageUrl && ticket.requestImageUrl !== '-'
     ? ticket.requestImageUrl
     : '';
@@ -191,6 +194,10 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   #{ticket.requestId}
                 </span>
                 <DivisionBadge division={ticket.division} size="sm" />
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${aging.badgeClass}`} title={aging.label}>
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>{aging.label}</span>
+                </span>
                 <span className="font-body-sm text-body-sm text-on-surface-variant truncate">
                   {createdAtText}
                 </span>

@@ -3,6 +3,7 @@ import { Ticket, Department, Technician } from '../types';
 import { Phone, CheckCircle2, Clock, Wrench, AlertTriangle, ChevronRight, Eye, Trash2 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 import { DivisionBadge } from './DivisionBadge';
+import { getTicketAgingInfo } from '../lib/ticketAging';
 
 interface QueueTableViewProps {
   tickets: Ticket[];
@@ -28,6 +29,20 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
     departments.forEach(d => map.set(d.name, d));
     return map;
   }, [departments]);
+
+  const departmentQueueNumbers = React.useMemo(() => {
+    const counters = new Map<string, number>();
+    const numbers = new Map<string, number>();
+    [...tickets]
+      .filter(t => t.status !== 'completed' && t.status !== 'cancelled')
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .forEach(ticket => {
+        const next = (counters.get(ticket.department) || 0) + 1;
+        counters.set(ticket.department, next);
+        numbers.set(ticket.id, next);
+      });
+    return numbers;
+  }, [tickets]);
 
   const getPriorityBadge = (p: string) => {
     switch (p) {
@@ -105,6 +120,8 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
               {tickets.map((ticket, idx) => {
                 const isPending = ticket.status === 'pending';
                 const queueNo = ticket.queueNumber || (idx + 1);
+                const deptQueueNo = departmentQueueNumbers.get(ticket.id);
+                const aging = getTicketAgingInfo(ticket);
 
                 return (
                   <tr 
@@ -114,15 +131,22 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
                   >
                     {/* คิวที่ */}
                     <td className="py-3.5 px-4 text-center">
-                      <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-xs ${
-                        ticket.priority === 'critical'
-                          ? 'bg-red-600 text-white shadow-xs'
-                          : isPending
-                          ? 'bg-amber-100 text-amber-900 border border-amber-300 font-extrabold'
-                          : 'bg-surface-container-high text-on-surface'
-                      }`}>
-                        #{queueNo}
-                      </span>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-xs ${
+                          ticket.priority === 'critical'
+                            ? 'bg-red-600 text-white shadow-xs'
+                            : isPending
+                            ? 'bg-amber-100 text-amber-900 border border-amber-300 font-extrabold'
+                            : 'bg-surface-container-high text-on-surface'
+                        }`}>
+                          #{queueNo}
+                        </span>
+                        {deptQueueNo && ticket.status !== 'completed' && ticket.status !== 'cancelled' && (
+                          <span className="text-[10px] font-bold text-primary bg-primary-fixed/30 px-1.5 py-0.2 rounded whitespace-nowrap">
+                            แผนก #{deptQueueNo}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* รหัส & วันที่ */}
@@ -137,6 +161,13 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
                           hour: '2-digit',
                           minute: '2-digit'
                         })}
+                      </div>
+                      {/* Aging Badge (งานค้างกี่วัน) */}
+                      <div className="mt-1">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${aging.badgeClass}`} title={aging.label}>
+                          <Clock className="w-2.5 h-2.5" />
+                          <span>{aging.badgeText}</span>
+                        </span>
                       </div>
                     </td>
 
