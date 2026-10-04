@@ -189,11 +189,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 <div className="mt-space-sm flex items-center gap-space-xs">
                   <button
                     onClick={() => onQuickAssign(emergencyTicket)}
-                    className="flex items-center justify-center gap-1.5 bg-error text-on-error px-4 py-2 rounded-lg font-label-md text-label-md shadow active:scale-95 transition-transform min-h-[44px] cursor-pointer"
+                    className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-label-md text-label-md shadow active:scale-95 transition-transform min-h-[44px] cursor-pointer"
                     type="button"
                   >
-                    <UserPlus className="w-4 h-4 shrink-0" />
-                    <span>มอบหมายทันที</span>
+                    <Wrench className="w-4 h-4 shrink-0" />
+                    <span>กดรับงานเองเลย</span>
                   </button>
                   <button
                     onClick={() => onSelectTicket(emergencyTicket)}
@@ -273,7 +273,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           {/* Card: Pending */}
           <div className="min-w-[130px] flex-shrink-0 bg-surface-container-lowest rounded-xl p-space-sm shadow-sm flex flex-col justify-between border border-slate-200/40">
             <div className="flex items-center justify-between text-on-secondary-fixed-variant">
-              <span className="font-label-sm text-label-sm font-medium">รอมอบหมาย</span>
+              <span className="font-label-sm text-label-sm font-medium">รอช่างรับงาน</span>
               <Clock className="w-4 h-4 text-secondary" />
             </div>
             <div className="mt-2 flex items-baseline gap-1">

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Ticket, Technician, PartItem } from '../types';
-import { AssignTechnicianModal } from './AssignTechnicianModal';
 import { ConfirmModal } from './ConfirmModal';
 import { AcceptWorkModal } from './AcceptWorkModal';
 import { CompleteWorkModal } from './CompleteWorkModal';
@@ -33,7 +32,6 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const assignedTechnician = technicians.find(
     technician => technician.name.toLowerCase() === (ticket.technicianName || '').toLowerCase()
   );
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isAcceptModalOpen, setIsAcceptModalOpen] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [currentTechName, setCurrentTechName] = useState(assignedTechnician?.name || '');
@@ -98,7 +96,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });
   const statusLabels: Record<string, string> = {
-    pending: 'รอตรวจสอบ', assigned: 'มอบหมายแล้ว', received: 'รับงานแล้ว',
+    pending: 'รอช่างรับงาน', assigned: 'รับงานแล้ว', received: 'รับงานแล้ว',
     in_progress: 'กำลังดำเนินการ', waiting_parts: 'รออะไหล่',
     waiting_inspect: 'รอตรวจรับ', completed: 'เสร็จสิ้น', cancelled: 'ยกเลิก'
   };
@@ -121,9 +119,9 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     }
   };
 
-  // Step mapping - Only 4 core steps: 1. รอตรวจสอบ, 2. รับงานแล้ว, 3. รออะไหล่, 4. เสร็จสิ้น
+  // Step mapping - Only 4 core steps: 1. รอช่างรับงาน, 2. รับงานแล้ว, 3. รออะไหล่, 4. เสร็จสิ้น
   const steps = [
-    { id: 'pending', label: '1. รอตรวจสอบ', sub: 'รอรับเรื่อง' },
+    { id: 'pending', label: '1. รอรับงาน', sub: 'รอช่างกดรับ' },
     { id: 'in_progress', label: '2. รับงานแล้ว', sub: 'กำลังดำเนินการ' },
     { id: 'waiting_parts', label: '3. รออะไหล่', sub: 'สั่งซื้อ/รอของ' },
     { id: 'completed', label: '4. เสร็จสิ้น', sub: 'ปิดงานเรียบร้อย' }
@@ -173,27 +171,6 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
         await onUpdateTicket(ticket.id, updates);
         setConfirmConfig(null);
         onClose();
-      }
-    });
-  };
-
-  const handleAssignTech = (newTech: string, newPhone?: string) => {
-    setConfirmConfig({
-      isOpen: true,
-      title: 'ยืนยันการมอบหมายช่าง',
-      message: `ยืนยันการมอบหมายงานซ่อมให้ "${newTech}" ${newPhone ? `(เบอร์โทร: ${newPhone})` : ''} ใช่หรือไม่?`,
-      confirmText: 'ยืนยันมอบหมาย',
-      cancelText: 'ยกเลิก',
-      confirmVariant: 'primary',
-      onConfirm: async () => {
-        setCurrentTechName(newTech);
-        if (newPhone !== undefined) setCurrentTechPhone(newPhone);
-        await onUpdateTicket(ticket.id, { 
-          technicianName: newTech, 
-          technicianPhone: newPhone || currentTechPhone,
-          status: 'in_progress' 
-        });
-        setConfirmConfig(null);
       }
     });
   };
@@ -424,78 +401,99 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
             </div>
           )}
 
-          {/* Section 3: Technician Assignment */}
+          {/* Section 3: Technician In Charge / Self-service Acceptance */}
           <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-3 border border-slate-200/40">
             <div className="flex items-center justify-between">
               <span className="font-label-lg text-label-lg text-on-surface flex items-center gap-2 font-bold">
                 <span className="material-symbols-outlined text-[20px] text-primary">engineering</span>
-                ช่างผู้รับผิดชอบหลัก
+                ช่างผู้รับงาน
               </span>
-              <button
-                className="px-2.5 py-1 bg-surface-container text-on-surface rounded-md font-label-sm text-label-sm hover:bg-surface-container-high transition-colors cursor-pointer font-semibold"
-                onClick={() => setIsAssignModalOpen(true)}
-                type="button"
-              >
-                เปลี่ยน / เพิ่มช่าง
-              </button>
+              {currentTechName && (
+                <button
+                  className="px-2.5 py-1 bg-surface-container text-on-surface rounded-md font-label-sm text-label-sm hover:bg-surface-container-high transition-colors cursor-pointer font-semibold"
+                  onClick={() => setIsAcceptModalOpen(true)}
+                  type="button"
+                >
+                  เปลี่ยนช่างรับงาน
+                </button>
+              )}
             </div>
-            {(() => {
-              const matchedTech = technicians.find(t => t.name.toLowerCase() === currentTechName.toLowerCase());
-              return (
-                <div className="flex items-center gap-3 p-3 bg-surface-container-low rounded-lg">
-                  <div className="relative shrink-0">
-                    {matchedTech?.avatarUrl ? (
-                      <img
-                        alt={currentTechName}
-                        className="w-12 h-12 rounded-2xl object-cover shadow-sm ring-2 ring-primary-fixed"
-                        src={matchedTech.avatarUrl}
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center font-bold text-base shadow-sm">
-                        {currentTechName ? currentTechName.slice(4, 5) || currentTechName.slice(0, 1) : '—'}
-                      </div>
-                    )}
-                    {currentTechName && (
+            {currentTechName ? (
+              (() => {
+                const matchedTech = technicians.find(t => t.name.toLowerCase() === currentTechName.toLowerCase());
+                return (
+                  <div className="flex items-center gap-3 p-3 bg-surface-container-low rounded-lg">
+                    <div className="relative shrink-0">
+                      {matchedTech?.avatarUrl ? (
+                        <img
+                          alt={currentTechName}
+                          className="w-12 h-12 rounded-2xl object-cover shadow-sm ring-2 ring-primary-fixed"
+                          src={matchedTech.avatarUrl}
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center font-bold text-base shadow-sm">
+                          {currentTechName.slice(4, 5) || currentTechName.slice(0, 1) || 'ช'}
+                        </div>
+                      )}
                       <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 rounded-full ring-2 ring-white"></span>
-                    )}
-                  </div>
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`font-headline-sm text-headline-sm truncate font-bold ${currentTechName ? 'text-on-surface' : 'text-slate-500'}`}>
-                        {currentTechName || 'ยังไม่ได้มอบหมายช่าง'}
-                      </span>
-                      {currentTechName && (
+                    </div>
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-headline-sm text-headline-sm truncate font-bold text-on-surface">
+                          {currentTechName}
+                        </span>
                         <span
                           className="material-symbols-outlined text-[16px] text-primary"
                           style={{ fontVariationSettings: "'FILL' 1" }}
                         >
                           verified
                         </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                          รับงานแล้ว
+                        </span>
+                      </div>
+                      <span className="font-body-sm text-body-sm text-on-surface-variant truncate">
+                        {matchedTech?.role || 'ช่างเทคนิค'} • {ticket.department || 'ทีมซ่อมบำรุง'}
+                      </span>
+                      {currentTechPhone ? (
+                        <div className="flex items-center gap-2 mt-1">
+                          <a
+                            href={`tel:${currentTechPhone}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-fixed text-on-primary-fixed font-bold text-xs rounded-full hover:bg-primary hover:text-on-primary transition-colors"
+                            title="กดโทรออกทันที"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">call</span>
+                            {currentTechPhone} (โทรออก)
+                          </a>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 mt-0.5">
+                          (ยังไม่มีเบอร์โทรช่าง)
+                        </span>
                       )}
                     </div>
-                    <span className="font-body-sm text-body-sm text-on-surface-variant truncate">
-                      {currentTechName ? (matchedTech?.role || 'ช่างเทคนิค') : 'เลือกช่างผู้รับผิดชอบเพื่อเริ่มงาน'} • {ticket.department || 'ทีมซ่อมบำรุง'}
-                    </span>
-                    {currentTechPhone ? (
-                      <div className="flex items-center gap-2 mt-1">
-                        <a
-                          href={`tel:${currentTechPhone}`}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-fixed text-on-primary-fixed font-bold text-xs rounded-full hover:bg-primary hover:text-on-primary transition-colors"
-                          title="กดโทรออกทันที"
-                        >
-                          <span className="material-symbols-outlined text-[14px]">call</span>
-                          {currentTechPhone} (โทรออก)
-                        </a>
-                      </div>
-                    ) : (
-                      <span className="text-[11px] text-slate-400 mt-0.5">
-                        (ยังไม่มีเบอร์โทรช่าง)
-                      </span>
-                    )}
                   </div>
+                );
+              })()
+            ) : (
+              <div className="flex flex-col items-center justify-center p-4 bg-amber-50/80 border border-amber-200/80 rounded-xl text-center gap-2">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                  <span className="material-symbols-outlined text-[24px]">touch_app</span>
                 </div>
-              );
-            })()}
+                <div>
+                  <h4 className="font-bold text-sm text-slate-800">ยังไม่มีช่างรับงานนี้</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">ไม่ต้องรอมอบหมาย ช่างคนใดสะดวกสามารถกดรับงานได้เองเลย</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAcceptModalOpen(true)}
+                  className="mt-1 px-4 py-2.5 bg-primary hover:bg-primary-container text-white rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                  <span>กดรับงานเองเลย (ลงชื่อช่าง)</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Section 4: Parts Management */}
@@ -584,14 +582,14 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
           {/* Section 6: Quick Action Status Buttons */}
           <div className="flex flex-col gap-2.5 pt-2">
-            {ticket.status === 'pending' && (
+            {(ticket.status === 'pending' || !currentTechName) && ticket.status !== 'completed' && ticket.status !== 'cancelled' && (
               <button
                 onClick={() => setIsAcceptModalOpen(true)}
-                className="w-full h-12 rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer font-bold"
+                className="w-full h-12 rounded-xl bg-primary hover:bg-primary-container text-white font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer font-bold"
                 type="button"
               >
-                <span className="material-symbols-outlined text-[20px]">play_circle</span>
-                กดรับงานซ่อม (ลงชื่อช่าง / เริ่มดำเนินการ)
+                <span className="material-symbols-outlined text-[20px]">touch_app</span>
+                กดรับงานเองเลย (ลงชื่อช่าง)
               </button>
             )}
 
@@ -662,16 +660,6 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
         </div>
       </div>
-
-      {/* Sub-modal: Assign Technician */}
-      <AssignTechnicianModal
-        isOpen={isAssignModalOpen}
-        onClose={() => setIsAssignModalOpen(false)}
-        technicians={technicians}
-        currentTechnicianName={currentTechName}
-        currentTechnicianPhone={currentTechPhone}
-        onAssign={handleAssignTech}
-      />
 
       {/* Confirmation Modal */}
       {confirmConfig && (

@@ -196,7 +196,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       case 'pending':
         return { text: 'รอรับงาน', color: 'bg-amber-100 text-amber-800 border-amber-300' };
       case 'assigned':
-        return { text: 'มอบหมายแล้ว', color: 'bg-blue-100 text-blue-800 border-blue-300' };
+        return { text: 'ช่างรับงานแล้ว', color: 'bg-blue-100 text-blue-800 border-blue-300' };
       case 'in_progress':
         return { text: 'กำลังซ่อมบำรุง', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
       case 'waiting_parts':

@@ -63,7 +63,7 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
       case 'pending':
         return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 text-[11px] font-bold border border-amber-300">🟡 รอรับงาน</span>;
       case 'assigned':
-        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-800 text-[11px] font-bold border border-blue-300">🔵 มอบหมายแล้ว</span>;
+        return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-800 text-[11px] font-bold border border-blue-300">🔵 รับงานแล้ว</span>;
       case 'in_progress':
         return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-300">🟢 กำลังซ่อม</span>;
       case 'waiting_parts':
@@ -249,7 +249,7 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
                         </div>
                       ) : (
                         <span className="text-amber-700 font-semibold text-[11px]">
-                          ยังไม่ได้มอบหมาย
+                          รอช่างกดรับ
                         </span>
                       )}
                     </td>
@@ -267,9 +267,9 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
                             type="button"
                             onClick={() => onQuickAccept(ticket)}
                             className="px-2.5 py-1.5 bg-primary hover:bg-primary-container text-white rounded-lg font-bold text-[11px] shadow-xs cursor-pointer active:scale-95 transition-all"
-                            title="กดรับงานเข้าคิวทันที"
+                            title="กดรับงานนี้เองทันที"
                           >
-                            รับงาน
+                            กดรับงานเอง
                           </button>
                         )}
                         <button

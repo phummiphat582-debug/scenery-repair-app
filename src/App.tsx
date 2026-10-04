@@ -239,10 +239,9 @@ export const App: React.FC = () => {
     }
   };
 
-  // Handle quick assign
+  // Handle quick accept (กดรับงานเองเลย)
   const handleQuickAssign = (ticket: Ticket) => {
-    setSelectedTicket(ticket);
-    setIsDetailModalOpen(true);
+    setQuickAcceptTicket(ticket);
   };
 
   // Handle open parts modal

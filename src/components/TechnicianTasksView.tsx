@@ -530,7 +530,7 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
                       className="col-span-2 py-3 bg-primary hover:bg-primary-container text-white rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                     >
                       <Check className="w-4 h-4" />
-                      <span>{acceptingId === ticket.id ? 'กำลังบันทึก...' : 'แตะเพื่อรับงาน (ลงชื่อช่าง)'}</span>
+                      <span>{acceptingId === ticket.id ? 'กำลังบันทึก...' : 'กดรับงานเองเลย (ลงชื่อช่าง)'}</span>
                     </button>
                   ) : isInProgress ? (
                     <>
