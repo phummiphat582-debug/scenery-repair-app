@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Ticket, PartItem } from '../types';
 import { compressImage } from '../lib/imageCompress';
 import { 
@@ -88,6 +88,9 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
   const [isProcessingImage, setIsProcessingImage] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
+
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen && ticket) {
@@ -456,30 +459,30 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
           {/* 4. After Repair Photo (รูปภาพหลังแก้ไข) */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-extrabold text-on-surface flex items-center gap-1.5">
+              <div className="text-xs font-extrabold text-on-surface flex items-center gap-1.5">
                 <Camera className="w-4 h-4 text-primary" />
                 <span>4. รูปภาพหลังแก้ไข (หลักฐานงานซ่อมเสร็จ)</span>
-              </label>
+              </div>
               <span className="text-[11px] text-on-surface-variant font-normal">
-                (ถ่ายสดหรือเลือกจากอัลบั้ม)
+                (ถ่ายสดหรือเลือกรูปจากอัลบั้ม)
               </span>
             </div>
 
-            {/* Hidden native file inputs */}
+            {/* Hidden native file inputs controlled via useRef */}
             <input
-              id="complete-work-camera-input"
+              ref={cameraInputRef}
               type="file"
               accept="image/*"
               capture="environment"
               onChange={handleImageCapture}
-              className="hidden"
+              style={{ display: 'none' }}
             />
             <input
-              id="complete-work-gallery-input"
+              ref={galleryInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/*,.jpg,.jpeg,.png,.webp,.heic"
               onChange={handleImageCapture}
-              className="hidden"
+              style={{ display: 'none' }}
             />
 
             {resultImageUrl ? (
@@ -495,20 +498,22 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
                     แนบรูปหลักฐานเรียบร้อยแล้ว
                   </span>
                   <div className="flex items-center gap-2">
-                    <label
-                      htmlFor="complete-work-camera-input"
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
                       className="px-2.5 py-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 active:scale-95"
                     >
                       <Camera className="w-3.5 h-3.5" />
                       <span>ถ่ายใหม่</span>
-                    </label>
-                    <label
-                      htmlFor="complete-work-gallery-input"
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => galleryInputRef.current?.click()}
                       className="px-2.5 py-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 active:scale-95"
                     >
                       <ImageIcon className="w-3.5 h-3.5" />
-                      <span>เลือกใหม่</span>
-                    </label>
+                      <span>เลือกจากอัลบั้ม</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setResultImageUrl('')}
@@ -524,11 +529,12 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2.5">
                   {/* Option 1: Live Camera */}
-                  <label
-                    htmlFor="complete-work-camera-input"
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
                     className="p-4 border-2 border-dashed border-slate-300 hover:border-primary rounded-2xl bg-surface-container-low hover:bg-primary/5 flex flex-col items-center justify-center gap-2 text-on-surface-variant transition-all cursor-pointer active:scale-98 group"
                   >
-                    <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary group-hover:scale-110 flex items-center justify-center transition-transform">
+                    <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary group-hover:scale-110 flex items-center justify-center transition-transform shadow-xs">
                       <Camera className="w-6 h-6" />
                     </div>
                     <div className="text-center">
@@ -536,17 +542,18 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
                         เปิดกล้องถ่ายสด
                       </span>
                       <span className="text-[10px] text-slate-400 mt-0.5 block">
-                        ถ่ายด้วยกล้องมือถือ
+                        ถ่ายรูปด้วยกล้องทันที
                       </span>
                     </div>
-                  </label>
+                  </button>
 
                   {/* Option 2: Gallery / Album */}
-                  <label
-                    htmlFor="complete-work-gallery-input"
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
                     className="p-4 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl bg-surface-container-low hover:bg-emerald-50 flex flex-col items-center justify-center gap-2 text-on-surface-variant transition-all cursor-pointer active:scale-98 group"
                   >
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 group-hover:scale-110 flex items-center justify-center transition-transform">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 group-hover:scale-110 flex items-center justify-center transition-transform shadow-xs">
                       <ImageIcon className="w-6 h-6" />
                     </div>
                     <div className="text-center">
@@ -554,10 +561,10 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
                         เลือกจากอัลบั้ม
                       </span>
                       <span className="text-[10px] text-slate-400 mt-0.5 block">
-                        คลังรูปภาพในเครื่อง
+                        คลังรูปภาพในมือถือ
                       </span>
                     </div>
-                  </label>
+                  </button>
                 </div>
 
                 {isProcessingImage && (
