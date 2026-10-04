@@ -192,7 +192,9 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
         if (!t.requesterName.trim().toLowerCase().includes(q)) return false;
       }
 
-      if (filterStatus === 'all') return true;
+      if (filterStatus === 'all') {
+        return t.status !== 'completed' && t.status !== 'cancelled';
+      }
       if (filterStatus === 'active') {
         return t.status !== 'completed' && t.status !== 'cancelled';
       }
@@ -200,7 +202,8 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       if (filterStatus === 'in_progress') return t.status === 'in_progress' || t.status === 'waiting_parts';
       if (filterStatus === 'completed') return t.status === 'completed' || t.status === 'waiting_inspect';
       if (filterStatus === 'cancelled') return t.status === 'cancelled';
-      return true;
+      if (filterStatus === 'history') return true;
+      return t.status !== 'completed' && t.status !== 'cancelled';
     });
   }, [tickets, searchQuery, filterStatus, selectedDivisionFilter, myDepartment, isAllDepts, filterMyTicketsOnly, activeRequesterName]);
 
@@ -465,7 +468,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
           <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
             activeSubTab === 'track' ? 'bg-white text-primary' : 'bg-surface-container-highest text-on-surface'
           }`}>
-            {myDeptTickets.length}
+            {isAllDepts ? allActiveTickets.length : myDeptActiveTickets.length}
           </span>
         </button>
       </div>
@@ -1398,8 +1401,8 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                     </h2>
                     <p className="text-[11px] text-on-surface-variant">
                       {isAllDepts
-                        ? `มีงานทั้งหมด ${myDeptTickets.length} รายการ (กำลังซ่อม ${myDeptTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length} รายการ ทั่วทั้งฟาร์ม)`
-                        : `มีงานทั้งหมด ${myDeptTickets.length} รายการ (กำลังซ่อม ${myDeptTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length} รายการ)`}
+                        ? `งานรอซ่อม ${allActiveTickets.length} รายการ (เสร็จสิ้นแล้ว ${tickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length} รายการ ทั่วทั้งฟาร์ม)`
+                        : `งานรอซ่อม ${myDeptActiveTickets.length} รายการ (เสร็จสิ้นแล้ว ${myDeptTickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length} รายการ)`}
                     </p>
                   </div>
                 </div>
@@ -1502,12 +1505,12 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
                   {[
-                    { id: 'all', label: 'ทั้งหมด', count: myDeptTickets.length },
-                    { id: 'active', label: 'งานรอซ่อม', count: myDeptTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length },
+                    { id: 'all', label: 'งานทั้งหมด', count: myDeptTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length },
                     { id: 'pending', label: 'รอรับงาน', count: myDeptTickets.filter(t => t.status === 'pending' || t.status === 'assigned').length },
                     { id: 'in_progress', label: 'กำลังซ่อม', count: myDeptTickets.filter(t => t.status === 'in_progress' || t.status === 'waiting_parts').length },
-                    { id: 'completed', label: '✅ เสร็จสิ้นแล้ว', count: myDeptTickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length },
+                    { id: 'completed', label: '✅ หมวดงานที่เสร็จ', count: myDeptTickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length },
                     { id: 'cancelled', label: 'ยกเลิก', count: myDeptTickets.filter(t => t.status === 'cancelled').length },
+                    { id: 'history', label: '📋 ประวัติรวมทั้งหมด', count: myDeptTickets.length },
                   ].map(f => (
                     <button
                       key={f.id}
@@ -1589,7 +1592,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                         onClick={() => setFilterStatus('all')}
                         className="px-3 py-1.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-200 cursor-pointer shadow-xs"
                       >
-                        📋 ดูทุกสถานะ (รวมงานเสร็จสิ้น)
+                        📋 ดูงานทั้งหมด
                       </button>
                     )}
                     {filterMyTicketsOnly && (
