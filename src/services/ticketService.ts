@@ -91,7 +91,7 @@ export function sortDepartments(depts: Department[]): Department[] {
 
 function ticketToDb(t: Partial<Ticket>, isNewTicket: boolean = false): any {
   const row: any = {};
-  if (t.id && UUID_REGEX.test(t.id)) {
+  if (isNewTicket && t.id && UUID_REGEX.test(t.id)) {
     row.id = t.id;
   }
   if (t.requestId !== undefined) row.request_id = t.requestId;
@@ -196,6 +196,7 @@ class TicketService {
   private initialSyncPromise: Promise<void> | null = null;
   private supabaseChannel: any = null;
   private isConnectedToCloud = false;
+  private recentlyDeletedTicketIds: Set<string> = new Set();
 
   constructor() {
     this.initLocalData();
@@ -420,6 +421,33 @@ class TicketService {
   }
 
   /**
+   * Push a ticket update to Supabase (Self-healing sync fallback)
+   */
+  private async pushTicketToCloud(ticket: Ticket): Promise<void> {
+    if (!isSupabaseConfigured || !supabase) return;
+    try {
+      const dbRow = ticketToDb(ticket, false);
+      const targetRequestId = ticket.requestId;
+      const targetUuid = (ticket.id && UUID_REGEX.test(ticket.id)) ? ticket.id : undefined;
+
+      let query = supabase.from('repair_tickets').update(dbRow);
+      if (targetUuid && targetRequestId) {
+        query = query.or(`id.eq.${targetUuid},request_id.eq.${targetRequestId}`);
+      } else if (targetRequestId) {
+        query = query.eq('request_id', targetRequestId);
+      } else if (targetUuid) {
+        query = query.eq('id', targetUuid);
+      }
+      let { data, error } = await query.select();
+      if (!error && (!data || data.length === 0) && targetRequestId) {
+        await supabase.from('repair_tickets').update(dbRow).eq('request_id', targetRequestId).select();
+      }
+    } catch (e) {
+      console.warn('[TicketService] pushTicketToCloud failed:', e);
+    }
+  }
+
+  /**
    * Fetch latest state from Supabase Cloud (Central single source of truth)
    */
   public async syncFromServer(): Promise<void> {
@@ -439,20 +467,79 @@ class TicketService {
             this.isConnectedToCloud = true;
             const mapped = supaTickets.map(dbToTicket);
 
-            const isDifferent = mapped.length !== this.tickets.length || mapped.some(mt => {
-              const current = this.tickets.find(t => t.id === mt.id || t.requestId === mt.requestId);
-              if (!current) return true;
-              return current.status !== mt.status ||
-                     current.technicianName !== mt.technicianName ||
-                     current.updatedAt !== mt.updatedAt ||
-                     current.repairResult !== mt.repairResult ||
-                     current.remark !== mt.remark ||
-                     current.department !== mt.department ||
-                     current.division !== mt.division;
-            });
+            // Smart Merge: Merge server records with local state
+            // Crucial: NEVER overwrite a local 'completed' status with an older server 'in_progress' status!
+            const mergedTickets: Ticket[] = [];
+            let stateChanged = false;
 
-            if (isDifferent) {
-              this.tickets = mapped;
+            for (const serverTicket of mapped) {
+              // Ignore tickets that were recently deleted on this client
+              if (
+                this.recentlyDeletedTicketIds.has(serverTicket.id) ||
+                (serverTicket.requestId && this.recentlyDeletedTicketIds.has(serverTicket.requestId))
+              ) {
+                continue;
+              }
+
+              const local = this.tickets.find(t => t.id === serverTicket.id || t.requestId === serverTicket.requestId);
+
+              if (!local) {
+                mergedTickets.push(serverTicket);
+                stateChanged = true;
+                continue;
+              }
+
+              const localTime = new Date(local.updatedAt).getTime();
+              const serverTime = new Date(serverTicket.updatedAt).getTime();
+
+              // Rule 1: Completed protection - If local ticket is completed and server is not completed
+              if (local.status === 'completed' && serverTicket.status !== 'completed') {
+                // If local completion is newer or happened recently (within 10 minutes), preserve completed!
+                if (localTime >= serverTime || (Date.now() - localTime) < 10 * 60 * 1000) {
+                  mergedTickets.push(local);
+                  // Self-healing: If server is older by more than 2 seconds, re-push to Supabase in background
+                  if (serverTime < localTime - 2000) {
+                    void this.pushTicketToCloud(local);
+                  }
+                  continue;
+                }
+              }
+
+              // Rule 2: Last-Write-Wins based on timestamps (local is newer by >1s)
+              if (localTime > serverTime + 1000) {
+                mergedTickets.push(local);
+                continue;
+              }
+
+              // Server is authoritative (newer or equal)
+              mergedTickets.push(serverTicket);
+              if (
+                local.status !== serverTicket.status ||
+                local.technicianName !== serverTicket.technicianName ||
+                local.updatedAt !== serverTicket.updatedAt ||
+                local.repairResult !== serverTicket.repairResult ||
+                local.remark !== serverTicket.remark ||
+                local.department !== serverTicket.department ||
+                local.division !== serverTicket.division
+              ) {
+                stateChanged = true;
+              }
+            }
+
+            // Keep locally created tickets that have not yet arrived in server query
+            for (const local of this.tickets) {
+              const inMerged = mergedTickets.some(t => t.id === local.id || t.requestId === local.requestId);
+              if (!inMerged && !this.recentlyDeletedTicketIds.has(local.id) && !this.recentlyDeletedTicketIds.has(local.requestId)) {
+                const localCreatedTime = new Date(local.createdAt).getTime();
+                if (Date.now() - localCreatedTime < 5 * 60 * 1000) {
+                  mergedTickets.push(local);
+                  stateChanged = true;
+                }
+              }
+            }
+
+            if (stateChanged || mergedTickets.length !== this.tickets.length) {
+              this.tickets = mergedTickets;
               changed = true;
             }
           }
@@ -882,7 +969,7 @@ class TicketService {
 
   public async updateTicket(id: string, updates: Partial<Ticket>): Promise<Ticket | null> {
     const existing = this.tickets.find(t => t.id === id || t.requestId === id);
-    const targetRequestId = existing?.requestId || (id.startsWith('REP-') ? id : undefined);
+    const targetRequestId = updates.requestId || existing?.requestId || (id.startsWith('REP-') ? id : undefined);
     const targetUuid = (existing?.id && UUID_REGEX.test(existing.id)) ? existing.id : (UUID_REGEX.test(id) ? id : undefined);
 
     const nowIso = new Date().toISOString();
@@ -912,11 +999,32 @@ class TicketService {
         } else {
           query = filterTicketQuery(query, id);
         }
-        const { error } = await query;
+        
+        let { data, error } = await query.select();
+
+        // If 0 rows matched (e.g. UUID mismatch), retry targeting request_id directly
+        if (!error && (!data || data.length === 0) && targetRequestId) {
+          console.warn('[TicketService] 0 rows matched on initial query, retrying by request_id:', targetRequestId);
+          const retryRes = await supabase
+            .from('repair_tickets')
+            .update(dbUpdates)
+            .eq('request_id', targetRequestId)
+            .select();
+          data = retryRes.data;
+          error = retryRes.error;
+        }
+
         if (error) {
           console.warn('[TicketService] Supabase update error:', error.message);
+        } else if (data && data.length > 0) {
+          const serverTicket = dbToTicket(data[0]);
+          if (existing) {
+            Object.assign(existing, serverTicket);
+            this.saveToLocalStorage();
+          }
+          this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: serverTicket.id, requestId: serverTicket.requestId });
         } else {
-          this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id, requestId: targetRequestId });
+          this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: targetUuid || id, requestId: targetRequestId });
         }
       } catch (e) {
         console.warn('[TicketService] Supabase update exception:', e);
@@ -931,8 +1039,12 @@ class TicketService {
     const targetRequestId = existing?.requestId || (id.startsWith('REP-') ? id : undefined);
     const targetUuid = (existing?.id && UUID_REGEX.test(existing.id)) ? existing.id : (UUID_REGEX.test(id) ? id : undefined);
 
+    if (id) this.recentlyDeletedTicketIds.add(id);
+    if (targetRequestId) this.recentlyDeletedTicketIds.add(targetRequestId);
+    if (targetUuid) this.recentlyDeletedTicketIds.add(targetUuid);
+
     // 1. Optimistic UI: Remove from memory immediately!
-    this.tickets = this.tickets.filter(t => t.id !== id && t.requestId !== id);
+    this.tickets = this.tickets.filter(t => t.id !== id && t.requestId !== id && (!targetRequestId || t.requestId !== targetRequestId) && (!targetUuid || t.id !== targetUuid));
     this.saveToLocalStorage();
     this.notify();
 
@@ -949,8 +1061,11 @@ class TicketService {
         } else {
           query = filterTicketQuery(query, id);
         }
-        await query;
-        this.broadcastEvent('TICKET_MUTATION', { action: 'DELETE', id, requestId: targetRequestId });
+        let { data, error } = await query.select();
+        if (!error && (!data || data.length === 0) && targetRequestId) {
+          await supabase.from('repair_tickets').delete().eq('request_id', targetRequestId).select();
+        }
+        this.broadcastEvent('TICKET_MUTATION', { action: 'DELETE', id: targetUuid || id, requestId: targetRequestId });
       } catch (e) {
         console.warn('[TicketService] Supabase delete exception:', e);
       }

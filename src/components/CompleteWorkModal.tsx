@@ -24,6 +24,7 @@ interface CompleteWorkModalProps {
   onConfirmComplete: (
     ticketId: string,
     data: {
+      requestId?: string;
       diagnosticReason: string;
       actionSteps: string;
       repairResult: string;
@@ -207,14 +208,15 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
         `อะไหล่ที่เปลี่ยน: ${partsSummary}`
       ].join('\n');
 
-      onClose();
       await onConfirmComplete(ticket.id, {
+        requestId: ticket.requestId,
         diagnosticReason: diagnosticReason.trim(),
         actionSteps: actionSteps.trim(),
         repairResult: fullResultText,
         parts: validParts,
         resultImageUrl: resultImageUrl || undefined
       });
+      onClose();
     } catch (err: any) {
       console.warn('บันทึกจบงานไม่สำเร็จ:', err);
     } finally {

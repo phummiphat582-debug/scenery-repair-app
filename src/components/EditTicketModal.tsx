@@ -40,13 +40,15 @@ export const EditTicketModal: React.FC<EditTicketModalProps> = ({
     setIsSaving(true);
     try {
       await onUpdate(ticket.id, {
+        requestId: ticket.requestId,
         division,
         status,
         priority,
         technicianName: technicianName.trim(),
         repairResult: repairResult.trim(),
         remark: remark.trim(),
-        resultImageUrl: resultImageUrl.trim() || '-'
+        resultImageUrl: resultImageUrl.trim() || '-',
+        ...(status === 'completed' ? { completedAt: new Date().toISOString() } : {})
       });
       onClose();
     } finally {

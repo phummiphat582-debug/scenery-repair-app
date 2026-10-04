@@ -105,6 +105,7 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
     setAcceptingId(ticketId);
     try {
       await onUpdateTicketStatus(ticketId, {
+        requestId: acceptModalTicket?.requestId,
         status: 'in_progress',
         technicianName,
         technicianPhone: technicianPhone || '',
@@ -122,6 +123,7 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
   const handleConfirmCompleteModal = async (
     ticketId: string,
     data: {
+      requestId?: string;
       diagnosticReason: string;
       actionSteps: string;
       repairResult: string;
@@ -130,6 +132,7 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
     }
   ) => {
     await onUpdateTicketStatus(ticketId, {
+      requestId: data.requestId || completeModalTicket?.requestId,
       status: 'completed',
       diagnosticReason: data.diagnosticReason,
       actionSteps: data.actionSteps,

@@ -47,6 +47,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     setCurrentTechName(technicianName);
     if (technicianPhone) setCurrentTechPhone(technicianPhone);
     await onUpdateTicket(ticketId, {
+      requestId: ticket.requestId,
       status: 'in_progress',
       technicianName,
       technicianPhone: technicianPhone || '',
@@ -57,6 +58,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const handleConfirmCompleteWork = async (
     ticketId: string,
     data: {
+      requestId?: string;
       diagnosticReason: string;
       actionSteps: string;
       repairResult: string;
@@ -65,6 +67,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     }
   ) => {
     await onUpdateTicket(ticketId, {
+      requestId: data.requestId || ticket.requestId,
       status: 'completed',
       diagnosticReason: data.diagnosticReason,
       actionSteps: data.actionSteps,
@@ -164,7 +167,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       cancelText: 'ย้อนกลับ',
       confirmVariant: variant,
       onConfirm: async () => {
-        const updates: Partial<Ticket> = { status: newStatus };
+        const updates: Partial<Ticket> = { requestId: ticket.requestId, status: newStatus };
         if (newStatus === 'completed') {
           updates.completedAt = new Date().toISOString();
         }

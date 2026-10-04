@@ -104,8 +104,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       }
 
       // Status: active excludes completed & cancelled; completed only shows completed
-      if (selectedStatusFilter === 'active' || selectedStatusFilter === 'all') {
+      if (selectedStatusFilter === 'active') {
         if (ticket.status === 'completed' || ticket.status === 'cancelled') return false;
+      } else if (selectedStatusFilter === 'all') {
+        // 'all' includes all tickets
       } else if (selectedStatusFilter === 'pending') {
         if (ticket.status !== 'pending' && ticket.status !== 'assigned') return false;
       } else if (selectedStatusFilter === 'in_progress') {
