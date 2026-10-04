@@ -122,6 +122,20 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
     return tickets.filter(t => t.department === myDepartment);
   }, [tickets, myDepartment, isAllDepts]);
 
+  const allActiveTickets = useMemo(() => {
+    return tickets
+      .filter(t => t.status !== 'completed' && t.status !== 'cancelled')
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }, [tickets]);
+
+  const globalQueueNumbers = useMemo(() => {
+    const numbers = new Map<string, number>();
+    allActiveTickets.forEach((ticket, idx) => {
+      numbers.set(ticket.id, idx + 1);
+    });
+    return numbers;
+  }, [allActiveTickets]);
+
   const myDeptActiveTickets = useMemo(() => {
     const list = isAllDepts ? tickets : tickets.filter(t => t.department === myDepartment);
     return list
@@ -429,11 +443,11 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
           }`}
         >
           <ListOrdered className="w-4 h-4" />
-          <span>{myDepartment && myDepartment !== 'all' ? `คิวงาน ${myDepartment}` : 'คิวงานแต่ละแผนก'}</span>
+          <span>{myDepartment && myDepartment !== 'all' ? `คิวงาน ${myDepartment}` : 'คิวงาน'}</span>
           <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
             activeSubTab === 'queue' ? 'bg-white text-primary' : 'bg-surface-container-highest text-on-surface'
           }`}>
-            {myDeptActiveTickets.length}
+            {isAllDepts ? allActiveTickets.length : myDeptActiveTickets.length}
           </span>
         </button>
 
@@ -462,6 +476,8 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
           <NewTicketForm
             departments={departments}
             defaultDepartment={myDepartment}
+            tickets={tickets}
+            onViewQueue={() => setActiveSubTab('queue')}
             onSubmit={async (ticketData) => {
               await onSubmitTicket(ticketData);
               if (ticketData.department) {
@@ -473,9 +489,9 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                   localStorage.setItem('scenery_requester_name', ticketData.requesterName);
                 } catch {}
               }
-              setActiveSubTab('track');
+              setActiveSubTab('queue');
             }}
-            onCancel={() => setActiveSubTab('track')}
+            onCancel={() => setActiveSubTab('queue')}
             onOpenQRScanner={onOpenQRScanner}
           />
         </div>
@@ -610,6 +626,66 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
           ) : (
             /* Selected Department Queues View */
             <div className="space-y-4">
+              {/* Primary Mode Switcher: All Departments vs Specific Department */}
+              <div className="grid grid-cols-2 gap-2 p-1.5 bg-surface-container-low rounded-2xl border border-slate-200 shadow-xs">
+                <button
+                  type="button"
+                  onClick={() => handleSelectDepartment('all')}
+                  className={`py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    isAllDepts
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                  }`}
+                >
+                  <span className="text-sm">🏢</span>
+                  <span>คิวงานรวมทุกแผนก</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                    isAllDepts ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {allActiveTickets.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isAllDepts) {
+                      const deptWithTickets = departments.find(d => tickets.some(t => t.department === d.name && t.status !== 'completed' && t.status !== 'cancelled'));
+                      handleSelectDepartment(deptWithTickets ? deptWithTickets.name : (departments[0]?.name || '84 ซ่อมบำรุง'));
+                    }
+                  }}
+                  className={`py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    !isAllDepts
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                  }`}
+                >
+                  <span className="text-sm">📌</span>
+                  <span className="truncate">คิวเฉพาะแผนก {!isAllDepts ? `(${myDepartment})` : ''}</span>
+                  {!isAllDepts && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-white/20 text-white">
+                      {myDeptActiveTickets.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {!isAllDepts && myDeptActiveTickets.length === 0 && allActiveTickets.length > 0 && (
+                <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-3 text-xs text-amber-900 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">💡</span>
+                    <span>แผนก "{myDepartment}" ไม่มีงานค้างในคิว แต่ทั่วทั้งฟาร์มมีงานรอซ่อม <strong>{allActiveTickets.length} รายการ</strong></span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectDepartment('all')}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold cursor-pointer shadow-xs whitespace-nowrap"
+                  >
+                    ดูคิวงานรวมทุกแผนก ➔
+                  </button>
+                </div>
+              )}
+
               {/* Department Header & Quick Switcher */}
               <div className="bg-surface-container-lowest p-4 rounded-3xl border border-slate-200 shadow-xs flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-3 min-w-0">
@@ -967,6 +1043,13 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                             </span>
                             <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-surface-container text-on-surface">
                               จาก {totalInDept} คิวของแผนก
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
+                              คิวรวมฟาร์ม #{globalQueueNumbers.get(ticket.id) || 1}
+                            </span>
+                            <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200 flex items-center gap-1">
+                              <span>🏢</span>
+                              <span>{ticket.department}</span>
                             </span>
                             {queueNum === 1 ? (
                               <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">

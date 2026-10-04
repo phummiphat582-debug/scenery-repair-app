@@ -47,6 +47,8 @@ interface NewTicketFormProps {
   onCancel?: () => void;
   onOpenQRScanner?: () => void;
   defaultDepartment?: string;
+  tickets?: Ticket[];
+  onViewQueue?: () => void;
 }
 
 export const NewTicketForm: React.FC<NewTicketFormProps> = ({
@@ -54,7 +56,9 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
   onSubmit,
   onCancel,
   onOpenQRScanner,
-  defaultDepartment
+  defaultDepartment,
+  tickets = [],
+  onViewQueue
 }) => {
   // Form States - Clean slate with localStorage prefill for speed
   const [step, setStep] = useState<number>(1);
@@ -113,6 +117,17 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
       localStorage.setItem('scenery_selected_dept', val);
     } catch {}
   };
+
+  const deptPendingTickets = React.useMemo(() => {
+    if (!department) return [];
+    return tickets
+      .filter(t => t.department === department && t.status !== 'completed' && t.status !== 'cancelled')
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }, [tickets, department]);
+
+  const allPendingTicketsCount = React.useMemo(() => {
+    return tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length;
+  }, [tickets]);
 
   const [selectedDivision, setSelectedDivision] = useState<DivisionId>('84');
   const [specificLocation, setSpecificLocation] = useState('');
@@ -372,6 +387,79 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-3 py-1.5 rounded-lg font-semibold mt-0.5">
               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
               <span>ใบแจ้งซ่อมจะถูกส่งในนามแผนก: <strong>{department}</strong></span>
+            </div>
+
+            {/* Live Queue Status Preview for selected department */}
+            <div className="mt-2 p-3.5 rounded-2xl bg-surface-container-low border border-slate-200/90 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
+                    📋
+                  </span>
+                  <span className="text-xs font-bold text-on-surface">
+                    คิวงานแจ้งซ่อมของแผนก "{department}"
+                  </span>
+                </div>
+                {deptPendingTickets.length > 0 ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300">
+                    ⏳ รอซ่อม {deptPendingTickets.length} คิว
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    🟢 ว่าง ไม่มีงานค้าง
+                  </span>
+                )}
+              </div>
+
+              {deptPendingTickets.length > 0 ? (
+                <div className="space-y-1.5 pt-0.5">
+                  <p className="text-[11px] text-on-surface-variant">
+                    หากส่งแจ้งซ่อมตอนนี้ งานของคุณจะได้รับ <strong className="text-primary font-bold">คิวที่ #{deptPendingTickets.length + 1}</strong> ของแผนกนี้
+                  </p>
+                  <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                    {deptPendingTickets.slice(0, 3).map((t, idx) => (
+                      <div
+                        key={t.id}
+                        className="px-2.5 py-1.5 rounded-xl bg-white border border-slate-200/80 text-[11px] flex items-center justify-between gap-2 shadow-2xs"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-extrabold text-[10px] px-1.5 py-0.2 rounded bg-amber-500 text-white shrink-0">
+                            #{idx + 1}
+                          </span>
+                          <span className="font-mono text-primary font-bold shrink-0">#{t.requestId}</span>
+                          <span className="truncate font-medium text-slate-700">{t.title}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 shrink-0 font-medium">({t.requesterName})</span>
+                      </div>
+                    ))}
+                    {deptPendingTickets.length > 3 && (
+                      <div className="text-[10px] text-center text-slate-400 py-0.5">
+                        และอีก {deptPendingTickets.length - 3} รายการ...
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[11px] text-emerald-700 font-medium">
+                  🎉 แผนกนี้ไม่มีงานคอยซ่อม หากคุณส่งรายการนี้ จะได้ <strong className="text-emerald-800">คิวที่ #1 ทันที</strong>
+                </p>
+              )}
+
+              {onViewQueue && (
+                <div className="pt-1.5 border-t border-slate-200/60 flex items-center justify-between text-[11px] flex-wrap gap-2">
+                  <span className="text-slate-500">
+                    คิวรวมทั้งฟาร์ม: <strong className="text-on-surface font-bold">{allPendingTicketsCount}</strong> งาน
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onViewQueue}
+                    className="text-primary font-bold hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    <span>ดูหน้าคิวงานทั้งหมด</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

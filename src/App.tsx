@@ -360,6 +360,7 @@ export const App: React.FC = () => {
                 {currentTab === 'new-request' && (
                   <NewTicketForm
                     departments={departments}
+                    tickets={tickets}
                     onSubmit={handleCreateTicket}
                     onCancel={() => setCurrentTab('dashboard')}
                     onOpenQRScanner={() => setIsQRScannerModalOpen(true)}
