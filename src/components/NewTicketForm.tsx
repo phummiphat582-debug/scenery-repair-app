@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Department, Priority, Ticket, DivisionId } from '../types';
 import { ConfirmModal } from './ConfirmModal';
 import { compressImage } from '../lib/imageCompress';
@@ -9,6 +9,7 @@ import {
   Check, 
   User, 
   ChevronUp, 
+  ChevronDown,
   Edit3, 
   ArrowLeft, 
   ArrowRight, 
@@ -28,6 +29,8 @@ import {
   Loader2, 
   Send, 
   Bookmark,
+  Building2,
+  Phone,
   Image as ImageIcon
 } from 'lucide-react';
 
@@ -53,23 +56,60 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
   onOpenQRScanner,
   defaultDepartment
 }) => {
-  // Form States - Clean slate without dummy text
+  // Form States - Clean slate with localStorage prefill for speed
   const [step, setStep] = useState<number>(1);
-  const [requesterName, setRequesterName] = useState('');
-  const [requesterPhone, setRequesterPhone] = useState('');
-  const [department, setDepartment] = useState(() => defaultDepartment || departments[0]?.name || '0 ฟร้อน');
-  const [isRequesterDrawerOpen, setIsRequesterDrawerOpen] = useState(true);
-
-  useEffect(() => {
-    if (defaultDepartment) {
-      setDepartment(defaultDepartment);
-    } else if (departments.length > 0 && (!department || !departments.some(d => d.name === department))) {
-      setDepartment(departments[0].name);
+  const [requesterName, setRequesterName] = useState(() => {
+    try {
+      return localStorage.getItem('scenery_requester_name') || '';
+    } catch {
+      return '';
     }
-  }, [defaultDepartment, departments]);
+  });
+  const [requesterPhone, setRequesterPhone] = useState(() => {
+    try {
+      return localStorage.getItem('scenery_requester_phone') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [department, setDepartment] = useState(() => {
+    try {
+      return defaultDepartment || localStorage.getItem('scenery_selected_dept') || departments[0]?.name || '0 ฟร้อน';
+    } catch {
+      return defaultDepartment || departments[0]?.name || '0 ฟร้อน';
+    }
+  });
+
+  const prevDefaultDeptRef = useRef(defaultDepartment);
+  useEffect(() => {
+    if (defaultDepartment && defaultDepartment !== prevDefaultDeptRef.current) {
+      prevDefaultDeptRef.current = defaultDepartment;
+      setDepartment(defaultDepartment);
+    }
+  }, [defaultDepartment]);
+
+  const handleRequesterNameChange = (val: string) => {
+    setRequesterName(val);
+    try {
+      localStorage.setItem('scenery_requester_name', val);
+    } catch {}
+  };
+
+  const handleRequesterPhoneChange = (val: string) => {
+    setRequesterPhone(val);
+    try {
+      localStorage.setItem('scenery_requester_phone', val);
+    } catch {}
+  };
+
+  const handleDepartmentChange = (val: string) => {
+    setDepartment(val);
+    try {
+      localStorage.setItem('scenery_selected_dept', val);
+    } catch {}
+  };
 
   const [selectedDivision, setSelectedDivision] = useState<DivisionId>('84');
-  const [selectedZone, setSelectedZone] = useState('C');
   const [specificLocation, setSpecificLocation] = useState('');
 
   const [problemDetail, setProblemDetail] = useState('');
@@ -85,22 +125,8 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
   const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<any>(null);
 
-  // Zone list
-  const zones = [
-    { key: 'A', name: 'โซน A • โรงแกะ/สัตว์', icon: '🐑', dept: '91 ดูแลสัตว์' },
-    { key: 'B', name: 'โซน B • ลานกิจกรรม/โชว์', icon: '🎪', dept: '92 โชว์' },
-    { key: 'C', name: 'โซน C • ร้านอาหาร/คาเฟ่', icon: '🍽️', dept: '22 ร้านอาหาร' },
-    { key: 'D', name: 'โซน D • บ้านพักวิลล่า', icon: '🏡', dept: 'H0 บ้านพัก' },
-    { key: 'HQ', name: 'สำนักงานส่วนกลาง', icon: '🏢', dept: '0 ฟร้อน' }
-  ];
-
   const handleDivisionSelect = (divId: DivisionId) => {
     setSelectedDivision(divId);
-  };
-
-  const handleZoneSelect = (z: typeof zones[0]) => {
-    setSelectedZone(z.key);
-    setDepartment(z.dept);
   };
 
   const appendTag = (tagName: string) => {
@@ -134,19 +160,16 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
   };
 
   const validateRequester = () => {
+    if (!department.trim()) {
+      alert('กรุณาเลือกแผนกของผู้แจ้ง');
+      return false;
+    }
     if (!requesterName.trim()) {
       alert('กรุณากรอกชื่อผู้แจ้ง');
-      setIsRequesterDrawerOpen(true);
       return false;
     }
     if (!requesterPhone.trim()) {
       alert('กรุณากรอกเบอร์ติดต่อของผู้แจ้ง');
-      setIsRequesterDrawerOpen(true);
-      return false;
-    }
-    if (!department.trim()) {
-      alert('กรุณาเลือกแผนกของผู้แจ้ง');
-      setIsRequesterDrawerOpen(true);
       return false;
     }
     return true;
@@ -154,7 +177,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
 
   const validateDetails = () => {
     if (!specificLocation.trim()) {
-      alert('กรุณาระบุจุด/ห้อง/ตำแหน่งที่เกิดเหตุ');
+      alert('กรุณาระบุจุด/ห้อง/สถานที่เกิดเหตุ');
       return false;
     }
     if (!problemDetail.trim()) {
@@ -183,22 +206,20 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
 
     if (!validateRequester() || !validateDetails()) return;
 
-    const zoneObj = zones.find(z => z.key === selectedZone);
     const divInfo = getDivisionInfo(selectedDivision);
-    const locText = specificLocation.trim() || zoneObj?.name || 'พื้นที่ฟาร์ม';
+    const locText = specificLocation.trim() || department || 'พื้นที่ฟาร์ม';
 
     const payload = {
       title: `${divInfo.name}: ${locText}`,
       division: selectedDivision,
-      department: department || zoneObj?.dept || departments[0]?.name || '0 ฟร้อน',
-      location: `${zoneObj?.name || selectedZone} - ${locText}`,
+      department: department.trim() || departments[0]?.name || '0 ฟร้อน',
+      location: locText,
       description: problemDetail.trim(),
       requesterName: requesterName.trim() || 'พนักงานฟาร์ม (ไม่ระบุชื่อ)',
       requesterPhone: requesterPhone.trim(),
       priority,
       status: 'pending',
       requestImageUrl: photos[0]?.url || '-',
-      zone: zoneObj?.name,
       category: divInfo.name
     };
 
@@ -305,83 +326,90 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
 
         {step === 1 && (<>
         {/* Requester Profile Bar */}
-        <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/40">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-space-sm min-w-0">
-              <div className="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-primary shrink-0">
-                <User className="w-5 h-5 text-primary" />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-label-lg text-label-lg text-on-surface font-bold truncate">
-                    {requesterName}
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-[10px]">
-                    อัตโนมัติ
-                  </span>
-                </div>
-                <p className="font-body-sm text-body-sm text-on-surface-variant truncate">
-                  {department} • {requesterPhone}
-                </p>
-              </div>
+        <section className="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200 flex flex-col gap-4">
+          <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
+              <User className="w-5 h-5 text-primary" />
             </div>
-            <button
-              aria-label="แก้ไขข้อมูลผู้แจ้ง"
-              className="w-10 h-10 rounded-full bg-surface-container-low text-primary flex items-center justify-center active:scale-95 transition-transform shrink-0 cursor-pointer"
-              onClick={() => setIsRequesterDrawerOpen(!isRequesterDrawerOpen)}
-              type="button"
-            >
-              {isRequesterDrawerOpen ? (
-                <ChevronUp className="w-4 h-4" />
-              ) : (
-                <Edit3 className="w-4 h-4" />
-              )}
-            </button>
+            <div>
+              <h2 className="font-bold text-base text-on-surface">ข้อมูลผู้แจ้งซ่อม</h2>
+              <p className="text-xs text-on-surface-variant">เลือกแผนกของคุณเพื่อลงบันทึกในใบงาน</p>
+            </div>
           </div>
 
-          {/* Editable fields drawer */}
-          {isRequesterDrawerOpen && (
-            <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2.5">
-              <div className="flex flex-col gap-1">
-                <label className="font-label-sm text-label-sm text-on-surface-variant">ชื่อผู้แจ้ง</label>
-                <input
-                  className="h-11 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest border border-slate-200"
-                  type="text"
-                  required
-                  value={requesterName}
-                  onChange={(e) => setRequesterName(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="font-label-sm text-label-sm text-on-surface-variant">เบอร์ติดต่อด่วน</label>
-                <input
-                  className="h-11 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest border border-slate-200"
-                  type="tel"
-                  required
-                  value={requesterPhone}
-                  onChange={(e) => setRequesterPhone(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="font-label-sm text-label-sm text-on-surface-variant">แผนก</label>
-                <select
-                  className="h-11 px-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none focus:bg-surface-container-lowest border border-slate-200"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                >
-                  {departments.map(d => (
-                    <option key={d.id} value={d.name}>{d.name}</option>
-                  ))}
-                </select>
+          {/* 1. Department Selection (Prominent & Clear) */}
+          <div className="flex flex-col gap-1.5">
+            <label className="font-label-md font-bold text-on-surface flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-primary" />
+                <span>แผนกที่แจ้งงาน (แผนกของคุณ)</span>
+                <span className="text-error font-bold">*</span>
+              </span>
+              <span className="text-xs text-on-surface-variant font-normal">25 แผนก</span>
+            </label>
+            <div className="relative">
+              <select
+                className="w-full h-12 pl-3.5 pr-10 rounded-xl bg-surface-container-low text-on-surface font-bold text-sm border border-slate-300 focus:outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 shadow-xs cursor-pointer appearance-none"
+                value={department}
+                onChange={(e) => handleDepartmentChange(e.target.value)}
+                required
+              >
+                {departments.map(d => (
+                  <option key={d.id} value={d.name}>
+                    {d.icon ? `${d.icon} ` : ''}{d.name}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-500">
+                <ChevronDown className="w-4 h-4" />
               </div>
             </div>
-          )}
+            <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-3 py-1.5 rounded-lg font-semibold mt-0.5">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              <span>ใบแจ้งซ่อมจะถูกส่งในนามแผนก: <strong>{department}</strong></span>
+            </div>
+          </div>
+
+          {/* 2. Requester Name */}
+          <div className="flex flex-col gap-1.5">
+            <label className="font-label-md font-bold text-on-surface flex items-center gap-1.5">
+              <User className="w-4 h-4 text-primary" />
+              <span>ชื่อผู้แจ้ง</span>
+              <span className="text-error font-bold">*</span>
+            </label>
+            <input
+              className="w-full h-12 px-3.5 rounded-xl bg-surface-container-low text-on-surface font-body-md text-sm border border-slate-300 focus:outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 shadow-xs"
+              placeholder="เช่น สมชาย, พี่แนน, ผู้จัดการร้าน"
+              type="text"
+              required
+              value={requesterName}
+              onChange={(e) => handleRequesterNameChange(e.target.value)}
+            />
+          </div>
+
+          {/* 3. Phone */}
+          <div className="flex flex-col gap-1.5">
+            <label className="font-label-md font-bold text-on-surface flex items-center gap-1.5">
+              <Phone className="w-4 h-4 text-primary" />
+              <span>เบอร์ติดต่อด่วน</span>
+              <span className="text-error font-bold">*</span>
+            </label>
+            <input
+              className="w-full h-12 px-3.5 rounded-xl bg-surface-container-low text-on-surface font-body-md text-sm border border-slate-300 focus:outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 shadow-xs"
+              placeholder="เช่น 081-234-5678"
+              type="tel"
+              required
+              value={requesterPhone}
+              onChange={(e) => handleRequesterPhoneChange(e.target.value)}
+            />
+          </div>
         </section>
+
         <div className="flex justify-end pt-1">
           <button
             type="button"
             onClick={() => goToStep(2)}
-            className="min-h-[48px] px-5 rounded-xl bg-primary text-white font-bold text-sm flex items-center gap-2 shadow-md cursor-pointer active:scale-95"
+            className="min-h-[48px] px-6 rounded-xl bg-primary text-white font-bold text-sm flex items-center gap-2 shadow-md cursor-pointer active:scale-95 hover:bg-primary-container"
           >
             ถัดไป: รายละเอียด
             <ArrowRight className="w-4 h-4" />
@@ -444,59 +472,34 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
           </div>
         </section>
 
-        {/* Zone Selection */}
-        <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm border border-slate-200/40">
+        {/* Location Section */}
+        <section className="bg-surface-container-lowest rounded-2xl p-space-md shadow-sm flex flex-col gap-space-sm border border-slate-200">
           <div className="flex items-center justify-between">
             <label className="font-label-lg text-label-lg text-on-surface flex items-center gap-1.5 font-bold">
               <MapPin className="w-5 h-5 text-primary" />
-              เลือกโซนเกิดเหตุ <span className="text-error font-bold">*</span>
+              <span>ระบุสถานที่ / จุดเกิดเหตุ</span>
+              <span className="text-error font-bold">*</span>
             </label>
-            <span className="font-label-sm text-label-sm text-on-surface-variant">5 โซนหลัก</span>
+            {onOpenQRScanner && (
+              <button
+                type="button"
+                onClick={onOpenQRScanner}
+                className="text-xs text-primary font-bold hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>สแกน QR จุดซ่อม</span>
+              </button>
+            )}
           </div>
-
-          {/* Horizontal Zone Chips */}
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scroll-smooth no-scrollbar">
-            {zones.map(z => {
-              const isSelected = selectedZone === z.key;
-              return (
-                <button
-                  key={z.key}
-                  className={`zone-btn shrink-0 min-h-[48px] px-3.5 py-2 rounded-xl font-label-md text-label-md flex items-center gap-2 active:scale-95 transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-primary-container text-on-primary shadow-sm font-bold'
-                      : 'bg-surface-container-low text-on-surface hover:bg-surface-container'
-                  }`}
-                  onClick={() => handleZoneSelect(z)}
-                  type="button"
-                >
-                  <span className="text-base shrink-0">
-                    {z.icon}
-                  </span>
-                  <span>{z.name}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Specific Location */}
-          <div className="grid grid-cols-1 gap-space-sm mt-1">
-            <div className="flex flex-col gap-1">
-              <label className="font-label-sm text-label-sm text-on-surface-variant">
-                ระบุจุด/ห้อง/ตำแหน่งเฉพาะ
-              </label>
-              <div className="relative flex items-center">
-                <MapPin className="w-4 h-4 absolute left-3 text-on-surface-variant" />
-                <input
-                  className="w-full h-12 pl-10 pr-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:bg-surface-container-lowest focus:outline-none border border-slate-200/50"
-                  placeholder="เช่น ซุ้มกาแฟสด, คอกแกะอนุบาล"
-                  required
-                  type="text"
-                  value={specificLocation}
-                  onChange={(e) => setSpecificLocation(e.target.value)}
-                />
-              </div>
-            </div>
-
+          <div className="relative flex items-center">
+            <MapPin className="w-4 h-4 absolute left-3.5 text-on-surface-variant" />
+            <input
+              className="w-full h-12 pl-10 pr-4 rounded-xl bg-surface-container-low text-on-surface font-body-md text-sm focus:bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 border border-slate-200 transition-all"
+              placeholder="เช่น ห้องอาหารครัวหลัก, ห้องน้ำโซนลำธาร, คอกแกะ, อาคารสำนักงาน ฯลฯ"
+              required
+              type="text"
+              value={specificLocation}
+              onChange={(e) => setSpecificLocation(e.target.value)}
+            />
           </div>
         </section>
 
@@ -804,14 +807,27 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-            <div className="rounded-xl bg-surface-container-low p-3"><span className="text-xs text-on-surface-variant block">ผู้แจ้ง</span><strong>{requesterName}</strong><div className="text-xs text-on-surface-variant">{requesterPhone} • {department}</div></div>
-            <div className="rounded-xl bg-surface-container-low p-3"><span className="text-xs text-on-surface-variant block">สถานที่</span><strong>{specificLocation}</strong><div className="text-xs text-on-surface-variant">{zones.find(z => z.key === selectedZone)?.name}</div></div>
-            <div className="rounded-xl bg-surface-container-low p-3 sm:col-span-2"><span className="text-xs text-on-surface-variant block">รายละเอียดอาการ</span><strong className="whitespace-pre-wrap">{problemDetail}</strong></div>
+            <div className="rounded-xl bg-surface-container-low p-3">
+              <span className="text-xs text-on-surface-variant block">แผนกที่แจ้งงาน</span>
+              <strong className="text-primary font-bold text-sm block">{department}</strong>
+              <div className="text-xs text-on-surface-variant mt-0.5">{requesterName} • {requesterPhone}</div>
+            </div>
+            <div className="rounded-xl bg-surface-container-low p-3">
+              <span className="text-xs text-on-surface-variant block">สถานที่ / จุดเกิดเหตุ</span>
+              <strong className="block text-sm">{specificLocation || 'ไม่ระบุ'}</strong>
+            </div>
+            <div className="rounded-xl bg-surface-container-low p-3 sm:col-span-2">
+              <span className="text-xs text-on-surface-variant block">รายละเอียดอาการ</span>
+              <strong className="whitespace-pre-wrap block text-sm">{problemDetail}</strong>
+            </div>
             <div className="rounded-xl bg-surface-container-low p-3">
               <span className="text-xs text-on-surface-variant block mb-1">สายงานที่รับผิดชอบ</span>
               <DivisionBadge division={selectedDivision} size="sm" />
             </div>
-            <div className="rounded-xl bg-surface-container-low p-3"><span className="text-xs text-on-surface-variant block">ความเร่งด่วน</span><strong>{priority === 'critical' ? 'ด่วนที่สุด / ฉุกเฉิน' : priority === 'high' ? 'ด่วน' : 'ปกติ'}</strong></div>
+            <div className="rounded-xl bg-surface-container-low p-3">
+              <span className="text-xs text-on-surface-variant block">ความเร่งด่วน</span>
+              <strong className="block text-sm">{priority === 'critical' ? 'ด่วนที่สุด / ฉุกเฉิน' : priority === 'high' ? 'ด่วน' : 'ปกติ'}</strong>
+            </div>
           </div>
           <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800">
             <Info className="w-4 h-4 text-emerald-700 shrink-0" />
