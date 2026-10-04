@@ -893,7 +893,25 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                       ? 'คุณสามารถกด "ดูคิวทั้งหมด" เพื่อดูงานของเพื่อนร่วมแผนก หรือแจ้งซ่อมรายการใหม่'
                       : 'คิวงานทั้งหมดของแผนกนี้เสร็จสิ้นแล้ว หรือยังไม่มีการส่งใบแจ้งซ่อมใหม่'}
                   </p>
-                  <div className="flex items-center gap-2 mt-2">
+                  <div className="flex items-center gap-2 mt-2 flex-wrap justify-center">
+                    {myDepartment !== 'all' && (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectDepartment('all')}
+                        className="px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-xl text-xs font-bold hover:bg-primary/20 cursor-pointer shadow-xs"
+                      >
+                        🏢 ดูคิวงานของทุกแผนก (แสดงทั้งหมด)
+                      </button>
+                    )}
+                    {selectedDivisionFilter !== 'all' && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDivisionFilter('all')}
+                        className="px-3 py-1.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-200 cursor-pointer shadow-xs"
+                      >
+                        🔍 ดูทุกฝ่าย (ซ่อมบำรุง/ก่อสร้าง/ศิลป์)
+                      </button>
+                    )}
                     {filterMyTicketsOnly && (
                       <button
                         type="button"
@@ -1463,7 +1481,34 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                       ? 'คุณสามารถกดปิดตัวกรองงานของฉัน เพื่อดูรายการทั้งหมดของแผนก'
                       : `เมื่อแผนก ${myDepartment} ส่งใบแจ้งซ่อม รายการจะแสดงสถานะ คิวงาน และชื่อช่างผู้รับผิดชอบตรงนี้`}
                   </p>
-                  <div className="flex items-center gap-2 mt-2">
+                  <div className="flex items-center gap-2 mt-2 flex-wrap justify-center">
+                    {myDepartment !== 'all' && (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectDepartment('all')}
+                        className="px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 rounded-xl text-xs font-bold hover:bg-primary/20 cursor-pointer shadow-xs"
+                      >
+                        🏢 ดูงานของทุกแผนก (แสดงทั้งหมด)
+                      </button>
+                    )}
+                    {selectedDivisionFilter !== 'all' && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDivisionFilter('all')}
+                        className="px-3 py-1.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-200 cursor-pointer shadow-xs"
+                      >
+                        🔍 ดูทุกฝ่าย (ซ่อมบำรุง/ก่อสร้าง/ศิลป์)
+                      </button>
+                    )}
+                    {filterStatus !== 'all' && (
+                      <button
+                        type="button"
+                        onClick={() => setFilterStatus('all')}
+                        className="px-3 py-1.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold hover:bg-slate-200 cursor-pointer shadow-xs"
+                      >
+                        📋 ดูทุกสถานะ (รวมงานเสร็จสิ้น)
+                      </button>
+                    )}
                     {filterMyTicketsOnly && (
                       <button
                         type="button"

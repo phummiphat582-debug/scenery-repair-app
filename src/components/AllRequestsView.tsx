@@ -24,9 +24,9 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
   onQuickAccept,
   onDeleteTicket
 }) => {
-  const [selectedDivision, setSelectedDivision] = useState<string>('84');
+  const [selectedDivision, setSelectedDivision] = useState<string>('all');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('active');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [onlyUrgent, setOnlyUrgent] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortOrder, setSortOrder] = useState<SortOrder>('fifo');
@@ -49,6 +49,7 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
       : tickets.filter(t => (t.division || '84') === selectedDivision);
 
     return {
+      all: divTickets.length,
       active: divTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length,
       pending: divTickets.filter(t => t.status === 'pending' || t.status === 'assigned').length,
       in_progress: divTickets.filter(t => t.status === 'in_progress').length,

@@ -87,10 +87,10 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
             <CheckCircle2 className="w-8 h-8" />
           </div>
           <h3 className="text-base font-bold text-on-surface">
-            ยังไม่มีรายการงานซ่อมในระบบ
+            ไม่พบรายการงานซ่อมในเงื่อนไขตัวกรองนี้
           </h3>
           <p className="text-xs text-on-surface-variant">
-            เมื่อมีผู้แจ้งซ่อมเข้ามา งานจะมาปรากฏในตารางคิวนี้ทันที
+            คุณสามารถกดเลือกแท็บ "📋 ทั้งหมด" หรือเลือกดูทุกฝ่าย / ทุกแผนก เพื่อดูงานทั้งหมดในระบบ
           </p>
         </div>
       </div>

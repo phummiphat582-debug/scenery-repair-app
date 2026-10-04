@@ -117,6 +117,24 @@ export const QueueControls: React.FC<QueueControlsProps> = ({
         {/* Status Pills Bar */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
           <button
+            onClick={() => onStatusFilterChange('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex-none flex items-center gap-1.5 ${
+              statusFilter === 'all'
+                ? 'bg-primary text-white shadow-xs'
+                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <span>📋 ทั้งหมด</span>
+            {statusCounts?.all !== undefined && (
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+              }`}>
+                {statusCounts.all}
+              </span>
+            )}
+          </button>
+
+          <button
             onClick={() => onStatusFilterChange('active')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex-none flex items-center gap-1.5 ${
               statusFilter === 'active'
