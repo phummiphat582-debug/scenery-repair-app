@@ -89,10 +89,10 @@ export const AcceptWorkModal: React.FC<AcceptWorkModalProps> = ({
         localStorage.setItem('scenery_technician_name', finalName);
       } catch {}
 
-      await onConfirmAccept(ticket.id, finalName, selectedTechPhone.trim());
       onClose();
+      await onConfirmAccept(ticket.id, finalName, selectedTechPhone.trim());
     } catch (err: any) {
-      setErrorMessage(err.message || 'เกิดข้อผิดพลาดในการรับงาน');
+      console.warn('เกิดข้อผิดพลาดในการรับงาน:', err);
     } finally {
       setIsSubmitting(false);
     }

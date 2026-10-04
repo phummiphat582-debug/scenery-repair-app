@@ -185,16 +185,12 @@ function filterTechnicianQuery(query: any, idOrName: string) {
   return query.eq('name', idOrName);
 }
 
-const isLocalEnv = (): boolean =>
-  typeof window !== 'undefined' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
 class TicketService {
   private tickets: Ticket[] = [];
   private departments: Department[] = [];
   private technicians: Technician[] = [];
   private listeners: Set<() => void> = new Set();
-  private eventSource: EventSource | null = null;
   private pollInterval: any = null;
   private isInitialSyncDone = false;
   private initialSyncPromise: Promise<void> | null = null;
@@ -285,16 +281,13 @@ class TicketService {
     // 2. Setup Supabase Realtime channel (Instant WebSocket broadcast & CDC)
     this.setupSupabaseRealtime();
 
-    // 3. Connect Server-Sent Events (SSE) for local development if present
-    this.connectSSE();
-
-    // 4. Background safety polling (every 3.5s when active tab, ensures 100% real-time cross-device sync)
+    // 3. Background safety polling (every 20s as fallback when active tab; Supabase Realtime WebSocket handles instant sync)
     if (!this.pollInterval) {
       this.pollInterval = setInterval(() => {
         if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
           void this.syncFromServer();
         }
-      }, 3500);
+      }, 20000);
     }
   }
 
@@ -311,10 +304,22 @@ class TicketService {
   private broadcastEvent(event: string, payload: any) {
     if (this.supabaseChannel && this.isConnectedToCloud) {
       try {
+        let cleanPayload = payload;
+        if (payload?.ticket) {
+          const { requestImageUrl, resultImageUrl, ...rest } = payload.ticket;
+          cleanPayload = {
+            ...payload,
+            ticket: {
+              ...rest,
+              requestImageUrl: requestImageUrl && requestImageUrl.length > 200 ? '[ATTACHED]' : requestImageUrl,
+              resultImageUrl: resultImageUrl && resultImageUrl.length > 200 ? '[ATTACHED]' : resultImageUrl
+            }
+          };
+        }
         this.supabaseChannel.send({
           type: 'broadcast',
           event: event,
-          payload: payload
+          payload: cleanPayload
         });
       } catch (e) {
         console.warn('[TicketService] Broadcast failed:', e);
@@ -391,37 +396,6 @@ class TicketService {
     }
   }
 
-  private connectSSE() {
-    if (!isLocalEnv() || this.eventSource) return;
-
-    try {
-      this.eventSource = new EventSource('/api/realtime');
-
-      this.eventSource.onmessage = (e) => {
-        try {
-          const data = JSON.parse(e.data);
-          if (
-            data.type === 'TICKET_CREATED' ||
-            data.type === 'TICKET_UPDATED' ||
-            data.type === 'TICKET_DELETED' ||
-            data.type === 'ALL_TICKETS_CLEARED' ||
-            data.type === 'TECHNICIANS_UPDATED' ||
-            data.type === 'SYNC_REQUIRED'
-          ) {
-            void this.syncFromServer();
-          }
-        } catch {}
-      };
-
-      this.eventSource.onerror = () => {
-        if (this.eventSource) {
-          this.eventSource.close();
-          this.eventSource = null;
-        }
-        setTimeout(() => this.connectSSE(), 10000);
-      };
-    } catch {}
-  }
 
   public subscribe(callback: () => void): () => void {
     this.listeners.add(callback);
@@ -512,44 +486,6 @@ class TicketService {
         } catch (supaErr) {
           console.warn('[TicketService] Cloud sync error:', supaErr);
         }
-      }
-
-      // 2. Local REST API Sync (Fallback only when running with local express backend on localhost)
-      if (isLocalEnv()) {
-        try {
-          const [ticketsRes, techsRes, deptsRes] = await Promise.allSettled([
-            fetch('/api/tickets', { cache: 'no-store' }),
-            fetch('/api/technicians', { cache: 'no-store' }),
-            fetch('/api/departments', { cache: 'no-store' })
-          ]);
-
-          if (ticketsRes.status === 'fulfilled' && ticketsRes.value.ok) {
-            const serverTickets: Ticket[] = await ticketsRes.value.json();
-            if (Array.isArray(serverTickets) && JSON.stringify(serverTickets) !== JSON.stringify(this.tickets)) {
-              this.tickets = serverTickets;
-              changed = true;
-            }
-          }
-
-          if (techsRes.status === 'fulfilled' && techsRes.value.ok) {
-            const serverTechs: Technician[] = await techsRes.value.json();
-            if (Array.isArray(serverTechs)) {
-              const filteredTechs = removeLegacyDemoTechnicians(serverTechs);
-              if (JSON.stringify(filteredTechs) !== JSON.stringify(this.technicians)) {
-                this.technicians = filteredTechs;
-                changed = true;
-              }
-            }
-          }
-
-          if (deptsRes.status === 'fulfilled' && deptsRes.value.ok) {
-            const serverDepts: Department[] = await deptsRes.value.json();
-            if (Array.isArray(serverDepts) && serverDepts.length > 0 && JSON.stringify(serverDepts) !== JSON.stringify(this.departments)) {
-              this.departments = serverDepts;
-              changed = true;
-            }
-          }
-        } catch {}
       }
 
       if (changed || !this.isInitialSyncDone) {
@@ -650,16 +586,6 @@ class TicketService {
       }
     }
 
-    if (isLocalEnv()) {
-      try {
-        await fetch('/api/technicians', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(tech)
-        });
-      } catch {}
-    }
-
     const existingIdx = this.technicians.findIndex(t => t.name.toLowerCase() === trimmedName.toLowerCase());
     if (existingIdx !== -1) {
       this.technicians[existingIdx] = newTech;
@@ -682,6 +608,15 @@ class TicketService {
     const baseRole = (updates.role !== undefined ? updates.role : (item?.role || 'ช่างซ่อมบำรุง')).replace(/\s*\[(84|85|86)\]\s*/g, '').trim();
     const roleWithDivision = divisionId ? `${baseRole} [${divisionId}]` : baseRole;
 
+    // Optimistic local update
+    if (item) {
+      Object.assign(item, updates);
+      if (divisionId) item.departmentId = divisionId;
+      item.role = baseRole;
+      this.saveToLocalStorage();
+      this.notify();
+    }
+
     if (isSupabaseConfigured && supabase) {
       try {
         const row: any = {};
@@ -700,39 +635,23 @@ class TicketService {
 
         let query = supabase.from('technicians').update(row);
         query = filterTechnicianQuery(query, targetId);
-        const { error } = await query;
-        if (error) {
-          console.error('[TicketService] Supabase updateTechnician error:', error);
-          throw error;
-        }
+        await query;
       } catch (e) {
         console.warn('[TicketService] Supabase updateTechnician failed:', e);
       }
     }
 
-    if (isLocalEnv()) {
-      try {
-        await fetch(`/api/technicians/${encodeURIComponent(targetId)}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updates)
-        });
-      } catch {}
-    }
-
-    if (item) {
-      Object.assign(item, updates);
-      if (divisionId) item.departmentId = divisionId;
-      item.role = baseRole;
-      this.saveToLocalStorage();
-      this.notify();
-    }
     return [...this.technicians];
   }
 
   public async deleteTechnician(idOrName: string): Promise<Technician[]> {
     const item = this.technicians.find(t => t.id === idOrName || t.name === idOrName);
     const targetId = item ? item.id : idOrName;
+
+    // Optimistic local delete
+    this.technicians = this.technicians.filter(t => t.id !== idOrName && t.name !== idOrName);
+    this.saveToLocalStorage();
+    this.notify();
 
     if (isSupabaseConfigured && supabase) {
       try {
@@ -744,15 +663,6 @@ class TicketService {
       }
     }
 
-    if (isLocalEnv()) {
-      try {
-        await fetch(`/api/technicians/${encodeURIComponent(targetId)}`, { method: 'DELETE' });
-      } catch {}
-    }
-
-    this.technicians = this.technicians.filter(t => t.id !== idOrName && t.name !== idOrName);
-    this.saveToLocalStorage();
-    this.notify();
     return [...this.technicians];
   }
 
@@ -764,6 +674,13 @@ class TicketService {
     const item = this.technicians.find(t => t.id === idOrName || t.name === idOrName);
     const id = item ? item.id : idOrName;
 
+    // Optimistic local duty toggle
+    if (item) {
+      item.isOnDutyToday = isOnDuty;
+      this.saveToLocalStorage();
+      this.notify();
+    }
+
     if (isSupabaseConfigured && supabase) {
       try {
         let query = supabase.from('technicians').update({ is_on_duty_today: isOnDuty });
@@ -774,25 +691,18 @@ class TicketService {
       }
     }
 
-    if (isLocalEnv()) {
-      try {
-        await fetch('/api/technicians/duty', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ [id]: isOnDuty })
-        });
-      } catch {}
-    }
-
-    if (item) {
-      item.isOnDutyToday = isOnDuty;
-      this.saveToLocalStorage();
-      this.notify();
-    }
     return [...this.technicians];
   }
 
   public async bulkSetDuty(dutyMap: Record<string, boolean>): Promise<Technician[]> {
+    // Optimistic local bulk update
+    this.technicians.forEach(t => {
+      if (dutyMap[t.id] !== undefined) t.isOnDutyToday = dutyMap[t.id];
+      else if (dutyMap[t.name] !== undefined) t.isOnDutyToday = dutyMap[t.name];
+    });
+    this.saveToLocalStorage();
+    this.notify();
+
     if (isSupabaseConfigured && supabase) {
       try {
         for (const [key, val] of Object.entries(dutyMap)) {
@@ -803,16 +713,6 @@ class TicketService {
       } catch (e) {
         console.warn('[TicketService] Supabase bulkSetDuty failed:', e);
       }
-    }
-
-    if (isLocalEnv()) {
-      try {
-        await fetch('/api/technicians/duty', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(dutyMap)
-        });
-      } catch {}
     }
 
     this.technicians.forEach(t => {
@@ -932,7 +832,12 @@ class TicketService {
       updatedAt: nowIso
     };
 
-    // 1. Primary write to Supabase Central Cloud
+    // 1. Optimistic UI: Put into local state immediately so UI updates in 0ms!
+    this.tickets.unshift(created);
+    this.saveToLocalStorage();
+    this.notify();
+
+    // 2. Persist to Supabase Central Cloud
     if (isSupabaseConfigured && supabase) {
       try {
         const dbRow = ticketToDb(created, true);
@@ -942,19 +847,28 @@ class TicketService {
           .select()
           .single();
         if (!error && data) {
-          created = dbToTicket(data);
-          this.broadcastEvent('TICKET_MUTATION', { action: 'CREATE', id: created.id, ticket: created });
+          const serverTicket = dbToTicket(data);
+          const idx = this.tickets.findIndex(t => t.id === created.id);
+          if (idx !== -1) {
+            this.tickets[idx] = { ...this.tickets[idx], ...serverTicket };
+            this.saveToLocalStorage();
+          }
+          this.broadcastEvent('TICKET_MUTATION', { action: 'CREATE', id: serverTicket.id, requestId: serverTicket.requestId });
         } else if (error) {
-          console.warn('[TicketService] Supabase insert returned error:', error.message);
-          // If conflict on request_id, generate collision-free unique id
+          console.warn('[TicketService] Supabase insert error:', error.message);
           if (error.code === '23505') {
             const fallbackId = `REP-${yearMonth}-${Date.now().toString().slice(-4)}`;
             dbRow.request_id = fallbackId;
             created.requestId = fallbackId;
             const retryRes = await supabase.from('repair_tickets').insert([dbRow]).select().single();
             if (retryRes.data) {
-              created = dbToTicket(retryRes.data);
-              this.broadcastEvent('TICKET_MUTATION', { action: 'CREATE', id: created.id, ticket: created });
+              const serverTicket = dbToTicket(retryRes.data);
+              const idx = this.tickets.findIndex(t => t.id === created.id);
+              if (idx !== -1) {
+                this.tickets[idx] = { ...this.tickets[idx], ...serverTicket };
+                this.saveToLocalStorage();
+              }
+              this.broadcastEvent('TICKET_MUTATION', { action: 'CREATE', id: serverTicket.id, requestId: serverTicket.requestId });
             }
           }
         }
@@ -963,24 +877,6 @@ class TicketService {
       }
     }
 
-    // 2. Try REST API if local server is active
-    if (isLocalEnv()) {
-      try {
-        const res = await fetch('/api/tickets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(created)
-        });
-        if (res.ok) {
-          const serverTicket: Ticket = await res.json();
-          created = serverTicket;
-        }
-      } catch {}
-    }
-
-    this.tickets.unshift(created);
-    this.saveToLocalStorage();
-    this.notify();
     return created;
   }
 
@@ -995,7 +891,14 @@ class TicketService {
       finalUpdates.completedAt = nowIso;
     }
 
-    // 1. Primary write to Supabase Central Cloud
+    // 1. Optimistic UI: Apply immediately so UI responds in 0ms!
+    if (existing) {
+      Object.assign(existing, finalUpdates);
+      this.saveToLocalStorage();
+      this.notify();
+    }
+
+    // 2. Persist to Supabase Central Cloud
     if (isSupabaseConfigured && supabase) {
       try {
         const dbUpdates = ticketToDb(finalUpdates, false);
@@ -1011,34 +914,16 @@ class TicketService {
         }
         const { error } = await query;
         if (error) {
-          console.warn('[TicketService] Supabase update returned error:', error.message);
+          console.warn('[TicketService] Supabase update error:', error.message);
         } else {
-          this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id, requestId: targetRequestId, updates: finalUpdates });
+          this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id, requestId: targetRequestId });
         }
       } catch (e) {
         console.warn('[TicketService] Supabase update exception:', e);
       }
     }
 
-    // 2. Try REST API
-    if (isLocalEnv()) {
-      try {
-        await fetch(`/api/tickets/${encodeURIComponent(id)}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(finalUpdates)
-        });
-      } catch {}
-    }
-
-    if (existing) {
-      Object.assign(existing, finalUpdates);
-      this.saveToLocalStorage();
-      this.notify();
-      return existing;
-    }
-
-    return null;
+    return existing || null;
   }
 
   public async deleteTicket(id: string): Promise<void> {
@@ -1046,7 +931,12 @@ class TicketService {
     const targetRequestId = existing?.requestId || (id.startsWith('REP-') ? id : undefined);
     const targetUuid = (existing?.id && UUID_REGEX.test(existing.id)) ? existing.id : (UUID_REGEX.test(id) ? id : undefined);
 
-    // 1. Primary delete on Supabase Central Cloud
+    // 1. Optimistic UI: Remove from memory immediately!
+    this.tickets = this.tickets.filter(t => t.id !== id && t.requestId !== id);
+    this.saveToLocalStorage();
+    this.notify();
+
+    // 2. Persist delete to Supabase Central Cloud
     if (isSupabaseConfigured && supabase) {
       try {
         let query = supabase.from('repair_tickets').delete();
@@ -1059,46 +949,27 @@ class TicketService {
         } else {
           query = filterTicketQuery(query, id);
         }
-        const { error } = await query;
-        if (error) {
-          console.warn('[TicketService] Supabase delete returned error:', error.message);
-        } else {
-          this.broadcastEvent('TICKET_MUTATION', { action: 'DELETE', id, requestId: targetRequestId });
-        }
+        await query;
+        this.broadcastEvent('TICKET_MUTATION', { action: 'DELETE', id, requestId: targetRequestId });
       } catch (e) {
         console.warn('[TicketService] Supabase delete exception:', e);
       }
     }
-
-    if (isLocalEnv()) {
-      try {
-        await fetch(`/api/tickets/${encodeURIComponent(id)}`, { method: 'DELETE' });
-      } catch {}
-    }
-
-    this.tickets = this.tickets.filter(t => t.id !== id && t.requestId !== id);
-    this.saveToLocalStorage();
-    this.notify();
   }
 
   public async clearAllTickets(): Promise<void> {
+    this.tickets = [];
+    this.saveToLocalStorage();
+    this.notify();
+
     if (isSupabaseConfigured && supabase) {
       try {
         await supabase.from('repair_tickets').delete().neq('request_id', '');
+        this.broadcastEvent('TICKET_MUTATION', { action: 'CLEAR_ALL' });
       } catch (e) {
         console.warn('[TicketService] Supabase clearAllTickets failed:', e);
       }
     }
-
-    if (isLocalEnv()) {
-      try {
-        await fetch('/api/tickets/clear-all', { method: 'POST' });
-      } catch {}
-    }
-
-    this.tickets = [];
-    this.saveToLocalStorage();
-    this.notify();
   }
 
   public async importTickets(imported: Ticket[], overwrite: boolean = false): Promise<void> {
@@ -1114,19 +985,8 @@ class TicketService {
       try {
         const rows = imported.map(t => ticketToDb(t, false));
         await supabase.from('repair_tickets').upsert(rows, { onConflict: 'request_id' });
+        this.broadcastEvent('TICKET_MUTATION', { action: 'IMPORT' });
       } catch (e) {}
-    }
-
-    if (isLocalEnv()) {
-      for (const t of imported) {
-        try {
-          await fetch('/api/tickets', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(t)
-          });
-        } catch {}
-      }
     }
   }
 
@@ -1137,12 +997,8 @@ class TicketService {
     if (isSupabaseConfigured && supabase) {
       try {
         await supabase.from('repair_tickets').delete().neq('request_id', '');
+        this.broadcastEvent('TICKET_MUTATION', { action: 'RESET_DEMO' });
       } catch (e) {}
-    }
-    if (isLocalEnv()) {
-      try {
-        await fetch('/api/tickets/clear-all', { method: 'POST' });
-      } catch {}
     }
   }
 }

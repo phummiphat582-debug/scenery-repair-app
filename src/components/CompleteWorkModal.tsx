@@ -207,6 +207,7 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
         `อะไหล่ที่เปลี่ยน: ${partsSummary}`
       ].join('\n');
 
+      onClose();
       await onConfirmComplete(ticket.id, {
         diagnosticReason: diagnosticReason.trim(),
         actionSteps: actionSteps.trim(),
@@ -214,10 +215,8 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
         parts: validParts,
         resultImageUrl: resultImageUrl || undefined
       });
-
-      onClose();
     } catch (err: any) {
-      setErrorMessage(err.message || 'บันทึกจบงานไม่สำเร็จ');
+      console.warn('บันทึกจบงานไม่สำเร็จ:', err);
     } finally {
       setIsSubmitting(false);
     }

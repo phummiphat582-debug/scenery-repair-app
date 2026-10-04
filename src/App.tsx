@@ -92,25 +92,21 @@ export const App: React.FC = () => {
     }
   };
 
-  const loadDataSilently = async () => {
+  const updateStateFromCache = () => {
     try {
-      const [depts, techs, tix] = await Promise.all([
-        ticketService.getDepartments(),
-        ticketService.getTechnicians(),
-        ticketService.getTickets({ statusFilter: 'all', sortOrder: 'fifo' })
-      ]);
-      setDepartments(depts);
-      setTechnicians(techs);
-      setTickets(tix);
+      const cached = ticketService.getCachedData();
+      if (cached.departments.length > 0) setDepartments(cached.departments);
+      if (cached.technicians.length > 0) setTechnicians(cached.technicians);
+      setTickets(cached.tickets);
     } catch (err) {
-      console.warn('Real-time background sync error:', err);
+      console.warn('Cache state sync error:', err);
     }
   };
 
   useEffect(() => {
     loadData();
     const unsubscribe = ticketService.subscribe(() => {
-      loadDataSilently();
+      updateStateFromCache();
     });
     return () => unsubscribe();
   }, []);
@@ -189,17 +185,15 @@ export const App: React.FC = () => {
     } else {
       showToast(`อัปเดตข้อมูลใบงาน #${targetRequestId} เรียบร้อย`);
     }
-    await loadData();
   };
 
   const handleDeleteTicket = async (id: string) => {
     const target = tickets.find(t => t.id === id || t.requestId === id);
     const reqId = target?.requestId || id;
-    await ticketService.deleteTicket(id);
     setIsDetailModalOpen(false);
     setSelectedTicket(null);
-    await loadData();
     showToast(`🗑️ ลบรายการ #${reqId} ออกจากฐานข้อมูลเรียบร้อยแล้ว`, 'info');
+    await ticketService.deleteTicket(id);
   };
 
   const handleRequestDeleteTicket = (ticket: Ticket) => {
@@ -231,7 +225,6 @@ export const App: React.FC = () => {
     void oneSignalService.notifyTechnicians(created);
     confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
     showToast(`ส่งใบแจ้งซ่อม #${created.requestId} สำเร็จ!`);
-    await loadData();
     if (userRole === 'technician') {
       setTimeout(() => {
         setCurrentTab('all-requests');
