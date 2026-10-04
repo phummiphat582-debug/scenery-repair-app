@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Ticket, PartItem } from '../types';
 import { compressImage } from '../lib/imageCompress';
 import { 
@@ -88,7 +88,28 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (isOpen && ticket) {
+      setDiagnosticReason(ticket.diagnosticReason || '');
+      setActionSteps(ticket.actionSteps || '');
+      setResultImageUrl(ticket.resultImageUrl || '');
+      setHasParts(Array.isArray(ticket.parts) && ticket.parts.length > 0);
+      setPartsList(
+        Array.isArray(ticket.parts) && ticket.parts.length > 0
+          ? ticket.parts.map(p => ({
+              id: p.id || 'part-' + Math.random().toString(36).slice(2, 6),
+              name: p.name,
+              quantity: p.quantity || 1,
+              unit: 'ชิ้น',
+              cost: p.cost || 0
+            }))
+          : []
+      );
+      setErrorMessage('');
+      setIsSubmitting(false);
+      setIsProcessingImage(false);
+    }
+  }, [isOpen, ticket?.id]);
 
   if (!isOpen || !ticket) return null;
 
@@ -125,10 +146,10 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
       const compressed = await compressImage(file, 1200, 1200, 0.75);
       setResultImageUrl(compressed);
     } catch (err: any) {
-      alert('ไม่สามารถประมวลผลรูปภาพได้: ' + err.message);
+      alert('ไม่สามารถประมวลผลรูปภาพได้: ' + (err?.message || 'เกิดข้อผิดพลาด'));
     } finally {
       setIsProcessingImage(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      e.target.value = '';
     }
   };
 
@@ -433,21 +454,29 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
 
           {/* 4. After Repair Photo (รูปภาพหลังแก้ไข) */}
           <div className="space-y-2">
-            <label className="text-xs font-extrabold text-on-surface flex items-center justify-between gap-1.5">
-              <span className="flex items-center gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-extrabold text-on-surface flex items-center gap-1.5">
                 <Camera className="w-4 h-4 text-primary" />
                 <span>4. รูปภาพหลังแก้ไข (หลักฐานงานซ่อมเสร็จ)</span>
-              </span>
+              </label>
               <span className="text-[11px] text-on-surface-variant font-normal">
-                (ถ่ายรูปด้วยมือถือหรือแนบรูป)
+                (ถ่ายสดหรือเลือกจากอัลบั้ม)
               </span>
-            </label>
+            </div>
 
+            {/* Hidden native file inputs */}
             <input
+              id="complete-work-camera-input"
               type="file"
-              ref={fileInputRef}
               accept="image/*"
               capture="environment"
+              onChange={handleImageCapture}
+              className="hidden"
+            />
+            <input
+              id="complete-work-gallery-input"
+              type="file"
+              accept="image/*"
               onChange={handleImageCapture}
               className="hidden"
             />
@@ -460,22 +489,29 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
                   className="w-full h-48 sm:h-56 object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-between p-3">
-                  <span className="text-white text-xs font-bold flex items-center gap-1">
+                  <span className="text-white text-xs font-bold flex items-center gap-1.5">
                     <Check className="w-4 h-4 text-emerald-400" />
                     แนบรูปหลักฐานเรียบร้อยแล้ว
                   </span>
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-2.5 py-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                    <label
+                      htmlFor="complete-work-camera-input"
+                      className="px-2.5 py-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 active:scale-95"
                     >
-                      ถ่ายใหม่
-                    </button>
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>ถ่ายใหม่</span>
+                    </label>
+                    <label
+                      htmlFor="complete-work-gallery-input"
+                      className="px-2.5 py-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5" />
+                      <span>เลือกใหม่</span>
+                    </label>
                     <button
                       type="button"
                       onClick={() => setResultImageUrl('')}
-                      className="p-1.5 bg-rose-600/80 hover:bg-rose-600 text-white rounded-xl transition-all cursor-pointer"
+                      className="p-1.5 bg-rose-600/80 hover:bg-rose-600 text-white rounded-xl transition-all cursor-pointer active:scale-95"
                       title="ลบรูปนี้"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -484,24 +520,52 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
                 </div>
               </div>
             ) : (
-              <button
-                type="button"
-                disabled={isProcessingImage}
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full p-6 border-2 border-dashed border-slate-300 hover:border-primary rounded-2xl bg-surface-container-low hover:bg-surface-container flex flex-col items-center justify-center gap-2 text-on-surface-variant transition-all cursor-pointer group"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary group-hover:scale-110 flex items-center justify-center transition-transform">
-                  <Camera className="w-6 h-6" />
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2.5">
+                  {/* Option 1: Live Camera */}
+                  <label
+                    htmlFor="complete-work-camera-input"
+                    className="p-4 border-2 border-dashed border-slate-300 hover:border-primary rounded-2xl bg-surface-container-low hover:bg-primary/5 flex flex-col items-center justify-center gap-2 text-on-surface-variant transition-all cursor-pointer active:scale-98 group"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary group-hover:scale-110 flex items-center justify-center transition-transform">
+                      <Camera className="w-6 h-6" />
+                    </div>
+                    <div className="text-center">
+                      <span className="text-xs font-bold text-on-surface block">
+                        เปิดกล้องถ่ายสด
+                      </span>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">
+                        ถ่ายด้วยกล้องมือถือ
+                      </span>
+                    </div>
+                  </label>
+
+                  {/* Option 2: Gallery / Album */}
+                  <label
+                    htmlFor="complete-work-gallery-input"
+                    className="p-4 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl bg-surface-container-low hover:bg-emerald-50 flex flex-col items-center justify-center gap-2 text-on-surface-variant transition-all cursor-pointer active:scale-98 group"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 group-hover:scale-110 flex items-center justify-center transition-transform">
+                      <ImageIcon className="w-6 h-6" />
+                    </div>
+                    <div className="text-center">
+                      <span className="text-xs font-bold text-on-surface block">
+                        เลือกจากอัลบั้ม
+                      </span>
+                      <span className="text-[10px] text-slate-400 mt-0.5 block">
+                        คลังรูปภาพในเครื่อง
+                      </span>
+                    </div>
+                  </label>
                 </div>
-                <div className="text-center">
-                  <span className="text-xs font-bold text-on-surface block">
-                    {isProcessingImage ? 'กำลังประมวลผลรูปภาพ...' : 'แตะเพื่อถ่ายรูป หรือเลือกรูปภาพหลังซ่อม'}
-                  </span>
-                  <span className="text-[11px] text-slate-400 mt-0.5 block">
-                    ระบบจะบีบอัดรูปภาพอัตโนมัติ ไม่เปลืองเน็ตมือถือ
-                  </span>
-                </div>
-              </button>
+
+                {isProcessingImage && (
+                  <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl flex items-center justify-center gap-2 text-xs font-semibold text-primary animate-pulse">
+                    <Sparkles className="w-4 h-4 animate-spin" />
+                    <span>กำลังบีบอัดและประมวลผลรูปภาพ กรุณารอสักครู่...</span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
