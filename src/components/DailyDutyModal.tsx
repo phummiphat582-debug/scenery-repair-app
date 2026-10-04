@@ -5,6 +5,7 @@ import { X, Users, CheckCircle2, Phone, Save, Edit3, ShieldAlert, Camera } from 
 import { ConfirmModal } from './ConfirmModal';
 import { DIVISION_LIST, getTechnicianDivision } from '../data/divisionData';
 import { DivisionBadge } from './DivisionBadge';
+import { compressImage } from '../lib/imageCompress';
 
 interface DailyDutyModalProps {
   isOpen: boolean;
@@ -89,16 +90,16 @@ export const DailyDutyModal: React.FC<DailyDutyModalProps> = ({
     onDutyChanged();
   };
 
-  const handleDirectPhotoUpload = (tech: Technician, file: File) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      if (e.target?.result) {
-        const url = e.target.result as string;
+  const handleDirectPhotoUpload = async (tech: Technician, file: File) => {
+    try {
+      const url = await compressImage(file, 200, 200, 0.7);
+      if (url) {
         await ticketService.updateTechnician(tech.id, { avatarUrl: url });
         onDutyChanged();
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (e) {
+      console.warn('Avatar compression failed:', e);
+    }
   };
 
   const onDutyCount = Object.values(dutyMap).filter(Boolean).length;

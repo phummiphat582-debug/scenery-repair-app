@@ -19,8 +19,8 @@ export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    // PIN สำหรับทีมช่าง
-    if (pin === '1234' || pin === '9999' || pin === '0000') {
+    // PIN สำหรับทีมช่าง (ต้องเป็น 1234 เท่านั้น)
+    if (pin === '1234') {
       setError(false);
       setPin('');
       onSuccess();
@@ -34,7 +34,7 @@ export const RoleLoginModal: React.FC<RoleLoginModalProps> = ({
       const next = pin + n;
       setPin(next);
       if (next.length === 4) {
-        if (next === '1234' || next === '9999' || next === '0000') {
+        if (next === '1234') {
           setTimeout(() => {
             setError(false);
             setPin('');

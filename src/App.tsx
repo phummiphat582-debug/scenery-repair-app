@@ -27,9 +27,12 @@ import { RotateCw, Trash2 } from 'lucide-react';
 
 export const App: React.FC = () => {
   // User Role: 'requester' (ผู้แจ้ง) | 'technician' (ช่าง / หลังบ้าน)
+  // ต้องยืนยันรหัส PIN 1234 เท่านั้นจึงจะเข้าหน้าช่างได้
   const [userRole, setUserRole] = useState<UserRole>(() => {
+    const isAuthed = sessionStorage.getItem('scenery_tech_authed') === '1234';
+    if (!isAuthed) return 'requester';
     const saved = localStorage.getItem('scenery_user_role');
-    return (saved === 'requester' || saved === 'technician') ? saved : 'requester';
+    return saved === 'technician' ? 'technician' : 'requester';
   });
 
   // Modal for entering technician backend
@@ -111,6 +114,18 @@ export const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  // Strict Technician Screen Security Guard:
+  // หากไม่มีรหัสผ่าน 1234 ใน session จะไม่สามารถเข้าหน้าช่างได้เด็ดขาด
+  useEffect(() => {
+    if (userRole === 'technician') {
+      const isAuthed = sessionStorage.getItem('scenery_tech_authed') === '1234';
+      if (!isAuthed) {
+        setUserRole('requester');
+        setIsRoleLoginOpen(true);
+      }
+    }
+  }, [userRole]);
+
   // Save userRole preference
   const handleSwitchToTechnician = () => {
     setIsRoleLoginOpen(true);
@@ -118,6 +133,7 @@ export const App: React.FC = () => {
 
   const handleRoleLoginSuccess = () => {
     setIsRoleLoginOpen(false);
+    sessionStorage.setItem('scenery_tech_authed', '1234');
     setUserRole('technician');
     localStorage.setItem('scenery_user_role', 'technician');
     void oneSignalService.setTechnicianRole(true);
@@ -126,6 +142,7 @@ export const App: React.FC = () => {
 
   const handleSwitchToRequester = () => {
     setUserRole('requester');
+    sessionStorage.removeItem('scenery_tech_authed');
     localStorage.setItem('scenery_user_role', 'requester');
     void oneSignalService.setTechnicianRole(false);
     showToast('สลับไปยังหน้าผู้แจ้งซ่อม เรียบร้อย 👤', 'info');

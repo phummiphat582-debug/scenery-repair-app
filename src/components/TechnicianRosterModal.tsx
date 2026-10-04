@@ -4,6 +4,7 @@ import { Technician, DivisionId } from '../types';
 import { ticketService } from '../services/ticketService';
 import { DIVISION_LIST, getDivisionInfo, getTechnicianDivision } from '../data/divisionData';
 import { DivisionBadge } from './DivisionBadge';
+import { compressImage } from '../lib/imageCompress';
 
 interface TechnicianRosterModalProps {
   isOpen: boolean;
@@ -70,27 +71,30 @@ export const TechnicianRosterModal: React.FC<TechnicianRosterModalProps> = ({
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const handlePhotoFile = (file: File, callback: (dataUrl: string) => void) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        callback(e.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
+  const handlePhotoFile = async (file: File, callback: (dataUrl: string) => void) => {
+    try {
+      const compressed = await compressImage(file, 200, 200, 0.7);
+      if (compressed) callback(compressed);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) callback(e.target.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  const handleDirectPhotoUpload = (tech: Technician, file: File) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      if (e.target?.result) {
-        const url = e.target.result as string;
+  const handleDirectPhotoUpload = async (tech: Technician, file: File) => {
+    try {
+      const url = await compressImage(file, 200, 200, 0.7);
+      if (url) {
         await ticketService.updateTechnician(tech.id, { avatarUrl: url });
         showToast(`อัปเดตรูปถ่ายของ "${tech.name}" เรียบร้อย 📸`);
         onRosterChanged();
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn('Avatar compression failed:', err);
+    }
   };
 
   const handleAdd = async (e: React.FormEvent) => {

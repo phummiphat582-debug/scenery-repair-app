@@ -145,7 +145,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       try {
-        const compressedUrl = await compressImage(file, 1200, 1200, 0.75);
+        const compressedUrl = await compressImage(file, 800, 800, 0.65);
         if (compressedUrl) {
           const now = new Date();
           const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;

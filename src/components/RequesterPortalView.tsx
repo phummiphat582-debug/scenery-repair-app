@@ -3,6 +3,7 @@ import { Ticket, Department, Technician } from '../types';
 import { NewTicketForm } from './NewTicketForm';
 import { DailyDutyModal } from './DailyDutyModal';
 import { ConfirmModal } from './ConfirmModal';
+import { RoleLoginModal } from './RoleLoginModal';
 import { Phone, Search, Wrench, Clock, CheckCircle2, ChevronRight, User, MapPin, Plus, Shield, CalendarCheck, AlertTriangle, ListOrdered, ClipboardList, ArrowRightLeft, X, Building2, Sparkles, Filter } from 'lucide-react';
 import { DivisionBadge } from './DivisionBadge';
 import { DivisionFilterTabs } from './DivisionFilterTabs';
@@ -39,6 +40,22 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
   const [isChangingDept, setIsChangingDept] = useState(false);
   const [deptSearchText, setDeptSearchText] = useState('');
   const [isDutyModalOpen, setIsDutyModalOpen] = useState(false);
+  const [isDutyPinModalOpen, setIsDutyPinModalOpen] = useState(false);
+
+  const handleOpenDutyModal = () => {
+    const isAuthed = sessionStorage.getItem('scenery_tech_authed') === '1234';
+    if (isAuthed) {
+      setIsDutyModalOpen(true);
+    } else {
+      setIsDutyPinModalOpen(true);
+    }
+  };
+
+  const handleDutyPinSuccess = () => {
+    sessionStorage.setItem('scenery_tech_authed', '1234');
+    setIsDutyPinModalOpen(false);
+    setIsDutyModalOpen(true);
+  };
 
   // Requester identity state to see personal queue position & aging
   const [savedRequesterName, setSavedRequesterName] = useState<string>(() => {
@@ -301,12 +318,12 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
           <button
             type="button"
-            onClick={() => setIsDutyModalOpen(true)}
+            onClick={handleOpenDutyModal}
             className="px-3 py-1.5 bg-surface-container hover:bg-surface-container-high text-primary rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
-            title="สำหรับช่างเช็คชื่อเข้าเวรหรืออัปเดตเบอร์โทร"
+            title="สำหรับช่างเช็คชื่อเข้าเวรหรืออัปเดตเบอร์โทร (ต้องใช้รหัส 1234)"
           >
             <CalendarCheck className="w-3.5 h-3.5 text-primary" />
-            <span>ช่างอัปเดตเวรวันนี้</span>
+            <span>ช่างอัปเดตเวร/เข้างาน 🔒</span>
           </button>
         </div>
 
@@ -1442,6 +1459,13 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       )}
     </div>
   )}
+
+      {/* PIN Gate Modal for Entering Work / Duty (หน้าเข้างาน) */}
+      <RoleLoginModal
+        isOpen={isDutyPinModalOpen}
+        onClose={() => setIsDutyPinModalOpen(false)}
+        onSuccess={handleDutyPinSuccess}
+      />
 
       {/* Daily Duty Attendance Modal */}
       <DailyDutyModal

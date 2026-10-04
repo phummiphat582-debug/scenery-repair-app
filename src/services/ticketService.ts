@@ -363,6 +363,39 @@ class TicketService {
           { event: '*', schema: 'public', table: 'repair_tickets' },
           (payload) => {
             console.log('⚡ [Realtime CDC] Ticket event received:', payload.eventType);
+            try {
+              if (payload.eventType === 'INSERT' && payload.new) {
+                const incoming = dbToTicket(payload.new);
+                if (!this.recentlyDeletedTicketIds.has(incoming.id) && !this.recentlyDeletedTicketIds.has(incoming.requestId)) {
+                  const existingIdx = this.tickets.findIndex(t => t.id === incoming.id || t.requestId === incoming.requestId);
+                  if (existingIdx === -1) {
+                    this.tickets.unshift(incoming);
+                    this.saveToLocalStorage();
+                    this.notify();
+                  }
+                }
+              } else if (payload.eventType === 'UPDATE' && payload.new) {
+                const incoming = dbToTicket(payload.new);
+                const existingIdx = this.tickets.findIndex(t => t.id === incoming.id || t.requestId === incoming.requestId);
+                if (existingIdx !== -1) {
+                  const local = this.tickets[existingIdx];
+                  if (!(local.status === 'completed' && incoming.status !== 'completed')) {
+                    this.tickets[existingIdx] = { ...local, ...incoming };
+                    this.saveToLocalStorage();
+                    this.notify();
+                  }
+                }
+              } else if (payload.eventType === 'DELETE' && payload.old) {
+                const delId = (payload.old as any).id;
+                if (delId) {
+                  this.tickets = this.tickets.filter(t => t.id !== delId && t.requestId !== delId);
+                  this.saveToLocalStorage();
+                  this.notify();
+                }
+              }
+            } catch (cdcErr) {
+              console.warn('[TicketService] Direct CDC merge exception:', cdcErr);
+            }
             void this.syncFromServer();
           }
         )
@@ -371,6 +404,20 @@ class TicketService {
           { event: '*', schema: 'public', table: 'technicians' },
           (payload) => {
             console.log('⚡ [Realtime CDC] Technician event received:', payload.eventType);
+            try {
+              if (payload.new && (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE')) {
+                const incoming = dbToTechnician(payload.new);
+                const idx = this.technicians.findIndex(t => t.id === incoming.id || t.name === incoming.name);
+                if (idx !== -1) {
+                  this.technicians[idx] = { ...this.technicians[idx], ...incoming };
+                } else {
+                  this.technicians.push(incoming);
+                }
+                this.technicians = removeLegacyDemoTechnicians(this.technicians);
+                this.saveToLocalStorage();
+                this.notify();
+              }
+            } catch (e) {}
             void this.syncFromServer();
           }
         )
@@ -462,11 +509,27 @@ class TicketService {
       // 1. Supabase Sync (Primary Central Cloud Database)
       if (isSupabaseConfigured && supabase) {
         try {
-          // A. Fetch Tickets
-          const { data: supaTickets, error: tErr } = await supabase
-            .from('repair_tickets')
-            .select('*')
-            .order('created_at', { ascending: false });
+          // Parallel fetch of Tickets, Technicians, and Departments for high speed
+          const [ticketsRes, techsRes, deptsRes] = await Promise.all([
+            supabase
+              .from('repair_tickets')
+              .select('*')
+              .order('created_at', { ascending: false }),
+            supabase
+              .from('technicians')
+              .select('id, name, role, status, phone, is_on_duty_today, department_id, avatar_url')
+              .order('name'),
+            supabase
+              .from('departments')
+              .select('*')
+          ]);
+
+          const supaTickets = ticketsRes.data;
+          const tErr = ticketsRes.error;
+          const supaTechs = techsRes.data;
+          const techErr = techsRes.error;
+          const supaDepts = deptsRes.data;
+          const dErr = deptsRes.error;
 
           if (!tErr && Array.isArray(supaTickets)) {
             this.isConnectedToCloud = true;
@@ -549,12 +612,7 @@ class TicketService {
             }
           }
 
-          // B. Fetch Technicians
-          const { data: supaTechs, error: techErr } = await supabase
-            .from('technicians')
-            .select('*')
-            .order('name');
-
+          // Process Technicians
           if (!techErr && Array.isArray(supaTechs)) {
             const mappedTechs = removeLegacyDemoTechnicians(supaTechs.map(dbToTechnician));
             if (JSON.stringify(mappedTechs) !== JSON.stringify(this.technicians)) {
@@ -563,11 +621,7 @@ class TicketService {
             }
           }
 
-          // C. Fetch Departments
-          const { data: supaDepts, error: dErr } = await supabase
-            .from('departments')
-            .select('*');
-
+          // Process Departments
           if (!dErr && Array.isArray(supaDepts) && supaDepts.length > 0) {
             const mappedDepts = sortDepartments(supaDepts.map(dbToDepartment));
             if (JSON.stringify(mappedDepts) !== JSON.stringify(this.departments)) {
@@ -929,44 +983,46 @@ class TicketService {
     this.saveToLocalStorage();
     this.notify();
 
-    // 2. Persist to Supabase Central Cloud
+    // 2. Persist to Supabase Central Cloud in background without blocking UI
     if (isSupabaseConfigured && supabase) {
-      try {
-        const dbRow = ticketToDb(created, true);
-        const { data, error } = await supabase
-          .from('repair_tickets')
-          .insert([dbRow])
-          .select()
-          .single();
-        if (!error && data) {
-          const serverTicket = dbToTicket(data);
-          const idx = this.tickets.findIndex(t => t.id === created.id);
-          if (idx !== -1) {
-            this.tickets[idx] = { ...this.tickets[idx], ...serverTicket };
-            this.saveToLocalStorage();
-          }
-          this.broadcastEvent('TICKET_MUTATION', { action: 'CREATE', id: serverTicket.id, requestId: serverTicket.requestId });
-        } else if (error) {
-          console.warn('[TicketService] Supabase insert error:', error.message);
-          if (error.code === '23505') {
-            const fallbackId = `REP-${yearMonth}-${Date.now().toString().slice(-4)}`;
-            dbRow.request_id = fallbackId;
-            created.requestId = fallbackId;
-            const retryRes = await supabase.from('repair_tickets').insert([dbRow]).select().single();
-            if (retryRes.data) {
-              const serverTicket = dbToTicket(retryRes.data);
-              const idx = this.tickets.findIndex(t => t.id === created.id);
-              if (idx !== -1) {
-                this.tickets[idx] = { ...this.tickets[idx], ...serverTicket };
-                this.saveToLocalStorage();
+      void (async () => {
+        try {
+          const dbRow = ticketToDb(created, true);
+          const { data, error } = await supabase
+            .from('repair_tickets')
+            .insert([dbRow])
+            .select()
+            .single();
+          if (!error && data) {
+            const serverTicket = dbToTicket(data);
+            const idx = this.tickets.findIndex(t => t.id === created.id);
+            if (idx !== -1) {
+              this.tickets[idx] = { ...this.tickets[idx], ...serverTicket };
+              this.saveToLocalStorage();
+            }
+            this.broadcastEvent('TICKET_MUTATION', { action: 'CREATE', id: serverTicket.id, requestId: serverTicket.requestId });
+          } else if (error) {
+            console.warn('[TicketService] Supabase insert error:', error.message);
+            if (error.code === '23505') {
+              const fallbackId = `REP-${yearMonth}-${Date.now().toString().slice(-4)}`;
+              dbRow.request_id = fallbackId;
+              created.requestId = fallbackId;
+              const retryRes = await supabase.from('repair_tickets').insert([dbRow]).select().single();
+              if (retryRes.data) {
+                const serverTicket = dbToTicket(retryRes.data);
+                const idx = this.tickets.findIndex(t => t.id === created.id);
+                if (idx !== -1) {
+                  this.tickets[idx] = { ...this.tickets[idx], ...serverTicket };
+                  this.saveToLocalStorage();
+                }
+                this.broadcastEvent('TICKET_MUTATION', { action: 'CREATE', id: serverTicket.id, requestId: serverTicket.requestId });
               }
-              this.broadcastEvent('TICKET_MUTATION', { action: 'CREATE', id: serverTicket.id, requestId: serverTicket.requestId });
             }
           }
+        } catch (e) {
+          console.warn('[TicketService] Supabase insert exception:', e);
         }
-      } catch (e) {
-        console.warn('[TicketService] Supabase insert exception:', e);
-      }
+      })();
     }
 
     return created;
