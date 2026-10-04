@@ -162,6 +162,23 @@ export const oneSignalService = {
     }
   },
 
+  async notifyFollowUp(ticket: {
+    id: string;
+    requestId: string;
+    title: string;
+    department: string;
+    location: string;
+    priority?: string;
+  }, requesterName?: string): Promise<boolean> {
+    const requesterText = requesterName ? ` (ผู้แจ้ง: ${requesterName})` : '';
+    const followUpTitle = `🔔 [ตามงานค้าง] ${ticket.department} เร่งงาน #${ticket.requestId}${requesterText}`;
+    return this.notifyTechnicians({
+      ...ticket,
+      title: followUpTitle,
+      priority: 'critical'
+    });
+  },
+
   async testPushNotification(): Promise<{ ok: boolean; message: string; notificationId?: string }> {
     try {
       const oneSignal = await this.getInstance();

@@ -2,6 +2,7 @@ import { Ticket, Department, Technician, SortOrder, DivisionId } from '../types'
 import { INITIAL_DEPARTMENTS } from '../data/mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { getTicketAgingInfo } from '../lib/ticketAging';
+import { oneSignalService } from './oneSignalService';
 
 const LOCAL_STORAGE_TICKETS = 'scenery_repair_v5_tickets';
 const LOCAL_STORAGE_DEPTS = 'scenery_repair_v5_departments';
@@ -355,6 +356,9 @@ class TicketService {
           { event: 'TICKET_MUTATION' },
           (payload) => {
             console.log('⚡ [Realtime Broadcast] Mutation from peer received:', payload);
+            if (payload?.payload?.action === 'FOLLOW_UP' && typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('SCENERY_FOLLOW_UP', { detail: payload.payload }));
+            }
             void this.syncFromServer();
           }
         )
@@ -1093,6 +1097,34 @@ class TicketService {
     }
 
     return existing || null;
+  }
+
+  /**
+   * Follow up on pending work (ตามงานค้าง)
+   * Broadcasts urgent alert to technicians and sends push notification
+   */
+  public async followUpTicket(ticketId: string, requesterName?: string): Promise<Ticket | null> {
+    const ticket = this.tickets.find(t => t.id === ticketId || t.requestId === ticketId);
+    if (!ticket) return null;
+
+    const timeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    const followUpNote = `🔔 มีการตามงานค้างเมื่อ ${timeStr}${requesterName ? ` โดยคุณ ${requesterName}` : ''}`;
+    
+    const updated = await this.updateTicket(ticket.id, {
+      remark: ticket.remark ? `${ticket.remark} | ${followUpNote}` : followUpNote
+    });
+
+    this.broadcastEvent('TICKET_MUTATION', {
+      action: 'FOLLOW_UP',
+      id: ticket.id,
+      requestId: ticket.requestId,
+      department: ticket.department,
+      title: ticket.title,
+      requesterName
+    });
+
+    void oneSignalService.notifyFollowUp(ticket, requesterName);
+    return updated || ticket;
   }
 
   public async deleteTicket(id: string): Promise<void> {

@@ -124,6 +124,8 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
     ticketId: string,
     data: {
       requestId?: string;
+      technicianName?: string;
+      technicianPhone?: string;
       diagnosticReason: string;
       actionSteps: string;
       repairResult: string;
@@ -131,16 +133,20 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
       resultImageUrl?: string;
     }
   ) => {
+    const finalTechName = data.technicianName || currentTech.name;
+    const finalTechPhone = data.technicianPhone || currentTech.phone || '';
     await onUpdateTicketStatus(ticketId, {
       requestId: data.requestId || completeModalTicket?.requestId,
       status: 'completed',
+      technicianName: finalTechName,
+      technicianPhone: finalTechPhone,
       diagnosticReason: data.diagnosticReason,
       actionSteps: data.actionSteps,
       repairResult: data.repairResult,
       parts: data.parts,
       resultImageUrl: data.resultImageUrl,
       completedAt: new Date().toISOString(),
-      remark: 'ช่างบันทึกจบงานซ่อมเรียบร้อย'
+      remark: `ช่าง ${finalTechName} บันทึกจบงานซ่อมเรียบร้อย`
     });
   };
 
@@ -636,6 +642,7 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
         isOpen={!!completeModalTicket}
         onClose={() => setCompleteModalTicket(null)}
         ticket={completeModalTicket}
+        technicians={technicians}
         onConfirmComplete={handleConfirmCompleteModal}
       />
 

@@ -59,6 +59,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     ticketId: string,
     data: {
       requestId?: string;
+      technicianName?: string;
+      technicianPhone?: string;
       diagnosticReason: string;
       actionSteps: string;
       repairResult: string;
@@ -66,16 +68,20 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       resultImageUrl?: string;
     }
   ) => {
+    const finalTechName = data.technicianName || ticket.technicianName || '';
+    const finalTechPhone = data.technicianPhone || ticket.technicianPhone || '';
     await onUpdateTicket(ticketId, {
       requestId: data.requestId || ticket.requestId,
       status: 'completed',
+      technicianName: finalTechName,
+      technicianPhone: finalTechPhone,
       diagnosticReason: data.diagnosticReason,
       actionSteps: data.actionSteps,
       repairResult: data.repairResult,
       parts: data.parts,
       resultImageUrl: data.resultImageUrl,
       completedAt: new Date().toISOString(),
-      remark: 'ช่างบันทึกจบงานซ่อมเรียบร้อย'
+      remark: `ช่าง ${finalTechName} บันทึกจบงานซ่อมเรียบร้อย`
     });
     onClose();
   };
@@ -730,6 +736,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
         isOpen={isCompleteModalOpen}
         onClose={() => setIsCompleteModalOpen(false)}
         ticket={ticket}
+        technicians={technicians}
         onConfirmComplete={handleConfirmCompleteWork}
       />
     </div>

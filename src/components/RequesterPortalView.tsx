@@ -4,7 +4,9 @@ import { NewTicketForm } from './NewTicketForm';
 import { DailyDutyModal } from './DailyDutyModal';
 import { ConfirmModal } from './ConfirmModal';
 import { RoleLoginModal } from './RoleLoginModal';
-import { Phone, Search, Wrench, Clock, CheckCircle2, ChevronRight, User, MapPin, Plus, Shield, CalendarCheck, AlertTriangle, ListOrdered, ClipboardList, ArrowRightLeft, X, Building2, Sparkles, Filter } from 'lucide-react';
+import { Toast } from './Toast';
+import { ticketService } from '../services/ticketService';
+import { Phone, Search, Wrench, Clock, CheckCircle2, ChevronRight, User, MapPin, Plus, Shield, CalendarCheck, AlertTriangle, ListOrdered, ClipboardList, ArrowRightLeft, X, Building2, Sparkles, Filter, Bell } from 'lucide-react';
 import { DivisionBadge } from './DivisionBadge';
 import { DivisionFilterTabs } from './DivisionFilterTabs';
 import { getTicketAgingInfo } from '../lib/ticketAging';
@@ -32,15 +34,34 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'create' | 'queue' | 'track'>('create');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDivisionFilter, setSelectedDivisionFilter] = useState<string>('84');
-  const [filterStatus, setFilterStatus] = useState<string>('active');
+  const [selectedDivisionFilter, setSelectedDivisionFilter] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
   const [myDepartment, setMyDepartment] = useState<string>(() => {
-    return localStorage.getItem('scenery_selected_dept') || '';
+    return localStorage.getItem('scenery_selected_dept') || 'all';
   });
   const [isChangingDept, setIsChangingDept] = useState(false);
   const [deptSearchText, setDeptSearchText] = useState('');
   const [isDutyModalOpen, setIsDutyModalOpen] = useState(false);
   const [isDutyPinModalOpen, setIsDutyPinModalOpen] = useState(false);
+  const [followingUpIds, setFollowingUpIds] = useState<Set<string>>(new Set());
+  const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
+    setToastMessage({ message, type });
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleFollowUp = async (ticket: Ticket) => {
+    if (followingUpIds.has(ticket.id)) return;
+    try {
+      setFollowingUpIds(prev => new Set(prev).add(ticket.id));
+      await ticketService.followUpTicket(ticket.id, activeRequesterName || savedRequesterName);
+      if (onDataChanged) onDataChanged();
+      showToast(`🔔 ส่งการแจ้งเตือนตามงาน #${ticket.requestId} ไปยังทีมช่างเรียบร้อยแล้ว!`, 'success');
+    } catch (err) {
+      console.warn('Follow up failed:', err);
+    }
+  };
 
   const handleOpenDutyModal = () => {
     const isAuthed = sessionStorage.getItem('scenery_tech_authed') === '1234';
@@ -94,16 +115,19 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
     return departments.find(d => d.name === myDepartment);
   }, [departments, myDepartment]);
 
+  const isAllDepts = !myDepartment || myDepartment === 'all';
+
   const myDeptTickets = useMemo(() => {
-    return myDepartment ? tickets.filter(t => t.department === myDepartment) : [];
-  }, [tickets, myDepartment]);
+    if (isAllDepts) return tickets;
+    return tickets.filter(t => t.department === myDepartment);
+  }, [tickets, myDepartment, isAllDepts]);
 
   const myDeptActiveTickets = useMemo(() => {
-    if (!myDepartment) return [];
-    return tickets
-      .filter(t => t.department === myDepartment && t.status !== 'completed' && t.status !== 'cancelled')
+    const list = isAllDepts ? tickets : tickets.filter(t => t.department === myDepartment);
+    return list
+      .filter(t => t.status !== 'completed' && t.status !== 'cancelled')
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }, [tickets, myDepartment]);
+  }, [tickets, myDepartment, isAllDepts]);
 
   const userActiveTicketsInDept = useMemo(() => {
     if (!activeRequesterName) return [];
@@ -129,13 +153,10 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
     return technicians.filter(t => t.isOnDutyToday !== false && t.status === 'active');
   }, [technicians]);
 
-  // Filter tickets for tracking (strictly for selected department)
+  // Filter tickets for tracking (scoped to department or all departments)
   const filteredTickets = useMemo(() => {
-    if (!myDepartment) return [];
-
     return tickets.filter(t => {
-      // Strictly only tickets of myDepartment
-      if (t.department !== myDepartment) {
+      if (!isAllDepts && t.department !== myDepartment) {
         return false;
       }
 
@@ -147,7 +168,8 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.requestId.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.requesterName.toLowerCase().includes(searchQuery.toLowerCase());
+        t.requesterName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.department && t.department.toLowerCase().includes(searchQuery.toLowerCase()));
 
       if (!matchSearch) return false;
 
@@ -156,6 +178,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
         if (!t.requesterName.trim().toLowerCase().includes(q)) return false;
       }
 
+      if (filterStatus === 'all') return true;
       if (filterStatus === 'active') {
         return t.status !== 'completed' && t.status !== 'cancelled';
       }
@@ -163,9 +186,9 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       if (filterStatus === 'in_progress') return t.status === 'in_progress' || t.status === 'waiting_parts';
       if (filterStatus === 'completed') return t.status === 'completed' || t.status === 'waiting_inspect';
       if (filterStatus === 'cancelled') return t.status === 'cancelled';
-      return t.status !== 'completed' && t.status !== 'cancelled';
+      return true;
     });
-  }, [tickets, searchQuery, filterStatus, selectedDivisionFilter, myDepartment, filterMyTicketsOnly, activeRequesterName]);
+  }, [tickets, searchQuery, filterStatus, selectedDivisionFilter, myDepartment, isAllDepts, filterMyTicketsOnly, activeRequesterName]);
 
   const departmentQueues = useMemo(() => {
     const activeTickets = tickets
@@ -406,14 +429,12 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
           }`}
         >
           <ListOrdered className="w-4 h-4" />
-          <span>คิวงานแต่ละแผนก</span>
-          {myDepartment && (
-            <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
-              activeSubTab === 'queue' ? 'bg-white text-primary' : 'bg-surface-container-highest text-on-surface'
-            }`}>
-              {myDeptActiveTickets.length}
-            </span>
-          )}
+          <span>{myDepartment && myDepartment !== 'all' ? `คิวงาน ${myDepartment}` : 'คิวงานแต่ละแผนก'}</span>
+          <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+            activeSubTab === 'queue' ? 'bg-white text-primary' : 'bg-surface-container-highest text-on-surface'
+          }`}>
+            {myDeptActiveTickets.length}
+          </span>
         </button>
 
         <button
@@ -426,11 +447,11 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
           }`}
         >
           <Clock className="w-4 h-4" />
-          <span>{myDepartment ? 'งานแผนกคุณ' : 'งานแจ้งซ่อม'}</span>
+          <span>{myDepartment && myDepartment !== 'all' ? `งานแผนก ${myDepartment}` : 'งานทั้งหมด/ติดตามงาน'}</span>
           <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
             activeSubTab === 'track' ? 'bg-white text-primary' : 'bg-surface-container-highest text-on-surface'
           }`}>
-            {myDepartment ? myDeptTickets.length : '-'}
+            {myDeptTickets.length}
           </span>
         </button>
       </div>
@@ -502,6 +523,40 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
               {/* Department Cards Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
+                {/* All Departments Option */}
+                {(!deptSearchText.trim() || 'ทุกแผนก ทั้งหมด all'.includes(deptSearchText.toLowerCase())) && (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectDepartment('all')}
+                    className={`p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                      myDepartment === 'all'
+                        ? 'border-primary bg-primary/10 ring-2 ring-primary/30 shadow-xs'
+                        : 'border-slate-200 bg-surface-container-low hover:border-primary/50 hover:bg-surface-container shadow-xs active:scale-[0.98]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 border border-slate-200/50 bg-primary/10">
+                        🏢
+                      </span>
+                      <div className="min-w-0">
+                        <div className="font-bold text-xs sm:text-sm text-on-surface truncate">
+                          ทุกแผนก (แสดงคิวทั้งหมด)
+                        </div>
+                        <div className="text-[11px] text-on-surface-variant">
+                          {tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length > 0 ? (
+                            <span className="text-amber-600 font-semibold">
+                              {tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length} คิวรวมทั่วฟาร์ม
+                            </span>
+                          ) : (
+                            'ไม่มีงานค้าง'
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 shrink-0 ${myDepartment === 'all' ? 'text-primary' : 'text-slate-400'}`} />
+                  </button>
+                )}
+
                 {departments
                   .filter(d =>
                     !deptSearchText.trim() ||
@@ -560,16 +615,18 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                 <div className="flex items-center gap-3 min-w-0">
                   <div
                     className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl shrink-0"
-                    style={{ backgroundColor: `${currentDeptObj?.color || '#3b82f6'}18` }}
+                    style={{ backgroundColor: isAllDepts ? '#3b82f618' : `${currentDeptObj?.color || '#3b82f6'}18` }}
                   >
-                    {currentDeptObj?.icon || '🏢'}
+                    {isAllDepts ? '🏢' : (currentDeptObj?.icon || '🏢')}
                   </div>
                   <div className="min-w-0">
                     <h2 className="font-extrabold text-sm sm:text-base text-on-surface truncate">
-                      คิวงานแจ้งซ่อมของ "{myDepartment}"
+                      {isAllDepts ? 'คิวงานแจ้งซ่อมของ "ทุกแผนก (ทั้งหมด)"' : `คิวงานแจ้งซ่อมของ "${myDepartment}"`}
                     </h2>
                     <p className="text-[11px] text-on-surface-variant">
-                      มีคิวงานที่กำลังรอ/ดำเนินการ {myDeptActiveTickets.length} รายการ
+                      {isAllDepts
+                        ? `มีคิวงานที่กำลังรอ/ดำเนินการรวม ${myDeptActiveTickets.length} รายการ ทั่วทั้งฟาร์ม`
+                        : `มีคิวงานที่กำลังรอ/ดำเนินการ ${myDeptActiveTickets.length} รายการ`}
                     </p>
                   </div>
                 </div>
@@ -581,6 +638,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                     onChange={(e) => handleSelectDepartment(e.target.value)}
                     className="h-[38px] px-3 bg-surface-container-low border border-slate-200 rounded-xl text-xs font-bold text-on-surface outline-none focus:border-primary shadow-xs cursor-pointer"
                   >
+                    <option value="all">🏢 ทุกแผนก (แสดงคิวทั้งหมด)</option>
                     {departments.map(d => (
                       <option key={d.id} value={d.name}>{d.name}</option>
                     ))}
@@ -600,6 +658,26 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
               {/* Horizontal Scrollable Department Switcher Pills */}
               <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar touch-pan-x">
+                <button
+                  type="button"
+                  onClick={() => handleSelectDepartment('all')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                    myDepartment === 'all'
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant'
+                  }`}
+                >
+                  <span>🏢</span>
+                  <span>ทุกแผนก (ทั้งหมด)</span>
+                  {tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length > 0 && (
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                      myDepartment === 'all' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length}
+                    </span>
+                  )}
+                </button>
+
                 {departments.map(dept => {
                   const deptCount = tickets.filter(
                     t => t.department === dept.name && t.status !== 'completed' && t.status !== 'cancelled'
@@ -729,13 +807,13 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                 {/* If activeRequesterName has active tickets in this department, display personal queue summary cards */}
                 {activeRequesterName && userActiveTicketsInDept.length > 0 && (
                   <div className="p-3.5 bg-gradient-to-r from-teal-50/80 via-emerald-50/50 to-teal-50/80 rounded-2xl border border-teal-200/80 space-y-2.5">
-                    <div className="flex items-center justify-between gap-2 text-xs font-bold text-teal-900">
+                    <div className="flex items-center justify-between gap-2 text-xs font-bold text-teal-900 flex-wrap">
                       <span className="flex items-center gap-1.5">
                         <Sparkles className="w-4 h-4 text-teal-600" />
-                        สถานะคิวงานของคุณในแผนก "{myDepartment}" ({userActiveTicketsInDept.length} รายการ):
+                        สถานะคิวงานของคุณ ({isAllDepts ? 'ทุกแผนก' : `แผนก ${myDepartment}`}): {userActiveTicketsInDept.length} รายการ
                       </span>
                       <span className="text-[11px] text-teal-700 font-medium">
-                        แผนกมีงานคอยซ่อมทั้งหมด {myDeptActiveTickets.length} คิว
+                        งานคอยซ่อมทั้งหมด {myDeptActiveTickets.length} คิว
                       </span>
                     </div>
 
@@ -771,13 +849,27 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                               </span>
                             </div>
 
-                            <div className="text-[11px] font-medium text-on-surface-variant flex items-center justify-between gap-1 pt-0.5 border-t border-slate-100">
+                            <div className="text-[11px] font-medium text-on-surface-variant flex items-center justify-between gap-1 pt-1 border-t border-slate-100 flex-wrap">
                               <span className={queueNum === 1 ? 'text-amber-700 font-bold' : 'text-slate-600'}>
-                                {queueNum === 1 ? '🔥 ถึงคิวของคุณแล้ว (คิวแรก)' : `⏳ มีงานก่อนหน้า ${ahead} คิว (รออีก ${ahead} คิว)`}
+                                {queueNum === 1 ? '🔥 ถึงคิวของคุณแล้ว' : `⏳ รออีก ${ahead} คิว`}
                               </span>
-                              <span className="text-[10px] text-slate-400">
-                                {ticket.status === 'in_progress' ? '🟢 กำลังซ่อม' : '🟡 รอรับงาน'}
-                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleFollowUp(ticket);
+                                }}
+                                disabled={followingUpIds.has(ticket.id)}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer shadow-xs active:scale-95 ${
+                                  followingUpIds.has(ticket.id)
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                    : 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20'
+                                }`}
+                                title="กดเพื่อส่งการแจ้งเตือนตามงานด่วนไปยังช่าง"
+                              >
+                                <Bell className={`w-2.5 h-2.5 ${followingUpIds.has(ticket.id) ? '' : 'animate-bounce'}`} />
+                                <span>{followingUpIds.has(ticket.id) ? 'เตือนแล้ว' : 'ตามงาน'}</span>
+                              </button>
                             </div>
                           </div>
                         );
@@ -931,6 +1023,20 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                             <span>•</span>
                             <span>ผู้แจ้ง: {ticket.requesterName}</span>
                           </div>
+
+                          {/* Attached Photo Thumbnail */}
+                          {ticket.requestImageUrl && (
+                            <div className="mt-2.5 flex items-center gap-2">
+                              <span className="text-[11px] font-bold text-slate-500">รูปที่แนบ:</span>
+                              <a href={ticket.requestImageUrl} target="_blank" rel="noreferrer" className="block">
+                                <img
+                                  src={ticket.requestImageUrl}
+                                  alt="ภาพปัญหา"
+                                  className="w-14 h-14 object-cover rounded-xl border border-slate-200 hover:opacity-90 shadow-2xs cursor-zoom-in"
+                                />
+                              </a>
+                            </div>
+                          )}
                         </div>
 
                         {/* Repair Progress Timeline */}
@@ -988,20 +1094,43 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                             </div>
                           </div>
 
-                          {/* Direct Phone Call Button with Confirmation */}
-                          {techPhone ? (
-                            <button
-                              type="button"
-                              onClick={(e) => handleCallClick(e, ticket.technicianName || 'ศูนย์ซ่อมส่วนกลาง', techPhone)}
-                              className="self-start sm:self-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-primary hover:bg-primary-container text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer active:scale-95"
-                              title="กดเพื่อโทรออกทันที"
-                            >
-                              <Phone className="w-3.5 h-3.5" />
-                              <span>โทรหาช่าง: {techPhone}</span>
-                            </button>
-                          ) : (
-                            <span className="self-start sm:self-auto text-xs font-semibold text-slate-400">ยังไม่มีเบอร์โทรช่าง</span>
-                          )}
+                          {/* Action Buttons: Follow Up & Call */}
+                          <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+                            {ticket.status !== 'completed' && ticket.status !== 'cancelled' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleFollowUp(ticket);
+                                }}
+                                disabled={followingUpIds.has(ticket.id)}
+                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 ${
+                                  followingUpIds.has(ticket.id)
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-300 opacity-80 cursor-not-allowed'
+                                    : 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20 hover:shadow-md'
+                                }`}
+                                title="กดเพื่อส่งการแจ้งเตือนตามงานด่วนไปยังช่าง"
+                              >
+                                <Bell className={`w-3.5 h-3.5 ${followingUpIds.has(ticket.id) ? '' : 'animate-bounce'}`} />
+                                <span>{followingUpIds.has(ticket.id) ? 'ตามงานแล้ว ✓' : 'ตามงานค้าง (เตือนช่าง)'}</span>
+                              </button>
+                            )}
+
+                            {/* Direct Phone Call Button with Confirmation */}
+                            {techPhone ? (
+                              <button
+                                type="button"
+                                onClick={(e) => handleCallClick(e, ticket.technicianName || 'ศูนย์ซ่อมส่วนกลาง', techPhone)}
+                                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-primary hover:bg-primary-container text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer active:scale-95"
+                                title="กดเพื่อโทรออกทันที"
+                              >
+                                <Phone className="w-3.5 h-3.5" />
+                                <span>โทรหาช่าง: {techPhone}</span>
+                              </button>
+                            ) : (
+                              <span className="text-xs font-semibold text-slate-400 py-1">ยังไม่มีเบอร์โทรช่าง</span>
+                            )}
+                          </div>
                         </div>
 
                         {/* Repair Remarks */}
@@ -1066,6 +1195,40 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
               {/* Department Cards Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
+                {/* All Departments Option */}
+                {(!deptSearchText.trim() || 'ทุกแผนก ทั้งหมด all'.includes(deptSearchText.toLowerCase())) && (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectDepartment('all')}
+                    className={`p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                      myDepartment === 'all'
+                        ? 'border-primary bg-primary/10 ring-2 ring-primary/30 shadow-xs'
+                        : 'border-slate-200 bg-surface-container-low hover:border-primary/50 hover:bg-surface-container shadow-xs active:scale-[0.98]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 border border-slate-200/50 bg-primary/10">
+                        🏢
+                      </span>
+                      <div className="min-w-0">
+                        <div className="font-bold text-xs sm:text-sm text-on-surface truncate">
+                          ทุกแผนก (แสดงทั้งหมด)
+                        </div>
+                        <div className="text-[11px] text-on-surface-variant">
+                          {tickets.length > 0 ? (
+                            <span className="text-primary font-semibold">
+                              รวม {tickets.length} รายการทั่วฟาร์ม
+                            </span>
+                          ) : (
+                            'ไม่มีรายการ'
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 shrink-0 ${myDepartment === 'all' ? 'text-primary' : 'text-slate-400'}`} />
+                  </button>
+                )}
+
                 {departments
                   .filter(d =>
                     !deptSearchText.trim() ||
@@ -1124,16 +1287,18 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                 <div className="flex items-center gap-3 min-w-0">
                   <div
                     className="w-11 h-11 rounded-2xl flex items-center justify-center text-xl shrink-0"
-                    style={{ backgroundColor: `${currentDeptObj?.color || '#3b82f6'}18` }}
+                    style={{ backgroundColor: isAllDepts ? '#3b82f618' : `${currentDeptObj?.color || '#3b82f6'}18` }}
                   >
-                    {currentDeptObj?.icon || '🏢'}
+                    {isAllDepts ? '🏢' : (currentDeptObj?.icon || '🏢')}
                   </div>
                   <div className="min-w-0">
                     <h2 className="font-extrabold text-sm sm:text-base text-on-surface truncate">
-                      งานแจ้งซ่อมของ "{myDepartment}"
+                      {isAllDepts ? 'งานแจ้งซ่อมของ "ทุกแผนก (ทั้งหมด)"' : `งานแจ้งซ่อมของ "${myDepartment}"`}
                     </h2>
                     <p className="text-[11px] text-on-surface-variant">
-                      มีงานทั้งหมด {myDeptTickets.length} รายการ (กำลังซ่อม {myDeptTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length} รายการ)
+                      {isAllDepts
+                        ? `มีงานทั้งหมด ${myDeptTickets.length} รายการ (กำลังซ่อม ${myDeptTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length} รายการ ทั่วทั้งฟาร์ม)`
+                        : `มีงานทั้งหมด ${myDeptTickets.length} รายการ (กำลังซ่อม ${myDeptTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length} รายการ)`}
                     </p>
                   </div>
                 </div>
@@ -1145,6 +1310,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                     onChange={(e) => handleSelectDepartment(e.target.value)}
                     className="h-[38px] px-3 bg-surface-container-low border border-slate-200 rounded-xl text-xs font-bold text-on-surface outline-none focus:border-primary shadow-xs cursor-pointer"
                   >
+                    <option value="all">🏢 ทุกแผนก (แสดงทั้งหมด)</option>
                     {departments.map(d => (
                       <option key={d.id} value={d.name}>{d.name}</option>
                     ))}
@@ -1160,6 +1326,55 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                     <span className="hidden sm:inline">เปลี่ยนแผนก</span>
                   </button>
                 </div>
+              </div>
+
+              {/* Horizontal Scrollable Department Switcher Pills */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar touch-pan-x">
+                <button
+                  type="button"
+                  onClick={() => handleSelectDepartment('all')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                    myDepartment === 'all'
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant'
+                  }`}
+                >
+                  <span>🏢</span>
+                  <span>ทุกแผนก (ทั้งหมด)</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                    myDepartment === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                  }`}>
+                    {tickets.length}
+                  </span>
+                </button>
+
+                {departments.map(dept => {
+                  const deptCount = tickets.filter(t => t.department === dept.name).length;
+                  const isCurrent = dept.name === myDepartment;
+
+                  return (
+                    <button
+                      key={dept.id}
+                      type="button"
+                      onClick={() => handleSelectDepartment(dept.name)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                        isCurrent
+                          ? 'bg-primary text-white shadow-xs'
+                          : 'bg-surface-container-low hover:bg-surface-container text-on-surface-variant'
+                      }`}
+                    >
+                      <span>{dept.icon}</span>
+                      <span>{dept.name}</span>
+                      {deptCount > 0 && (
+                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                          isCurrent ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                        }`}>
+                          {deptCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Division Filter Tabs (Scoped to myDeptTickets) */}
@@ -1186,10 +1401,11 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
                   {[
+                    { id: 'all', label: 'ทั้งหมด', count: myDeptTickets.length },
                     { id: 'active', label: 'งานรอซ่อม', count: myDeptTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length },
                     { id: 'pending', label: 'รอรับงาน', count: myDeptTickets.filter(t => t.status === 'pending' || t.status === 'assigned').length },
                     { id: 'in_progress', label: 'กำลังซ่อม', count: myDeptTickets.filter(t => t.status === 'in_progress' || t.status === 'waiting_parts').length },
-                    { id: 'completed', label: 'เสร็จสิ้น', count: myDeptTickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length },
+                    { id: 'completed', label: '✅ เสร็จสิ้นแล้ว', count: myDeptTickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length },
                     { id: 'cancelled', label: 'ยกเลิก', count: myDeptTickets.filter(t => t.status === 'cancelled').length },
                   ].map(f => (
                     <button
@@ -1366,6 +1582,20 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                         <span>•</span>
                         <span>ผู้แจ้ง: {ticket.requesterName}</span>
                       </div>
+
+                      {/* Attached Photo Thumbnail (for active/pending tickets) */}
+                      {ticket.requestImageUrl && ticket.status !== 'completed' && (
+                        <div className="mt-2.5 flex items-center gap-2">
+                          <span className="text-[11px] font-bold text-slate-500">รูปที่แนบ:</span>
+                          <a href={ticket.requestImageUrl} target="_blank" rel="noreferrer" className="block">
+                            <img
+                              src={ticket.requestImageUrl}
+                              alt="ภาพปัญหา"
+                              className="w-14 h-14 object-cover rounded-xl border border-slate-200 hover:opacity-90 shadow-2xs cursor-zoom-in"
+                            />
+                          </a>
+                        </div>
+                      )}
                     </div>
 
                     {/* Repair Progress Timeline */}
@@ -1423,24 +1653,116 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                         </div>
                       </div>
 
-                      {/* Direct Phone Call Button with Confirmation */}
-                      {techPhone ? (
-                        <button
-                          type="button"
-                          onClick={(e) => handleCallClick(e, ticket.technicianName || 'ศูนย์ซ่อมส่วนกลาง', techPhone)}
-                          className="self-start sm:self-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-primary hover:bg-primary-container text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer active:scale-95"
-                          title="กดเพื่อโทรออกทันที"
-                        >
-                          <Phone className="w-3.5 h-3.5" />
-                          <span>โทรหาช่าง: {techPhone}</span>
-                        </button>
-                      ) : (
-                        <span className="self-start sm:self-auto text-xs font-semibold text-slate-400">ยังไม่มีเบอร์โทรช่าง</span>
-                      )}
+                      {/* Action Buttons: Follow Up & Call */}
+                      <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+                        {ticket.status !== 'completed' && ticket.status !== 'cancelled' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleFollowUp(ticket);
+                            }}
+                            disabled={followingUpIds.has(ticket.id)}
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 ${
+                              followingUpIds.has(ticket.id)
+                                ? 'bg-amber-100 text-amber-800 border border-amber-300 opacity-80 cursor-not-allowed'
+                                : 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20 hover:shadow-md'
+                            }`}
+                            title="กดเพื่อส่งการแจ้งเตือนตามงานด่วนไปยังช่าง"
+                          >
+                            <Bell className={`w-3.5 h-3.5 ${followingUpIds.has(ticket.id) ? '' : 'animate-bounce'}`} />
+                            <span>{followingUpIds.has(ticket.id) ? 'ตามงานแล้ว ✓' : 'ตามงานค้าง (เตือนช่าง)'}</span>
+                          </button>
+                        )}
+
+                        {/* Direct Phone Call Button with Confirmation */}
+                        {techPhone ? (
+                          <button
+                            type="button"
+                            onClick={(e) => handleCallClick(e, ticket.technicianName || 'ศูนย์ซ่อมส่วนกลาง', techPhone)}
+                            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-primary hover:bg-primary-container text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer active:scale-95"
+                            title="กดเพื่อโทรออกทันที"
+                          >
+                            <Phone className="w-3.5 h-3.5" />
+                            <span>โทรหาช่าง: {techPhone}</span>
+                          </button>
+                        ) : (
+                          <span className="text-xs font-semibold text-slate-400 py-1">ยังไม่มีเบอร์โทรช่าง</span>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Repair Remarks / Progress */}
-                    {ticket.repairResult && (
+                    {/* Completed Work Banner & Details */}
+                    {ticket.status === 'completed' && (
+                      <div className="p-4 bg-emerald-50/90 rounded-2xl border border-emerald-200 flex flex-col gap-2.5">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="flex items-center gap-1.5 font-extrabold text-xs sm:text-sm text-emerald-800">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                            ✅ ดำเนินการซ่อมเสร็จสิ้นเรียบร้อยแล้ว
+                          </span>
+                          {ticket.completedAt && (
+                            <span className="text-[11px] text-emerald-700 font-medium">
+                              เสร็จเมื่อ {new Date(ticket.completedAt).toLocaleDateString('th-TH', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          )}
+                        </div>
+
+                        {ticket.technicianName && (
+                          <div className="text-xs text-emerald-950 flex items-center gap-2 flex-wrap">
+                            <span>ช่างผู้รับผิดชอบปิดงาน: <strong className="text-emerald-900 font-extrabold">{ticket.technicianName}</strong></span>
+                            {techPhone && (
+                              <span className="text-emerald-700">({techPhone})</span>
+                            )}
+                          </div>
+                        )}
+
+                        {ticket.repairResult && (
+                          <div className="text-xs text-emerald-950 bg-white/90 p-2.5 rounded-xl border border-emerald-200/80">
+                            <span className="font-bold text-emerald-800">รายละเอียดผลการซ่อม: </span>
+                            <span>{ticket.repairResult}</span>
+                          </div>
+                        )}
+
+                        {/* Before & After Photos */}
+                        {(ticket.requestImageUrl || ticket.resultImageUrl) && (
+                          <div className="flex items-center gap-3 pt-1 flex-wrap">
+                            {ticket.requestImageUrl && (
+                              <div className="space-y-1">
+                                <div className="text-[10px] font-bold text-slate-500">รูปภาพก่อนซ่อม:</div>
+                                <a href={ticket.requestImageUrl} target="_blank" rel="noreferrer" className="block">
+                                  <img
+                                    src={ticket.requestImageUrl}
+                                    alt="ภาพก่อนซ่อม"
+                                    className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border border-slate-200 hover:opacity-90 shadow-2xs cursor-zoom-in"
+                                  />
+                                </a>
+                              </div>
+                            )}
+                            {ticket.resultImageUrl && (
+                              <div className="space-y-1">
+                                <div className="text-[10px] font-bold text-emerald-700">รูปภาพหลังซ่อมเสร็จ:</div>
+                                <a href={ticket.resultImageUrl} target="_blank" rel="noreferrer" className="block">
+                                  <img
+                                    src={ticket.resultImageUrl}
+                                    alt="ภาพหลังซ่อมเสร็จ"
+                                    className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border-2 border-emerald-400 hover:opacity-90 shadow-2xs cursor-zoom-in"
+                                  />
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Repair Remarks (if not completed but has note) */}
+                    {ticket.status !== 'completed' && ticket.repairResult && (
                       <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex flex-col gap-1">
                         <span className="font-bold flex items-center gap-1 text-emerald-800">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
@@ -1488,6 +1810,15 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
           confirmVariant="primary"
           onConfirm={executeCall}
           onCancel={() => setCallConfirmTech(null)}
+        />
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <Toast
+          message={toastMessage.message}
+          type={toastMessage.type}
+          onClose={() => setToastMessage(null)}
         />
       )}
 

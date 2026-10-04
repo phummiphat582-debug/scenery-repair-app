@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Ticket, PartItem } from '../types';
+import { Ticket, PartItem, Technician } from '../types';
 import { compressImage } from '../lib/imageCompress';
+import { ticketService } from '../services/ticketService';
 import { 
   CheckCircle2, 
   X, 
@@ -21,10 +22,13 @@ interface CompleteWorkModalProps {
   isOpen: boolean;
   onClose: () => void;
   ticket: Ticket | null;
+  technicians?: Technician[];
   onConfirmComplete: (
     ticketId: string,
     data: {
       requestId?: string;
+      technicianName: string;
+      technicianPhone?: string;
       diagnosticReason: string;
       actionSteps: string;
       repairResult: string;
@@ -72,8 +76,15 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
   isOpen,
   onClose,
   ticket,
+  technicians = [],
   onConfirmComplete
 }) => {
+  const availableTechs = technicians && technicians.length > 0
+    ? technicians
+    : ticketService.getCachedData().technicians;
+
+  const [selectedTechName, setSelectedTechName] = useState<string>('');
+  const [selectedTechPhone, setSelectedTechPhone] = useState<string>('');
   const [diagnosticReason, setDiagnosticReason] = useState<string>('');
   const [actionSteps, setActionSteps] = useState<string>('');
   const [hasParts, setHasParts] = useState<boolean>(false);
@@ -94,6 +105,8 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
 
   useEffect(() => {
     if (isOpen && ticket) {
+      setSelectedTechName(ticket.technicianName || '');
+      setSelectedTechPhone(ticket.technicianPhone || '');
       setDiagnosticReason(ticket.diagnosticReason || '');
       setActionSteps(ticket.actionSteps || '');
       setResultImageUrl(ticket.resultImageUrl || '');
@@ -114,6 +127,17 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
       setIsProcessingImage(false);
     }
   }, [isOpen, ticket?.id]);
+
+  const handleSelectTech = (name: string) => {
+    setSelectedTechName(name);
+    const tech = availableTechs.find(t => t.name === name);
+    if (tech?.phone) {
+      setSelectedTechPhone(tech.phone);
+    }
+    if (errorMessage && !name) {
+      setErrorMessage('');
+    }
+  };
 
   if (!isOpen || !ticket) return null;
 
@@ -175,6 +199,10 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedTechName.trim()) {
+      setErrorMessage('กรุณาเลือก "ช่างผู้ปฏิบัติงานที่ปิดงาน" (บังคับเลือกช่างก่อนบันทึกปิดงาน)');
+      return;
+    }
     if (!diagnosticReason.trim()) {
       setErrorMessage('กรุณาระบุ "สาเหตุของปัญหา"');
       return;
@@ -206,6 +234,7 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
         : 'ไม่มีการเปลี่ยนอะไหล่';
 
       const fullResultText = [
+        `ช่างผู้ปิดงาน: ${selectedTechName.trim()}${selectedTechPhone.trim() ? ` (${selectedTechPhone.trim()})` : ''}`,
         `สาเหตุ: ${diagnosticReason.trim()}`,
         `วิธีแก้ไข: ${actionSteps.trim()}`,
         `อะไหล่ที่เปลี่ยน: ${partsSummary}`
@@ -213,6 +242,8 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
 
       await onConfirmComplete(ticket.id, {
         requestId: ticket.requestId,
+        technicianName: selectedTechName.trim(),
+        technicianPhone: selectedTechPhone.trim(),
         diagnosticReason: diagnosticReason.trim(),
         actionSteps: actionSteps.trim(),
         repairResult: fullResultText,
@@ -291,6 +322,60 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
               </span>
               <span>•</span>
               <span>ผู้แจ้ง: {ticket.requesterName}</span>
+            </div>
+          </div>
+
+          {/* 0. Technician Selection (บังคับเลือกช่างผู้ปฏิบัติงาน) */}
+          <div className={`p-4 rounded-2xl border transition-all ${
+            !selectedTechName
+              ? 'bg-amber-50/70 border-amber-300 ring-2 ring-amber-200/60'
+              : 'bg-surface-container-low border-slate-200'
+          }`}>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <label className="text-xs font-extrabold text-on-surface flex items-center gap-1.5">
+                <Wrench className="w-4 h-4 text-primary" />
+                <span>ช่างผู้ปฏิบัติงานที่ปิดงาน</span>
+                <span className="text-red-500 font-bold">*</span>
+              </label>
+              <span className="text-[11px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
+                * บังคับเลือกช่าง
+              </span>
+            </div>
+
+            <select
+              value={selectedTechName}
+              onChange={(e) => handleSelectTech(e.target.value)}
+              className={`w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-surface-container-lowest border outline-none shadow-xs transition-colors cursor-pointer ${
+                !selectedTechName
+                  ? 'border-amber-400 text-amber-900 focus:border-primary'
+                  : 'border-slate-300 text-on-surface focus:border-primary'
+              }`}
+            >
+              <option value="">-- กรุณาเลือกช่างที่ดำเนินการปิดงาน (บังคับ) --</option>
+              {availableTechs.map(t => (
+                <option key={t.id} value={t.name}>
+                  👷‍♂️ {t.name} ({t.role || 'ช่างซ่อมบำรุง'}) {t.phone ? `• โทร ${t.phone}` : ''} {t.isOnDutyToday ? '🟢 เข้าเวรวันนี้' : ''}
+                </option>
+              ))}
+            </select>
+
+            {/* Quick Select Buttons */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-2">
+              <span className="text-[11px] text-on-surface-variant font-medium">กดเลือกเร็ว:</span>
+              {availableTechs.map(t => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => handleSelectTech(t.name)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    selectedTechName === t.name
+                      ? 'bg-primary text-white shadow-xs scale-105'
+                      : 'bg-surface-container hover:bg-surface-container-high text-on-surface border border-slate-200'
+                  }`}
+                >
+                  {t.name} {selectedTechName === t.name ? '✓' : ''}
+                </button>
+              ))}
             </div>
           </div>
 

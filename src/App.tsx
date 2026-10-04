@@ -111,7 +111,20 @@ export const App: React.FC = () => {
     const unsubscribe = ticketService.subscribe(() => {
       updateStateFromCache();
     });
-    return () => unsubscribe();
+
+    const handleFollowUpEvent = (e: any) => {
+      const detail = e.detail;
+      const dept = detail?.department ? `แผนก "${detail.department}"` : 'ผู้แจ้ง';
+      const reqId = detail?.requestId ? `#${detail.requestId}` : '';
+      const title = detail?.title ? ` (${detail.title})` : '';
+      showToast(`🔔 มีการตามงานค้าง! ${dept} เร่งงาน ${reqId}${title} ด่วน`, 'info');
+    };
+    window.addEventListener('SCENERY_FOLLOW_UP', handleFollowUpEvent);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('SCENERY_FOLLOW_UP', handleFollowUpEvent);
+    };
   }, []);
 
   // Strict Technician Screen Security Guard:
