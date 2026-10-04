@@ -212,6 +212,11 @@ class TicketService {
 
       const savedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS);
       this.tickets = savedTickets ? JSON.parse(savedTickets) : [];
+      this.tickets.forEach(t => {
+        if (t.requesterName && t.requesterName.includes('าดสดส')) {
+          t.requesterName = '';
+        }
+      });
 
       const savedDepts = localStorage.getItem(LOCAL_STORAGE_DEPTS);
       const parsedDepts = savedDepts ? JSON.parse(savedDepts) : null;

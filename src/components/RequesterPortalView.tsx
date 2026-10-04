@@ -42,13 +42,24 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
   // Requester identity state to see personal queue position & aging
   const [savedRequesterName, setSavedRequesterName] = useState<string>(() => {
-    return localStorage.getItem('scenery_requester_name') || '';
+    try {
+      const val = localStorage.getItem('scenery_requester_name') || '';
+      if (val.includes('าดสดส')) {
+        localStorage.removeItem('scenery_requester_name');
+        return '';
+      }
+      return val;
+    } catch {
+      return '';
+    }
   });
   const [nameSearchInput, setNameSearchInput] = useState<string>('');
   const [filterMyTicketsOnly, setFilterMyTicketsOnly] = useState<boolean>(false);
 
   const activeRequesterName = useMemo(() => {
-    return (nameSearchInput.trim() || savedRequesterName.trim());
+    const name = (nameSearchInput.trim() || savedRequesterName.trim());
+    if (name.includes('าดสดส')) return '';
+    return name;
   }, [nameSearchInput, savedRequesterName]);
 
   // Call confirmation modal

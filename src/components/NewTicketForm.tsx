@@ -60,7 +60,12 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
   const [step, setStep] = useState<number>(1);
   const [requesterName, setRequesterName] = useState(() => {
     try {
-      return localStorage.getItem('scenery_requester_name') || '';
+      const val = localStorage.getItem('scenery_requester_name') || '';
+      if (val.includes('าดสดส')) {
+        localStorage.removeItem('scenery_requester_name');
+        return '';
+      }
+      return val;
     } catch {
       return '';
     }
