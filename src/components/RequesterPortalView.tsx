@@ -625,8 +625,20 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                           ตรวจสอบคิวงานที่คุณแจ้งซ่อม
                         </h4>
                         {activeRequesterName && (
-                          <span className="px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 text-[11px] font-extrabold border border-teal-300">
-                            👤 {activeRequesterName}
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 text-[11px] font-extrabold border border-teal-300">
+                            <span>👤 {activeRequesterName}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNameSearchInput('');
+                                setSavedRequesterName('');
+                                try { localStorage.removeItem('scenery_requester_name'); } catch {}
+                              }}
+                              className="w-3.5 h-3.5 rounded-full hover:bg-teal-200 text-teal-700 flex items-center justify-center cursor-pointer ml-0.5"
+                              title="ล้าง/เปลี่ยนชื่อผู้แจ้ง"
+                            >
+                              <X className="w-2.5 h-2.5" />
+                            </button>
                           </span>
                         )}
                       </div>
@@ -653,11 +665,16 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                         placeholder={savedRequesterName ? `ชื่อผู้แจ้ง: ${savedRequesterName}` : "พิมพ์ชื่อผู้แจ้งเพื่อดูคิว..."}
                         className="w-full pl-3 pr-8 py-1.5 text-xs bg-surface-container-low border border-slate-200 rounded-xl text-on-surface outline-none focus:border-primary focus:bg-surface-container-lowest"
                       />
-                      {nameSearchInput && (
+                      {(nameSearchInput || savedRequesterName) && (
                         <button
                           type="button"
-                          onClick={() => setNameSearchInput('')}
+                          onClick={() => {
+                            setNameSearchInput('');
+                            setSavedRequesterName('');
+                            try { localStorage.removeItem('scenery_requester_name'); } catch {}
+                          }}
                           className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                          title="ล้างชื่อผู้แจ้ง"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
