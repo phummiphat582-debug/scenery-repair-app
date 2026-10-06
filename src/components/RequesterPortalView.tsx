@@ -6,9 +6,10 @@ import { ConfirmModal } from './ConfirmModal';
 import { RoleLoginModal } from './RoleLoginModal';
 import { Toast } from './Toast';
 import { ticketService } from '../services/ticketService';
-import { Phone, Search, Wrench, Clock, CheckCircle2, ChevronRight, User, MapPin, Plus, Shield, CalendarCheck, AlertTriangle, ListOrdered, ClipboardList, ArrowRightLeft, X, Building2, Sparkles, Filter, Bell } from 'lucide-react';
+import { Phone, Search, Wrench, Clock, CheckCircle2, ChevronRight, User, MapPin, Plus, Shield, CalendarCheck, AlertTriangle, ListOrdered, ClipboardList, ArrowRightLeft, X, Building2, Sparkles, Filter, Bell, BarChart2 } from 'lucide-react';
 import { DivisionBadge } from './DivisionBadge';
 import { DivisionFilterTabs } from './DivisionFilterTabs';
+import { RepairSummaryView } from './RepairSummaryView';
 import { getTicketAgingInfo } from '../lib/ticketAging';
 
 interface RequesterPortalViewProps {
@@ -32,7 +33,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
   onSwitchToTechnician,
   onDataChanged
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'create' | 'queue' | 'track'>('create');
+  const [activeSubTab, setActiveSubTab] = useState<'create' | 'queue' | 'track' | 'summary'>('create');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDivisionFilter, setSelectedDivisionFilter] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -421,12 +422,12 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
         )}
       </div>
 
-      {/* 3. Top Segmented Tabs: create, department queues, tracking */}
-      <div className="grid grid-cols-3 gap-1.5 bg-surface-container-low p-1.5 rounded-2xl border border-slate-200 shadow-xs">
+      {/* 3. Top Segmented Tabs: create, department queues, tracking, summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-surface-container-low p-1.5 rounded-2xl border border-slate-200 shadow-xs">
         <button
           type="button"
           onClick={() => setActiveSubTab('create')}
-          className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          className={`py-3 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
             activeSubTab === 'create'
               ? 'bg-primary text-white shadow-md'
               : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
@@ -439,7 +440,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
         <button
           type="button"
           onClick={() => setActiveSubTab('queue')}
-          className={`flex-1 py-3 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+          className={`py-3 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
             activeSubTab === 'queue'
               ? 'bg-primary text-white shadow-md'
               : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
@@ -457,18 +458,36 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
         <button
           type="button"
           onClick={() => setActiveSubTab('track')}
-          className={`flex-1 py-3 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+          className={`py-3 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
             activeSubTab === 'track'
               ? 'bg-primary text-white shadow-md'
               : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
           }`}
         >
           <Clock className="w-4 h-4" />
-          <span>{myDepartment && myDepartment !== 'all' ? `งานแผนก ${myDepartment}` : 'งานทั้งหมด/ติดตามงาน'}</span>
+          <span>{myDepartment && myDepartment !== 'all' ? `งานแผนก ${myDepartment}` : 'งานทั้งหมด'}</span>
           <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
             activeSubTab === 'track' ? 'bg-white text-primary' : 'bg-surface-container-highest text-on-surface'
           }`}>
             {isAllDepts ? allActiveTickets.length : myDeptActiveTickets.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('summary')}
+          className={`py-3 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            activeSubTab === 'summary'
+              ? 'bg-primary text-white shadow-md'
+              : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+          }`}
+        >
+          <BarChart2 className="w-4 h-4" />
+          <span>สรุปรายงาน</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+            activeSubTab === 'summary' ? 'bg-white text-primary' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+          }`}>
+            สถิติ
           </span>
         </button>
       </div>
@@ -1912,6 +1931,19 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       )}
     </div>
   )}
+
+      {/* 7. Sub-Tab 4: Repair Summary & Reports (สรุปการซ่อม รายวัน / รายสัปดาห์ / รายเดือน / แยกแผนก) */}
+      {activeSubTab === 'summary' && (
+        <RepairSummaryView
+          tickets={tickets}
+          departments={departments}
+          technicians={technicians}
+          initialDepartment={myDepartment}
+          onSelectDepartmentFilter={(dept) => {
+            if (dept) handleSelectDepartment(dept);
+          }}
+        />
+      )}
 
       {/* PIN Gate Modal for Entering Work / Duty (หน้าเข้างาน) */}
       <RoleLoginModal

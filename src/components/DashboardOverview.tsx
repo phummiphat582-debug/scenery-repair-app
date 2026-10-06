@@ -3,6 +3,7 @@ import { Ticket, Department, Technician } from '../types';
 import { ConfirmModal } from './ConfirmModal';
 import { DivisionBadge } from './DivisionBadge';
 import { DivisionFilterTabs } from './DivisionFilterTabs';
+import { RepairSummaryView } from './RepairSummaryView';
 import { getTicketAgingInfo } from '../lib/ticketAging';
 import {
   Wrench,
@@ -48,6 +49,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('active');
   const [selectedZoneFilter, setSelectedZoneFilter] = useState<string>('all');
   const [callConfirmTech, setCallConfirmTech] = useState<{ name: string; phone: string } | null>(null);
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
 
   // Format today's date in Thai
   const todayText = useMemo(() => {
@@ -245,17 +247,29 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
       {/* 4. KPI Metrics Carousel */}
       <section className="mt-space-xs mb-space-sm">
-        <div className="flex items-center justify-between px-margin mb-2">
+        <div className="flex items-center justify-between px-margin mb-2 flex-wrap gap-2">
           <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold flex items-center gap-1.5">
             <BarChart2 className="w-5 h-5 text-primary shrink-0" />
             ตัวชี้วัดประจำวัน
           </h3>
-          <button
-            onClick={onRefresh}
-            className="font-label-sm text-label-sm text-secondary font-semibold flex items-center gap-1 cursor-pointer hover:underline bg-transparent border-none"
-          >
-            รีเฟรชล่าสุด <RotateCw className="w-3.5 h-3.5 ml-0.5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsSummaryModalOpen(true)}
+              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs transition-all cursor-pointer active:scale-95"
+              title="ดูรายงานสรุปงานซ่อม รายวัน / รายสัปดาห์ / รายเดือน และสถิติแยกตามแผนก"
+              type="button"
+            >
+              <BarChart2 className="w-3.5 h-3.5 text-emerald-700" />
+              <span>📊 สรุปรายงาน</span>
+            </button>
+            <button
+              onClick={onRefresh}
+              className="font-label-sm text-label-sm text-secondary font-semibold flex items-center gap-1 cursor-pointer hover:underline bg-transparent border-none"
+              type="button"
+            >
+              รีเฟรชล่าสุด <RotateCw className="w-3.5 h-3.5 ml-0.5" />
+            </button>
+          </div>
         </div>
         <div className="flex overflow-x-auto gap-space-sm px-margin pb-2 scroll-smooth no-scrollbar">
           {/* Card: Active Pending */}
@@ -583,6 +597,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             setCallConfirmTech(null);
           }}
           onCancel={() => setCallConfirmTech(null)}
+        />
+      )}
+
+      {/* Repair Summary Modal (สำหรับช่าง/หัวหน้างานดูรายงาน) */}
+      {isSummaryModalOpen && (
+        <RepairSummaryView
+          tickets={tickets}
+          departments={departments}
+          technicians={technicians}
+          isModal={true}
+          onClose={() => setIsSummaryModalOpen(false)}
         />
       )}
 
