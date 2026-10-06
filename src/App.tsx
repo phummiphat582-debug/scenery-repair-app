@@ -202,8 +202,8 @@ export const App: React.FC = () => {
 
   // Handle update ticket
   const handleUpdateTicket = async (id: string, updates: Partial<Ticket>) => {
-    const updated = await ticketService.updateTicket(id, updates);
-    const targetRequestId = updated?.requestId || id;
+    const existing = tickets.find(t => t.id === id || t.requestId === id);
+    const targetRequestId = updates.requestId || existing?.requestId || id;
     if (updates.status === 'completed') {
       confetti({ particleCount: 50, spread: 70, origin: { y: 0.7 } });
       showToast(`🎉 ปิดงานซ่อม #${targetRequestId} เรียบร้อย! สามารถดูรายการได้ที่แท็บ "เสร็จสิ้น"`, 'success');
@@ -216,6 +216,7 @@ export const App: React.FC = () => {
     } else {
       showToast(`อัปเดตข้อมูลใบงาน #${targetRequestId} เรียบร้อย`);
     }
+    await ticketService.updateTicket(id, updates);
   };
 
   const handleDeleteTicket = async (id: string) => {

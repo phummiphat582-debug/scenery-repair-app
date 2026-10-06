@@ -46,6 +46,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const handleConfirmAcceptWork = async (ticketId: string, technicianName: string, technicianPhone?: string) => {
     setCurrentTechName(technicianName);
     if (technicianPhone) setCurrentTechPhone(technicianPhone);
+    setIsAcceptModalOpen(false);
+    onClose();
     await onUpdateTicket(ticketId, {
       requestId: ticket.requestId,
       status: 'in_progress',
@@ -70,6 +72,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   ) => {
     const finalTechName = data.technicianName || ticket.technicianName || '';
     const finalTechPhone = data.technicianPhone || ticket.technicianPhone || '';
+    
+    // Close both modals immediately so the user experiences zero lag (0ms)!
+    setIsCompleteModalOpen(false);
+    onClose();
+
     await onUpdateTicket(ticketId, {
       requestId: data.requestId || ticket.requestId,
       status: 'completed',
@@ -83,7 +90,6 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       completedAt: new Date().toISOString(),
       remark: `ช่าง ${finalTechName} บันทึกจบงานซ่อมเรียบร้อย`
     });
-    onClose();
   };
 
   const [confirmConfig, setConfirmConfig] = useState<{
@@ -177,9 +183,9 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
         if (newStatus === 'completed') {
           updates.completedAt = new Date().toISOString();
         }
-        await onUpdateTicket(ticket.id, updates);
         setConfirmConfig(null);
         onClose();
+        await onUpdateTicket(ticket.id, updates);
       }
     });
   };

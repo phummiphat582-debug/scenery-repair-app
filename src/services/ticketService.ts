@@ -198,6 +198,7 @@ class TicketService {
   private supabaseChannel: any = null;
   private isConnectedToCloud = false;
   private recentlyDeletedTicketIds: Set<string> = new Set();
+  private syncDebounceTimer: any = null;
 
   constructor() {
     this.initLocalData();
@@ -238,13 +239,41 @@ class TicketService {
     }
   }
 
+  public scheduleSyncFromServer(delayMs = 2500) {
+    if (this.syncDebounceTimer) {
+      clearTimeout(this.syncDebounceTimer);
+    }
+    this.syncDebounceTimer = setTimeout(() => {
+      this.syncDebounceTimer = null;
+      void this.syncFromServer();
+    }, delayMs);
+  }
+
   private saveToLocalStorage() {
     try {
       localStorage.setItem(LOCAL_STORAGE_TICKETS, JSON.stringify(this.tickets));
       localStorage.setItem(LOCAL_STORAGE_DEPTS, JSON.stringify(this.departments));
       localStorage.setItem(LOCAL_STORAGE_TECHS, JSON.stringify(this.technicians));
     } catch (e) {
-      console.warn('LocalStorage save failed:', e);
+      console.warn('LocalStorage save failed, optimizing storage for quota:', e);
+      try {
+        // Fallback: If 5MB quota exceeded, store tickets with trimmed images for older tickets (>15)
+        const safeTickets = this.tickets.map((t, idx) => {
+          if (idx > 15) {
+            return {
+              ...t,
+              requestImageUrl: t.requestImageUrl && t.requestImageUrl.length > 500 ? '[CACHED_ON_CLOUD]' : t.requestImageUrl,
+              resultImageUrl: t.resultImageUrl && t.resultImageUrl.length > 500 ? '[CACHED_ON_CLOUD]' : t.resultImageUrl
+            };
+          }
+          return t;
+        });
+        localStorage.setItem(LOCAL_STORAGE_TICKETS, JSON.stringify(safeTickets));
+        localStorage.setItem(LOCAL_STORAGE_DEPTS, JSON.stringify(this.departments));
+        localStorage.setItem(LOCAL_STORAGE_TECHS, JSON.stringify(this.technicians));
+      } catch (innerErr) {
+        console.warn('LocalStorage safe save failed:', innerErr);
+      }
     }
   }
 
@@ -359,7 +388,7 @@ class TicketService {
             if (payload?.payload?.action === 'FOLLOW_UP' && typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('SCENERY_FOLLOW_UP', { detail: payload.payload }));
             }
-            void this.syncFromServer();
+            this.scheduleSyncFromServer(2500);
           }
         )
         .on(
@@ -400,7 +429,7 @@ class TicketService {
             } catch (cdcErr) {
               console.warn('[TicketService] Direct CDC merge exception:', cdcErr);
             }
-            void this.syncFromServer();
+            this.scheduleSyncFromServer(2500);
           }
         )
         .on(
@@ -422,7 +451,7 @@ class TicketService {
                 this.notify();
               }
             } catch (e) {}
-            void this.syncFromServer();
+            this.scheduleSyncFromServer(2500);
           }
         )
         .on(
@@ -430,7 +459,7 @@ class TicketService {
           { event: '*', schema: 'public', table: 'departments' },
           (payload) => {
             console.log('⚡ [Realtime CDC] Department event received:', payload.eventType);
-            void this.syncFromServer();
+            this.scheduleSyncFromServer(2500);
           }
         )
         .subscribe((status) => {
@@ -652,7 +681,11 @@ class TicketService {
    * Departments
    */
   public async getDepartments(): Promise<Department[]> {
-    await this.ensureInitialSync();
+    if (this.departments.length === 0) {
+      await this.ensureInitialSync();
+    } else {
+      void this.ensureInitialSync();
+    }
     return sortDepartments(this.departments);
   }
 
@@ -660,7 +693,11 @@ class TicketService {
    * Technicians
    */
   public async getTechnicians(): Promise<Technician[]> {
-    await this.ensureInitialSync();
+    if (this.technicians.length === 0) {
+      await this.ensureInitialSync();
+    } else {
+      void this.ensureInitialSync();
+    }
     return [...this.technicians];
   }
 
@@ -886,7 +923,11 @@ class TicketService {
     onlyUrgent?: boolean;
     searchQuery?: string;
   }): Promise<Ticket[]> {
-    await this.ensureInitialSync();
+    if (this.tickets.length === 0) {
+      await this.ensureInitialSync();
+    } else {
+      void this.ensureInitialSync();
+    }
 
     let list: Ticket[] = [...this.tickets];
     const now = Date.now();
@@ -1055,17 +1096,15 @@ class TicketService {
       try {
         const dbUpdates = ticketToDb(finalUpdates, false);
         let query = supabase.from('repair_tickets').update(dbUpdates);
-        if (targetUuid && targetRequestId) {
-          query = query.or(`id.eq.${targetUuid},request_id.eq.${targetRequestId}`);
+        if (targetRequestId) {
+          query = query.eq('request_id', targetRequestId);
         } else if (targetUuid) {
           query = query.eq('id', targetUuid);
-        } else if (targetRequestId) {
-          query = query.eq('request_id', targetRequestId);
         } else {
           query = filterTicketQuery(query, id);
         }
         
-        let { data, error } = await query.select();
+        let { data, error } = await query.select('id, request_id, status, updated_at, completed_at, technician_name, repair_result, remark');
 
         // If 0 rows matched (e.g. UUID mismatch), retry targeting request_id directly
         if (!error && (!data || data.length === 0) && targetRequestId) {
@@ -1074,7 +1113,7 @@ class TicketService {
             .from('repair_tickets')
             .update(dbUpdates)
             .eq('request_id', targetRequestId)
-            .select();
+            .select('id, request_id, status, updated_at, completed_at, technician_name, repair_result, remark');
           data = retryRes.data;
           error = retryRes.error;
         }
@@ -1084,7 +1123,11 @@ class TicketService {
         } else if (data && data.length > 0) {
           const serverTicket = dbToTicket(data[0]);
           if (existing) {
-            Object.assign(existing, serverTicket);
+            Object.assign(existing, {
+              ...serverTicket,
+              requestImageUrl: existing.requestImageUrl || serverTicket.requestImageUrl,
+              resultImageUrl: existing.resultImageUrl || serverTicket.resultImageUrl
+            });
             this.saveToLocalStorage();
           }
           this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: serverTicket.id, requestId: serverTicket.requestId });

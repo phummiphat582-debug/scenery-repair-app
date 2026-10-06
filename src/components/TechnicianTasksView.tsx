@@ -135,6 +135,7 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
   ) => {
     const finalTechName = data.technicianName || currentTech.name;
     const finalTechPhone = data.technicianPhone || currentTech.phone || '';
+    setCompleteModalTicket(null);
     await onUpdateTicketStatus(ticketId, {
       requestId: data.requestId || completeModalTicket?.requestId,
       status: 'completed',

@@ -171,7 +171,7 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
 
     setIsProcessingImage(true);
     try {
-      const compressed = await compressImage(file, 1200, 1200, 0.75);
+      const compressed = await compressImage(file, 800, 800, 0.65);
       setResultImageUrl(compressed);
     } catch (err: any) {
       alert('ไม่สามารถประมวลผลรูปภาพได้: ' + (err?.message || 'เกิดข้อผิดพลาด'));
@@ -240,7 +240,7 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
         `อะไหล่ที่เปลี่ยน: ${partsSummary}`
       ].join('\n');
 
-      await onConfirmComplete(ticket.id, {
+      const completionData = {
         requestId: ticket.requestId,
         technicianName: selectedTechName.trim(),
         technicianPhone: selectedTechPhone.trim(),
@@ -249,8 +249,15 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
         repairResult: fullResultText,
         parts: validParts,
         resultImageUrl: resultImageUrl || undefined
-      });
+      };
+
+      // Close modal immediately so the UI responds in 0ms!
       onClose();
+
+      // Proceed with update in background
+      void onConfirmComplete(ticket.id, completionData).catch((err) => {
+        console.warn('บันทึกจบงานไม่สำเร็จ:', err);
+      });
     } catch (err: any) {
       console.warn('บันทึกจบงานไม่สำเร็จ:', err);
     } finally {
