@@ -43,10 +43,11 @@ export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
 
   // Core Data
-  const [tickets, setTickets] = useState<Ticket[]>(() => ticketService.getCachedData().tickets);
-  const [departments, setDepartments] = useState<Department[]>(() => ticketService.getCachedData().departments);
-  const [technicians, setTechnicians] = useState<Technician[]>(() => ticketService.getCachedData().technicians);
-  const [isLoading, setIsLoading] = useState(false);
+  const cachedData = ticketService.getCachedData();
+  const [tickets, setTickets] = useState<Ticket[]>(() => cachedData.tickets);
+  const [departments, setDepartments] = useState<Department[]>(() => cachedData.departments);
+  const [technicians, setTechnicians] = useState<Technician[]>(() => cachedData.technicians);
+  const [isLoading, setIsLoading] = useState<boolean>(() => cachedData.tickets.length === 0);
 
   // Selected ticket for Detail Modal
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -102,6 +103,7 @@ export const App: React.FC = () => {
       if (cached.departments.length > 0) setDepartments(cached.departments);
       if (cached.technicians.length > 0) setTechnicians(cached.technicians);
       setTickets(cached.tickets);
+      if (cached.tickets.length > 0) setIsLoading(false);
     } catch (err) {
       console.warn('Cache state sync error:', err);
     }

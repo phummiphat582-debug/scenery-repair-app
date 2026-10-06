@@ -262,8 +262,8 @@ class TicketService {
           if (idx > 15) {
             return {
               ...t,
-              requestImageUrl: t.requestImageUrl && t.requestImageUrl.length > 500 ? '[CACHED_ON_CLOUD]' : t.requestImageUrl,
-              resultImageUrl: t.resultImageUrl && t.resultImageUrl.length > 500 ? '[CACHED_ON_CLOUD]' : t.resultImageUrl
+              requestImageUrl: t.requestImageUrl && t.requestImageUrl.length > 500 ? '' : t.requestImageUrl,
+              resultImageUrl: t.resultImageUrl && t.resultImageUrl.length > 500 ? '' : t.resultImageUrl
             };
           }
           return t;
@@ -388,7 +388,18 @@ class TicketService {
             if (payload?.payload?.action === 'FOLLOW_UP' && typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('SCENERY_FOLLOW_UP', { detail: payload.payload }));
             }
-            this.scheduleSyncFromServer(2500);
+            if (payload?.payload?.ticket) {
+              const incoming = payload.payload.ticket;
+              const idx = this.tickets.findIndex(t => t.id === incoming.id || t.requestId === incoming.requestId);
+              if (idx !== -1) {
+                this.tickets[idx] = { ...this.tickets[idx], ...incoming };
+              } else {
+                this.tickets.unshift(incoming);
+              }
+              this.saveToLocalStorage();
+              this.notify();
+            }
+            void this.syncFromServer();
           }
         )
         .on(
@@ -429,7 +440,7 @@ class TicketService {
             } catch (cdcErr) {
               console.warn('[TicketService] Direct CDC merge exception:', cdcErr);
             }
-            this.scheduleSyncFromServer(2500);
+            void this.syncFromServer();
           }
         )
         .on(
@@ -451,7 +462,7 @@ class TicketService {
                 this.notify();
               }
             } catch (e) {}
-            this.scheduleSyncFromServer(2500);
+            void this.syncFromServer();
           }
         )
         .on(
@@ -459,7 +470,7 @@ class TicketService {
           { event: '*', schema: 'public', table: 'departments' },
           (payload) => {
             console.log('⚡ [Realtime CDC] Department event received:', payload.eventType);
-            this.scheduleSyncFromServer(2500);
+            void this.syncFromServer();
           }
         )
         .subscribe((status) => {
@@ -1104,7 +1115,7 @@ class TicketService {
           query = filterTicketQuery(query, id);
         }
         
-        let { data, error } = await query.select('id, request_id, status, updated_at, completed_at, technician_name, repair_result, remark');
+        let { data, error } = await query.select('*');
 
         // If 0 rows matched (e.g. UUID mismatch), retry targeting request_id directly
         if (!error && (!data || data.length === 0) && targetRequestId) {
@@ -1113,7 +1124,7 @@ class TicketService {
             .from('repair_tickets')
             .update(dbUpdates)
             .eq('request_id', targetRequestId)
-            .select('id, request_id, status, updated_at, completed_at, technician_name, repair_result, remark');
+            .select('*');
           data = retryRes.data;
           error = retryRes.error;
         }
@@ -1123,14 +1134,10 @@ class TicketService {
         } else if (data && data.length > 0) {
           const serverTicket = dbToTicket(data[0]);
           if (existing) {
-            Object.assign(existing, {
-              ...serverTicket,
-              requestImageUrl: existing.requestImageUrl || serverTicket.requestImageUrl,
-              resultImageUrl: existing.resultImageUrl || serverTicket.resultImageUrl
-            });
+            Object.assign(existing, serverTicket);
             this.saveToLocalStorage();
           }
-          this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: serverTicket.id, requestId: serverTicket.requestId });
+          this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: serverTicket.id, requestId: serverTicket.requestId, ticket: serverTicket });
         } else {
           this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: targetUuid || id, requestId: targetRequestId });
         }
