@@ -42,6 +42,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'ตารางรับงานตามคิว & ทุกรายการ';
       case 'settings':
         return 'ตั้งค่า & อัปเดตเวรช่าง';
+      case 'summary':
+        return 'สรุปรายงานสถิติงานซ่อมบำรุง';
       default:
         return 'Scenery Farm Maintenance';
     }

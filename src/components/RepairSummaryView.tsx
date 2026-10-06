@@ -19,7 +19,8 @@ import {
   ArrowUpDown, 
   Info,
   X,
-  PieChart
+  PieChart,
+  Printer
 } from 'lucide-react';
 import { DivisionBadge } from './DivisionBadge';
 
@@ -312,8 +313,185 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  return (
-    <div className={`w-full max-w-5xl mx-auto space-y-4 animate-in fade-in duration-200 ${isModal ? 'p-4 sm:p-6' : ''}`}>
+  // Print / Save as PDF
+  const handlePrintPDF = () => {
+    const deptTitle = selectedDept === 'all' ? 'ภาพรวมทุกแผนก (ทั้งฟาร์มเดอะซีนเนอรี่)' : `แผนก "${selectedDept}"`;
+    const tfTitle = timeframeLabels[timeframe];
+    const printDate = new Date().toLocaleDateString('th-TH', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    const activeTicketsRows = activeTickets.map((t) => `
+      <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
+        <td style="padding: 6px 8px; text-align: center; font-weight: bold; color: #184e38;">#${t.requestId}</td>
+        <td style="padding: 6px 8px;">${new Date(t.createdAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+        <td style="padding: 6px 8px; font-weight: 600;">${t.department}</td>
+        <td style="padding: 6px 8px;">${t.title}</td>
+        <td style="padding: 6px 8px;">${t.location}</td>
+        <td style="padding: 6px 8px;">${t.technicianName || '-'}</td>
+        <td style="padding: 6px 8px; text-align: center;">
+          <span style="display: inline-block; padding: 2px 6px; border-radius: 9999px; font-size: 10px; font-weight: bold; ${
+            t.status === 'completed' ? 'background: #d1fae5; color: #065f46;' :
+            t.status === 'in_progress' ? 'background: #dbeafe; color: #1e40af;' :
+            'background: #fef3c7; color: #92400e;'
+          }">
+            ${t.status === 'completed' ? 'เสร็จสิ้น' : t.status === 'in_progress' ? 'กำลังซ่อม' : 'รอรับงาน'}
+          </span>
+        </td>
+      </tr>
+    `).join('');
+
+    const deptRows = departmentStats.filter(d => d.total > 0).map((d, idx) => `
+      <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
+        <td style="padding: 6px 8px; text-align: center;">${idx + 1}</td>
+        <td style="padding: 6px 8px; font-weight: 600;">${d.name}</td>
+        <td style="padding: 6px 8px; text-align: center; font-weight: bold;">${d.total}</td>
+        <td style="padding: 6px 8px; text-align: center; color: #059669; font-weight: bold;">${d.completed}</td>
+        <td style="padding: 6px 8px; text-align: center; color: #d97706; font-weight: bold;">${d.pending + d.inProgress}</td>
+        <td style="padding: 6px 8px; text-align: center; font-weight: bold;">${d.rate}%</td>
+      </tr>
+    `).join('');
+
+    const printHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>รายงานสรุปงานซ่อมบำรุง - ${deptTitle} (${tfTitle})</title>
+  <style>
+    @page { size: A4 portrait; margin: 12mm 15mm; }
+    body { font-family: 'Sarabun', 'Prompt', 'Segoe UI', Tahoma, sans-serif; color: #0f172a; margin: 0; padding: 0; line-height: 1.4; }
+    .header { text-align: center; border-bottom: 2px solid #184e38; padding-bottom: 10px; margin-bottom: 14px; }
+    .logo-text { font-size: 20px; font-weight: 800; color: #184e38; letter-spacing: 0.5px; margin: 0; }
+    .sub { font-size: 13px; color: #334155; margin: 3px 0 0; font-weight: 600; }
+    .meta { font-size: 11px; color: #64748b; margin-top: 4px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+    .kpi-card { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; text-align: center; background: #f8fafc; }
+    .kpi-val { font-size: 18px; font-weight: 800; color: #0f172a; margin-top: 2px; }
+    .kpi-label { font-size: 10px; color: #64748b; font-weight: 700; }
+    .sec-title { font-size: 12px; font-weight: 800; color: #184e38; margin: 14px 0 6px; border-left: 3px solid #184e38; padding-left: 6px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    th { background: #f1f5f9; padding: 6px 8px; font-size: 10.5px; font-weight: 700; text-align: left; border-bottom: 2px solid #cbd5e1; }
+    .sign-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 26px; text-align: center; font-size: 11px; page-break-inside: avoid; }
+    .sign-line { border-bottom: 1px dotted #94a3b8; height: 35px; margin-bottom: 5px; }
+    @media print {
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1 class="logo-text">ฟาร์มเดอะซีนเนอรี่ สวนผึ้ง (The Scenery Vintage Farm)</h1>
+    <div class="sub">รายงานสรุปผลงานซ่อมบำรุงและสถิติ • ${deptTitle}</div>
+    <div class="meta">ช่วงเวลา: <strong>${tfTitle}</strong> | พิมพ์ข้อมูล ณ วันที่: ${printDate} น.</div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">งานแจ้งซ่อมทั้งหมด</div>
+      <div class="kpi-val">${metrics.total} <span style="font-size:11px; font-weight: normal;">งาน</span></div>
+    </div>
+    <div class="kpi-card" style="border-color: #a7f3d0; background: #f0fdf4;">
+      <div class="kpi-label" style="color: #065f46;">ซ่อมเสร็จ (${metrics.completionRate}%)</div>
+      <div class="kpi-val" style="color: #047857;">${metrics.completed} <span style="font-size:11px; font-weight: normal;">งาน</span></div>
+    </div>
+    <div class="kpi-card" style="border-color: #fed7aa; background: #fffbeb;">
+      <div class="kpi-label" style="color: #92400e;">กำลังซ่อม / รออะไหล่</div>
+      <div class="kpi-val" style="color: #b45309;">${metrics.inProgress} <span style="font-size:11px; font-weight: normal;">งาน</span></div>
+    </div>
+    <div class="kpi-card" style="border-color: #bae6fd; background: #f0f9ff;">
+      <div class="kpi-label" style="color: #0369a1;">เวลาเฉลี่ยในการซ่อม</div>
+      <div class="kpi-val" style="color: #0284c7;">${metrics.avgDurationText}</div>
+    </div>
+  </div>
+
+  <div style="font-size: 11px; margin-bottom: 10px; display: flex; gap: 14px; background: #f8fafc; padding: 6px 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+    <span>🛠️ <strong>สรุปสายงาน:</strong></span>
+    <span>84 ซ่อมบำรุง: <strong>${metrics.div84} งาน</strong></span>
+    <span>85 ก่อสร้าง: <strong>${metrics.div85} งาน</strong></span>
+    <span>86 งานศิลป์: <strong>${metrics.div86} งาน</strong></span>
+  </div>
+
+  ${deptRows ? `
+    <div class="sec-title">ตารางเปรียบเทียบสถิติแยกตามแผนก</div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 36px; text-align: center;">ลำดับ</th>
+          <th>แผนก</th>
+          <th style="width: 70px; text-align: center;">รวมแจ้ง</th>
+          <th style="width: 70px; text-align: center;">เสร็จสิ้น</th>
+          <th style="width: 70px; text-align: center;">คงค้าง</th>
+          <th style="width: 75px; text-align: center;">ความสำเร็จ</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${deptRows}
+      </tbody>
+    </table>
+  ` : ''}
+
+  <div class="sec-title">รายการงานแจ้งซ่อม (${activeTickets.length} รายการ)</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 65px; text-align: center;">รหัส</th>
+        <th style="width: 85px;">วันที่แจ้ง</th>
+        <th style="width: 95px;">แผนก</th>
+        <th>ชื่องาน / อาการเสีย</th>
+        <th style="width: 85px;">สถานที่</th>
+        <th style="width: 85px;">ช่างผู้ดูแล</th>
+        <th style="width: 65px; text-align: center;">สถานะ</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${activeTicketsRows || '<tr><td colspan="7" style="text-align:center; padding: 10px; color: #94a3b8;">ไม่มีรายการในช่วงเวลานี้</td></tr>'}
+    </tbody>
+  </table>
+
+  <div class="sign-grid">
+    <div>
+      <div class="sign-line"></div>
+      <div>(ลงชื่อ ผู้จัดทำรายงาน)</div>
+      <div style="color: #64748b; font-size: 10px;">วันที่: ....../....../......</div>
+    </div>
+    <div>
+      <div class="sign-line"></div>
+      <div>(ลงชื่อ หัวหน้าฝ่ายช่างซ่อมบำรุง)</div>
+      <div style="color: #64748b; font-size: 10px;">วันที่: ....../....../......</div>
+    </div>
+    <div>
+      <div class="sign-line"></div>
+      <div>(ลงชื่อ ผู้จัดการฟาร์ม / ผู้บริหาร)</div>
+      <div style="color: #64748b; font-size: 10px;">วันที่: ....../....../......</div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+      printWin.document.open();
+      printWin.document.write(printHtml);
+      printWin.document.close();
+      printWin.focus();
+      setTimeout(() => {
+        try {
+          printWin.print();
+        } catch {
+          window.print();
+        }
+      }, 400);
+    } else {
+      window.print();
+    }
+  };
+
+  const renderContent = (
+    <div className="w-full max-w-5xl mx-auto space-y-4 animate-in fade-in duration-200">
       
       {/* 1. Header & Actions Bar */}
       <div className="bg-gradient-to-r from-primary via-primary to-primary-container text-white p-5 sm:p-6 rounded-3xl shadow-lg border border-primary-fixed/20 relative overflow-hidden">
@@ -335,7 +513,7 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
             </p>
           </div>
 
-          {/* Quick Action Buttons: Copy for LINE + Export CSV */}
+          {/* Quick Action Buttons: Copy for LINE + Print PDF + Export CSV */}
           <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
@@ -345,6 +523,16 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
             >
               {copiedToast ? <Check className="w-4 h-4 text-white" /> : <Copy className="w-4 h-4" />}
               <span>{copiedToast ? 'คัดลอกแล้ว!' : 'คัดลอกส่งไลน์'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePrintPDF}
+              className="px-3.5 py-2 bg-white text-primary hover:bg-slate-50 border border-white/60 rounded-2xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title="พิมพ์รายงานสรุป หรือบันทึกเป็นไฟล์ PDF (Print to PDF)"
+            >
+              <Printer className="w-4 h-4 text-primary" />
+              <span>พิมพ์ / บันทึก PDF</span>
             </button>
 
             <button
@@ -361,7 +549,7 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-9 h-9 rounded-2xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white cursor-pointer ml-1"
+                className="w-9 h-9 rounded-2xl bg-white/20 hover:bg-white/30 flex items-center justify-center text-white cursor-pointer ml-1 active:scale-95 transition-all"
                 title="ปิดหน้ารายงาน"
               >
                 <X className="w-5 h-5" />
@@ -814,4 +1002,21 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
 
     </div>
   );
+
+  if (isModal) {
+    return (
+      <div 
+        className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-150"
+        onClick={(e) => {
+          if (e.target === e.currentTarget && onClose) onClose();
+        }}
+      >
+        <div className="relative w-full max-w-5xl bg-surface-container-lowest rounded-3xl shadow-2xl border border-slate-200 max-h-[92vh] overflow-y-auto p-2 sm:p-5 my-auto">
+          {renderContent}
+        </div>
+      </div>
+    );
+  }
+
+  return renderContent;
 };

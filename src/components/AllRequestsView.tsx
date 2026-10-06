@@ -6,6 +6,8 @@ import { DepartmentBoard } from './DepartmentBoard';
 import { UrgentAlertBanner } from './UrgentAlertBanner';
 import { QueueTableView } from './QueueTableView';
 import { DivisionFilterTabs } from './DivisionFilterTabs';
+import { RepairSummaryView } from './RepairSummaryView';
+import { BarChart2 } from 'lucide-react';
 
 interface AllRequestsViewProps {
   tickets: Ticket[];
@@ -31,6 +33,7 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortOrder, setSortOrder] = useState<SortOrder>('fifo');
   const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState<boolean>(false);
 
   // Urgent tickets for banner (scoped to current division)
   const urgentTickets = useMemo(() => {
@@ -122,12 +125,21 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
     <div className="flex flex-col w-full pb-20">
       
       {/* 0. Division Filter Tabs (84 ซ่อมบำรุง, 85 ก่อสร้าง, 86 งานศิลป์) */}
-      <div className="px-4 pt-2 pb-1 bg-surface-container-low/50 border-b border-slate-200/60">
+      <div className="px-4 pt-2 pb-1 bg-surface-container-low/50 border-b border-slate-200/60 flex items-center justify-between gap-2 flex-wrap">
         <DivisionFilterTabs
           selectedDivision={selectedDivision}
           onSelectDivision={setSelectedDivision}
           tickets={tickets}
         />
+        <button
+          type="button"
+          onClick={() => setIsSummaryModalOpen(true)}
+          className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 ml-auto"
+          title="ดูสรุปรายงานการซ่อมภาพรวมและสถิติแยกแผนก พร้อมพิมพ์ PDF"
+        >
+          <BarChart2 className="w-3.5 h-3.5 text-emerald-700" />
+          <span>📊 สรุปรายงาน / พิมพ์ PDF</span>
+        </button>
       </div>
 
       {/* 1. Urgent Task Alert Ribbon */}
@@ -177,6 +189,17 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
           onOpenEdit={onSelectTicket}
           onQuickAccept={onQuickAccept}
           onDeleteTicket={onDeleteTicket}
+        />
+      )}
+
+      {/* Repair Summary Modal (สำหรับดูรายงานและพิมพ์ PDF จากหน้ารายการ) */}
+      {isSummaryModalOpen && (
+        <RepairSummaryView
+          tickets={tickets}
+          departments={departments}
+          technicians={technicians}
+          isModal={true}
+          onClose={() => setIsSummaryModalOpen(false)}
         />
       )}
 

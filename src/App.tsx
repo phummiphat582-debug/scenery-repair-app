@@ -6,6 +6,7 @@ import { NewTicketForm } from './components/NewTicketForm';
 import { AllRequestsView } from './components/AllRequestsView';
 import { SettingsView } from './components/SettingsView';
 import { RequesterPortalView } from './components/RequesterPortalView';
+import { RepairSummaryView } from './components/RepairSummaryView';
 import { RoleLoginModal } from './components/RoleLoginModal';
 import { DailyDutyModal } from './components/DailyDutyModal';
 import { ConfirmModal } from './components/ConfirmModal';
@@ -387,6 +388,16 @@ export const App: React.FC = () => {
                     onOpenDailyDuty={() => setIsDailyDutyModalOpen(true)}
                     onClearAllTickets={handleClearAllTickets}
                   />
+                )}
+
+                {currentTab === 'summary' && (
+                  <div className="pb-20 pt-2 px-3 sm:px-4">
+                    <RepairSummaryView
+                      tickets={tickets}
+                      departments={departments}
+                      technicians={technicians}
+                    />
+                  </div>
                 )}
               </>
             )}

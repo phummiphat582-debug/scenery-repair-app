@@ -183,3 +183,29 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* Touch responsiveness & silky smooth interactive feel */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, a, input, select {
+  touch-action: manipulation;
+}
+
+button:active {
+  transform: scale(0.98);
+  transition: transform 0.05s ease;
+}
+
+/* Print Styles for PDF export */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  header, nav, footer, .no-print {
+    display: none !important;
+  }
+}
+
+
