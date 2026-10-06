@@ -424,7 +424,12 @@ class TicketService {
                 if (existingIdx !== -1) {
                   const local = this.tickets[existingIdx];
                   if (!(local.status === 'completed' && incoming.status !== 'completed')) {
-                    this.tickets[existingIdx] = { ...local, ...incoming };
+                    this.tickets[existingIdx] = {
+                      ...local,
+                      ...incoming,
+                      requestImageUrl: incoming.requestImageUrl || local.requestImageUrl || '',
+                      resultImageUrl: incoming.resultImageUrl || local.resultImageUrl || ''
+                    };
                     this.saveToLocalStorage();
                     this.notify();
                   }
@@ -608,6 +613,8 @@ class TicketService {
               if (local.status === 'completed' && serverTicket.status !== 'completed') {
                 // If local completion is newer or happened recently (within 10 minutes), preserve completed!
                 if (localTime >= serverTime || (Date.now() - localTime) < 10 * 60 * 1000) {
+                  if (!local.requestImageUrl && serverTicket.requestImageUrl) local.requestImageUrl = serverTicket.requestImageUrl;
+                  if (!local.resultImageUrl && serverTicket.resultImageUrl) local.resultImageUrl = serverTicket.resultImageUrl;
                   mergedTickets.push(local);
                   // Self-healing: If server is older by more than 2 seconds, re-push to Supabase in background
                   if (serverTime < localTime - 2000) {
@@ -619,20 +626,29 @@ class TicketService {
 
               // Rule 2: Last-Write-Wins based on timestamps (local is newer by >1s)
               if (localTime > serverTime + 1000) {
+                if (!local.requestImageUrl && serverTicket.requestImageUrl) local.requestImageUrl = serverTicket.requestImageUrl;
+                if (!local.resultImageUrl && serverTicket.resultImageUrl) local.resultImageUrl = serverTicket.resultImageUrl;
                 mergedTickets.push(local);
                 continue;
               }
 
               // Server is authoritative (newer or equal)
-              mergedTickets.push(serverTicket);
+              const finalMerged: Ticket = {
+                ...serverTicket,
+                requestImageUrl: serverTicket.requestImageUrl || local.requestImageUrl || '',
+                resultImageUrl: serverTicket.resultImageUrl || local.resultImageUrl || ''
+              };
+              mergedTickets.push(finalMerged);
               if (
-                local.status !== serverTicket.status ||
-                local.technicianName !== serverTicket.technicianName ||
-                local.updatedAt !== serverTicket.updatedAt ||
-                local.repairResult !== serverTicket.repairResult ||
-                local.remark !== serverTicket.remark ||
-                local.department !== serverTicket.department ||
-                local.division !== serverTicket.division
+                local.status !== finalMerged.status ||
+                local.technicianName !== finalMerged.technicianName ||
+                local.updatedAt !== finalMerged.updatedAt ||
+                local.repairResult !== finalMerged.repairResult ||
+                local.remark !== finalMerged.remark ||
+                local.department !== finalMerged.department ||
+                local.division !== finalMerged.division ||
+                local.requestImageUrl !== finalMerged.requestImageUrl ||
+                local.resultImageUrl !== finalMerged.resultImageUrl
               ) {
                 stateChanged = true;
               }
