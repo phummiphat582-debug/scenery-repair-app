@@ -188,10 +188,6 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
       alert('กรุณากรอกชื่อผู้แจ้ง');
       return false;
     }
-    if (!requesterPhone.trim()) {
-      alert('กรุณากรอกเบอร์ติดต่อของผู้แจ้ง');
-      return false;
-    }
     return true;
   };
 
@@ -485,13 +481,12 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             <label className="font-label-md font-bold text-on-surface flex items-center gap-1.5">
               <Phone className="w-4 h-4 text-primary" />
               <span>เบอร์ติดต่อด่วน</span>
-              <span className="text-error font-bold">*</span>
+              <span className="text-slate-400 font-normal text-xs">(ไม่บังคับ)</span>
             </label>
             <input
               className="w-full h-12 px-3.5 rounded-xl bg-surface-container-low text-on-surface font-body-md text-sm border border-slate-300 focus:outline-none focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 shadow-xs"
-              placeholder="เช่น 081-234-5678"
+              placeholder="เช่น 081-234-5678 (หากมี หรือเว้นว่างได้)"
               type="tel"
-              required
               value={requesterPhone}
               onChange={(e) => handleRequesterPhoneChange(e.target.value)}
             />

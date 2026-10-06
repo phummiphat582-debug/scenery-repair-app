@@ -52,8 +52,10 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
   const [customStart, setCustomStart] = useState<string>('');
   const [customEnd, setCustomEnd] = useState<string>('');
   const [copiedToast, setCopiedToast] = useState(false);
-  const [sortField, setSortField] = useState<'total' | 'completed' | 'pending' | 'name'>('total');
+  const [sortField, setSortField] = useState<'total' | 'completed' | 'pending' | 'name'>('completed');
   const [sortAsc, setSortAsc] = useState(false);
+  const [onlyCompletedDepts, setOnlyCompletedDepts] = useState<boolean>(true);
+  const [statusViewFilter, setStatusViewFilter] = useState<'completed' | 'all'>('completed');
 
   // Timeframe labels
   const timeframeLabels: Record<TimeframeMode, string> = {
@@ -121,6 +123,14 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
       return true;
     });
   }, [filteredByTimeframe, selectedDivision, selectedDept]);
+
+  // Display tickets: งานที่จบแล้ว (default) หรือทั้งหมด
+  const displayTickets = useMemo(() => {
+    if (statusViewFilter === 'completed') {
+      return activeTickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect');
+    }
+    return activeTickets;
+  }, [activeTickets, statusViewFilter]);
 
   // Overall Metrics for the current filter
   const metrics = useMemo(() => {
@@ -193,8 +203,8 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
       const pending = deptTickets.filter(t => t.status === 'pending' || t.status === 'assigned').length;
       const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-      // Extract sample recent titles
-      const recentTitle = deptTickets[0]?.title || '-';
+      // Extract sample recent titles (เน้นงานที่จบแล้ว)
+      const recentTitle = deptTickets.find(t => t.status === 'completed' || t.status === 'waiting_inspect')?.title || deptTickets[0]?.title || '-';
 
       return {
         id: d.id,
@@ -210,8 +220,13 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
       };
     });
 
+    // แสดงแค่งานแผนกที่จบแล้วพอ (completed > 0) ตามคำขอ
+    let filteredStats = onlyCompletedDepts 
+      ? stats.filter(d => d.completed > 0)
+      : stats;
+
     // Sort
-    stats.sort((a, b) => {
+    filteredStats.sort((a, b) => {
       if (sortField === 'name') {
         return sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
       }
@@ -220,8 +235,8 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
       return sortAsc ? valA - valB : valB - valA;
     });
 
-    return stats;
-  }, [filteredByTimeframe, selectedDivision, departments, sortField, sortAsc]);
+    return filteredStats;
+  }, [filteredByTimeframe, selectedDivision, departments, sortField, sortAsc, onlyCompletedDepts]);
 
   // Copy Summary text for LINE messaging
   const handleCopySummary = () => {
@@ -236,9 +251,9 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
     });
 
     const topDepts = departmentStats
-      .filter(d => d.total > 0)
-      .slice(0, 5)
-      .map((d, idx) => `${idx + 1}. ${d.name}: ${d.total} งาน (เสร็จ ${d.completed} | ค้าง ${d.pending + d.inProgress})`)
+      .filter(d => d.completed > 0)
+      .slice(0, 10)
+      .map((d, idx) => `${idx + 1}. ${d.name}: ซ่อมเสร็จแล้ว ${d.completed} งาน (จาก ${d.total} งาน • ${d.rate}%)`)
       .join('\n');
 
     const message = [
@@ -256,7 +271,7 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
       `• 84 ซ่อมบำรุง: ${metrics.div84} งาน`,
       `• 85 งานก่อสร้าง: ${metrics.div85} งาน`,
       `• 86 งานศิลป์: ${metrics.div86} งาน`,
-      topDepts ? `---------------------------------\n🏆 แผนกที่มีการแจ้งซ่อมสูงสุด:\n${topDepts}` : '',
+      topDepts ? `---------------------------------\n🏆 แผนกที่มีงานซ่อมจบแล้ว (${departmentStats.filter(d => d.completed > 0).length} แผนก):\n${topDepts}` : '',
       `---------------------------------`,
       `⏰ รายงาน ณ วันที่ ${dateNow} น.`
     ].filter(Boolean).join('\n');
@@ -325,7 +340,8 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
       minute: '2-digit'
     });
 
-    const activeTicketsRows = activeTickets.map((t) => `
+    const ticketsForPrint = displayTickets;
+    const activeTicketsRows = ticketsForPrint.map((t) => `
       <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
         <td style="padding: 6px 8px; text-align: center; font-weight: bold; color: #184e38;">#${t.requestId}</td>
         <td style="padding: 6px 8px;">${new Date(t.createdAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
@@ -345,14 +361,15 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
       </tr>
     `).join('');
 
-    const deptRows = departmentStats.filter(d => d.total > 0).map((d, idx) => `
+    const completedDeptsList = departmentStats.filter(d => d.completed > 0);
+    const deptRows = completedDeptsList.map((d, idx) => `
       <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
         <td style="padding: 6px 8px; text-align: center;">${idx + 1}</td>
         <td style="padding: 6px 8px; font-weight: 600;">${d.name}</td>
-        <td style="padding: 6px 8px; text-align: center; font-weight: bold;">${d.total}</td>
-        <td style="padding: 6px 8px; text-align: center; color: #059669; font-weight: bold;">${d.completed}</td>
-        <td style="padding: 6px 8px; text-align: center; color: #d97706; font-weight: bold;">${d.pending + d.inProgress}</td>
-        <td style="padding: 6px 8px; text-align: center; font-weight: bold;">${d.rate}%</td>
+        <td style="padding: 6px 8px; text-align: center; color: #059669; font-weight: bold;">${d.completed} งาน</td>
+        <td style="padding: 6px 8px; text-align: center;">${d.total} งาน</td>
+        <td style="padding: 6px 8px; text-align: center; color: #d97706;">${d.pending + d.inProgress} งาน</td>
+        <td style="padding: 6px 8px; text-align: center; font-weight: bold; color: #065f46;">${d.rate}%</td>
       </tr>
     `).join('');
 
@@ -360,7 +377,7 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
 <html>
 <head>
   <meta charset="utf-8">
-  <title>รายงานสรุปงานซ่อมบำรุง - ${deptTitle} (${tfTitle})</title>
+  <title>รายงานสรุปงานซ่อมบำรุงที่จบแล้ว - ${deptTitle} (${tfTitle})</title>
   <style>
     @page { size: A4 portrait; margin: 12mm 15mm; }
     body { font-family: 'Sarabun', 'Prompt', 'Segoe UI', Tahoma, sans-serif; color: #0f172a; margin: 0; padding: 0; line-height: 1.4; }
@@ -385,18 +402,18 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
 <body>
   <div class="header">
     <h1 class="logo-text">ฟาร์มเดอะซีนเนอรี่ สวนผึ้ง (The Scenery Vintage Farm)</h1>
-    <div class="sub">รายงานสรุปผลงานซ่อมบำรุงและสถิติ • ${deptTitle}</div>
+    <div class="sub">รายงานสรุปงานซ่อมบำรุงที่จบแล้ว • ${deptTitle}</div>
     <div class="meta">ช่วงเวลา: <strong>${tfTitle}</strong> | พิมพ์ข้อมูล ณ วันที่: ${printDate} น.</div>
   </div>
 
   <div class="kpi-grid">
+    <div class="kpi-card" style="border-color: #a7f3d0; background: #f0fdf4;">
+      <div class="kpi-label" style="color: #065f46;">ซ่อมเสร็จสิ้นแล้ว (${metrics.completionRate}%)</div>
+      <div class="kpi-val" style="color: #047857;">${metrics.completed} <span style="font-size:11px; font-weight: normal;">งาน</span></div>
+    </div>
     <div class="kpi-card">
       <div class="kpi-label">งานแจ้งซ่อมทั้งหมด</div>
       <div class="kpi-val">${metrics.total} <span style="font-size:11px; font-weight: normal;">งาน</span></div>
-    </div>
-    <div class="kpi-card" style="border-color: #a7f3d0; background: #f0fdf4;">
-      <div class="kpi-label" style="color: #065f46;">ซ่อมเสร็จ (${metrics.completionRate}%)</div>
-      <div class="kpi-val" style="color: #047857;">${metrics.completed} <span style="font-size:11px; font-weight: normal;">งาน</span></div>
     </div>
     <div class="kpi-card" style="border-color: #fed7aa; background: #fffbeb;">
       <div class="kpi-label" style="color: #92400e;">กำลังซ่อม / รออะไหล่</div>
@@ -416,14 +433,14 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
   </div>
 
   ${deptRows ? `
-    <div class="sec-title">ตารางเปรียบเทียบสถิติแยกตามแผนก</div>
+    <div class="sec-title">ตารางสถิติแผนกที่มีงานซ่อมเสร็จสิ้นแล้ว (${completedDeptsList.length} แผนก)</div>
     <table>
       <thead>
         <tr>
           <th style="width: 36px; text-align: center;">ลำดับ</th>
           <th>แผนก</th>
+          <th style="width: 80px; text-align: center;">ซ่อมเสร็จแล้ว</th>
           <th style="width: 70px; text-align: center;">รวมแจ้ง</th>
-          <th style="width: 70px; text-align: center;">เสร็จสิ้น</th>
           <th style="width: 70px; text-align: center;">คงค้าง</th>
           <th style="width: 75px; text-align: center;">ความสำเร็จ</th>
         </tr>
@@ -434,7 +451,7 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
     </table>
   ` : ''}
 
-  <div class="sec-title">รายการงานแจ้งซ่อม (${activeTickets.length} รายการ)</div>
+  <div class="sec-title">รายการงานซ่อม${statusViewFilter === 'completed' ? 'ที่เสร็จสิ้นแล้ว' : ''} (${ticketsForPrint.length} รายการ)</div>
   <table>
     <thead>
       <tr>
@@ -634,15 +651,21 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
               }}
               className="w-full h-10 px-3 bg-surface-container-low border border-slate-200 rounded-xl text-xs sm:text-sm font-bold text-on-surface outline-none focus:border-primary shadow-xs cursor-pointer"
             >
-              <option value="all">🏢 ทุกแผนก (ภาพรวมทั้งฟาร์ม)</option>
-              {departments.map(d => {
-                const count = filteredByTimeframe.filter(t => t.department === d.name).length;
-                return (
-                  <option key={d.id} value={d.name}>
-                    {d.icon} {d.name} {count > 0 ? `(${count} งาน)` : '(0)'}
-                  </option>
-                );
-              })}
+              <option value="all">
+                {onlyCompletedDepts 
+                  ? `🏢 แผนกที่มีงานจบแล้ว (${departments.filter(d => filteredByTimeframe.some(t => t.department === d.name && (t.status === 'completed' || t.status === 'waiting_inspect'))).length} แผนก)`
+                  : '🏢 ทุกแผนก (ภาพรวมทั้งฟาร์ม)'}
+              </option>
+              {departments
+                .filter(d => !onlyCompletedDepts || filteredByTimeframe.some(t => t.department === d.name && (t.status === 'completed' || t.status === 'waiting_inspect')))
+                .map(d => {
+                  const doneCount = filteredByTimeframe.filter(t => t.department === d.name && (t.status === 'completed' || t.status === 'waiting_inspect')).length;
+                  return (
+                    <option key={d.id} value={d.name}>
+                      {d.icon} {d.name} {doneCount > 0 ? `(เสร็จ ${doneCount} งาน)` : '(0)'}
+                    </option>
+                  );
+                })}
             </select>
           </div>
 
@@ -755,44 +778,74 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div>
             <h3 className="font-extrabold text-sm sm:text-base text-on-surface flex items-center gap-2">
-              <span>🏢 ตารางสรุปการซ่อมแยกแต่ละแผนก</span>
+              <span>{onlyCompletedDepts ? '🏢 ตารางสรุปงานแผนกที่จบแล้ว' : '🏢 ตารางสรุปการซ่อมทุกแผนก'}</span>
               <span className="text-xs font-normal text-slate-500">
                 ({timeframeLabels[timeframe]})
               </span>
             </h3>
             <p className="text-[11px] text-on-surface-variant">
-              คลิกที่แถวของแผนก เพื่อดูเจาะจงเฉพาะงานของแผนกนั้นๆ
+              {onlyCompletedDepts 
+                ? 'แสดงเฉพาะแผนกที่มีงานซ่อมเสร็จสิ้นแล้วตามรอบเวลา' 
+                : 'แสดงทุกแผนกในฟาร์ม'} • คลิกแถวแผนกเพื่อเจาะลึกดูงาน
             </p>
           </div>
 
-          <div className="flex items-center gap-1 text-xs">
-            <span className="text-slate-500 font-bold">เรียงตาม:</span>
-            <button
-              type="button"
-              onClick={() => {
-                if (sortField === 'total') setSortAsc(!sortAsc);
-                else { setSortField('total'); setSortAsc(false); }
-              }}
-              className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 cursor-pointer ${
-                sortField === 'total' ? 'bg-primary text-white' : 'bg-slate-100 text-slate-700'
-              }`}
-            >
-              <span>งานมากสุด</span>
-              <ArrowUpDown className="w-3 h-3" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (sortField === 'pending') setSortAsc(!sortAsc);
-                else { setSortField('pending'); setSortAsc(false); }
-              }}
-              className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 cursor-pointer ${
-                sortField === 'pending' ? 'bg-primary text-white' : 'bg-slate-100 text-slate-700'
-              }`}
-            >
-              <span>งานค้างมากสุด</span>
-              <ArrowUpDown className="w-3 h-3" />
-            </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Toggle: เฉพาะแผนกที่จบแล้ว vs ทุกแผนก */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setOnlyCompletedDepts(true)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  onlyCompletedDepts
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                ✅ แผนกที่จบแล้ว ({departmentStats.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setOnlyCompletedDepts(false)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  !onlyCompletedDepts
+                    ? 'bg-primary text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                ทุกแผนก ({departments.length})
+              </button>
+            </div>
+
+            {/* Sort Buttons */}
+            <div className="flex items-center gap-1 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  if (sortField === 'completed') setSortAsc(!sortAsc);
+                  else { setSortField('completed'); setSortAsc(false); }
+                }}
+                className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 cursor-pointer ${
+                  sortField === 'completed' ? 'bg-emerald-700 text-white shadow-xs' : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                <span>งานจบมากสุด</span>
+                <ArrowUpDown className="w-3 h-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (sortField === 'total') setSortAsc(!sortAsc);
+                  else { setSortField('total'); setSortAsc(false); }
+                }}
+                className={`px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 cursor-pointer ${
+                  sortField === 'total' ? 'bg-primary text-white shadow-xs' : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                <span>งานรวม</span>
+                <ArrowUpDown className="w-3 h-3" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -802,8 +855,8 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
             <thead>
               <tr className="bg-surface-container-low border-b border-slate-200 text-slate-600 font-extrabold">
                 <th className="py-2.5 px-3">แผนก</th>
-                <th className="py-2.5 px-3 text-center">แจ้งซ่อมรวม</th>
                 <th className="py-2.5 px-3 text-center">ซ่อมเสร็จแล้ว</th>
+                <th className="py-2.5 px-3 text-center">แจ้งซ่อมรวม</th>
                 <th className="py-2.5 px-3 text-center">กำลังซ่อม/รอ</th>
                 <th className="py-2.5 px-3 text-center">สำเร็จ (%)</th>
                 <th className="py-2.5 px-3">ตัวอย่างงานล่าสุด</th>
@@ -811,7 +864,25 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {departmentStats.map((d, idx) => {
+              {departmentStats.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-500 text-xs">
+                    <div className="flex flex-col items-center gap-2">
+                      <span>ยังไม่มีแผนกที่มีงานซ่อมเสร็จสิ้น (จบงานแล้ว) ในช่วงเวลา {timeframeLabels[timeframe]}</span>
+                      {onlyCompletedDepts && (
+                        <button
+                          type="button"
+                          onClick={() => setOnlyCompletedDepts(false)}
+                          className="px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-xl text-xs font-bold hover:bg-primary/20 cursor-pointer"
+                        >
+                          คลิกเพื่อดูทุกแผนก ({departments.length} แผนก)
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                departmentStats.map((d, idx) => {
                 const isSelected = selectedDept === d.name;
                 return (
                   <tr
@@ -903,7 +974,7 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>
@@ -914,31 +985,60 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div>
             <h3 className="font-extrabold text-sm sm:text-base text-on-surface">
-              📋 รายการงานซ่อมในช่วงเวลานี้ ({activeTickets.length} รายการ)
+              {statusViewFilter === 'completed' ? '✅ รายการงานซ่อมที่จบแล้ว' : '📋 รายการงานซ่อมทั้งหมด'} ({displayTickets.length} รายการ)
             </h3>
             <p className="text-[11px] text-on-surface-variant">
               {selectedDept === 'all' ? 'แสดงทุกแผนก' : `เฉพาะแผนก "${selectedDept}"`} • {timeframeLabels[timeframe]}
             </p>
           </div>
 
-          {selectedDept !== 'all' && (
-            <button
-              type="button"
-              onClick={() => setSelectedDept('all')}
-              className="px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-xl text-xs font-bold hover:bg-primary/20 cursor-pointer"
-            >
-              แสดงงานทุกแผนก
-            </button>
-          )}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setStatusViewFilter('completed')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  statusViewFilter === 'completed'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                ✅ เฉพาะงานที่จบแล้ว ({metrics.completed})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusViewFilter('all')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  statusViewFilter === 'all'
+                    ? 'bg-primary text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                งานทั้งหมด ({metrics.total})
+              </button>
+            </div>
+
+            {selectedDept !== 'all' && (
+              <button
+                type="button"
+                onClick={() => setSelectedDept('all')}
+                className="px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-xl text-xs font-bold hover:bg-primary/20 cursor-pointer"
+              >
+                แสดงงานทุกแผนก
+              </button>
+            )}
+          </div>
         </div>
 
-        {activeTickets.length === 0 ? (
+        {displayTickets.length === 0 ? (
           <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-500">
-            ไม่มีรายการแจ้งซ่อมในช่วงเวลาที่เลือก
+            {statusViewFilter === 'completed'
+              ? 'ยังไม่มีงานซ่อมที่เสร็จสิ้น (จบงานแล้ว) ในช่วงเวลาที่เลือก'
+              : 'ไม่มีรายการแจ้งซ่อมในช่วงเวลาที่เลือก'}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-2.5">
-            {activeTickets.map(t => {
+            {displayTickets.map(t => {
               const isDone = t.status === 'completed';
               return (
                 <div
