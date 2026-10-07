@@ -392,12 +392,23 @@ class TicketService {
               const incoming = payload.payload.ticket;
               const idx = this.tickets.findIndex(t => t.id === incoming.id || t.requestId === incoming.requestId);
               if (idx !== -1) {
-                this.tickets[idx] = { ...this.tickets[idx], ...incoming };
+                const local = this.tickets[idx];
+                // Strict Protection: Never overwrite local 'completed' with non-completed from peer broadcast
+                if (!(local.status === 'completed' && incoming.status !== 'completed')) {
+                  this.tickets[idx] = {
+                    ...local,
+                    ...incoming,
+                    requestImageUrl: incoming.requestImageUrl && incoming.requestImageUrl !== '[ATTACHED]' ? incoming.requestImageUrl : local.requestImageUrl || '',
+                    resultImageUrl: incoming.resultImageUrl && incoming.resultImageUrl !== '[ATTACHED]' ? incoming.resultImageUrl : local.resultImageUrl || ''
+                  };
+                  this.saveToLocalStorage();
+                  this.notify();
+                }
               } else {
                 this.tickets.unshift(incoming);
+                this.saveToLocalStorage();
+                this.notify();
               }
-              this.saveToLocalStorage();
-              this.notify();
             }
             void this.syncFromServer();
           }
@@ -423,6 +434,7 @@ class TicketService {
                 const existingIdx = this.tickets.findIndex(t => t.id === incoming.id || t.requestId === incoming.requestId);
                 if (existingIdx !== -1) {
                   const local = this.tickets[existingIdx];
+                  // Strict Protection: If incoming is completed, ALWAYS accept it! If local is completed and incoming is NOT, do not revert!
                   if (!(local.status === 'completed' && incoming.status !== 'completed')) {
                     this.tickets[existingIdx] = {
                       ...local,
@@ -543,6 +555,15 @@ class TicketService {
       if (!error && (!data || data.length === 0) && targetRequestId) {
         await supabase.from('repair_tickets').update(dbRow).eq('request_id', targetRequestId).select();
       }
+      // If error occurred (e.g. payload too large), fallback retry without huge base64 images
+      if (error && (dbRow.result_image_url || dbRow.request_image_url)) {
+        const safeRow = { ...dbRow };
+        delete safeRow.result_image_url;
+        delete safeRow.request_image_url;
+        if (targetRequestId) {
+          await supabase.from('repair_tickets').update(safeRow).eq('request_id', targetRequestId).select();
+        }
+      }
     } catch (e) {
       console.warn('[TicketService] pushTicketToCloud failed:', e);
     }
@@ -585,7 +606,6 @@ class TicketService {
             const mapped = supaTickets.map(dbToTicket);
 
             // Smart Merge: Merge server records with local state
-            // Crucial: NEVER overwrite a local 'completed' status with an older server 'in_progress' status!
             const mergedTickets: Ticket[] = [];
             let stateChanged = false;
 
@@ -609,23 +629,34 @@ class TicketService {
               const localTime = new Date(local.updatedAt).getTime();
               const serverTime = new Date(serverTicket.updatedAt).getTime();
 
-              // Rule 1: Completed protection - If local ticket is completed and server is not completed
+              // Rule 0: Server Completed Protection
+              // If server is completed or cancelled, server ALWAYS takes precedence over a local 'in_progress' or 'pending' cached status!
+              // This permanently stops mobile local cache from looping back or reverting completed jobs!
+              if ((serverTicket.status === 'completed' || serverTicket.status === 'cancelled') && local.status !== serverTicket.status) {
+                const finalMerged: Ticket = {
+                  ...serverTicket,
+                  requestImageUrl: serverTicket.requestImageUrl || local.requestImageUrl || '',
+                  resultImageUrl: serverTicket.resultImageUrl || local.resultImageUrl || ''
+                };
+                mergedTickets.push(finalMerged);
+                stateChanged = true;
+                continue;
+              }
+
+              // Rule 1: Local Completed Protection
+              // If local ticket is completed and server is not completed
               if (local.status === 'completed' && serverTicket.status !== 'completed') {
-                // If local completion is newer or happened recently (within 10 minutes), preserve completed!
-                if (localTime >= serverTime || (Date.now() - localTime) < 10 * 60 * 1000) {
-                  if (!local.requestImageUrl && serverTicket.requestImageUrl) local.requestImageUrl = serverTicket.requestImageUrl;
-                  if (!local.resultImageUrl && serverTicket.resultImageUrl) local.resultImageUrl = serverTicket.resultImageUrl;
-                  mergedTickets.push(local);
-                  // Self-healing: If server is older by more than 2 seconds, re-push to Supabase in background
-                  if (serverTime < localTime - 2000) {
-                    void this.pushTicketToCloud(local);
-                  }
-                  continue;
-                }
+                if (!local.requestImageUrl && serverTicket.requestImageUrl) local.requestImageUrl = serverTicket.requestImageUrl;
+                if (!local.resultImageUrl && serverTicket.resultImageUrl) local.resultImageUrl = serverTicket.resultImageUrl;
+                mergedTickets.push(local);
+                // Self-healing: Push completed to Supabase Central Cloud
+                void this.pushTicketToCloud(local);
+                continue;
               }
 
               // Rule 2: Last-Write-Wins based on timestamps (local is newer by >1s)
-              if (localTime > serverTime + 1000) {
+              // Only apply for non-completed state transitions
+              if (localTime > serverTime + 1000 && local.status !== 'completed') {
                 if (!local.requestImageUrl && serverTicket.requestImageUrl) local.requestImageUrl = serverTicket.requestImageUrl;
                 if (!local.resultImageUrl && serverTicket.resultImageUrl) local.resultImageUrl = serverTicket.resultImageUrl;
                 mergedTickets.push(local);
@@ -1147,15 +1178,45 @@ class TicketService {
 
         if (error) {
           console.warn('[TicketService] Supabase update error:', error.message);
-        } else if (data && data.length > 0) {
+          // If error might be due to payload size (large base64 image), retry without images
+          if (dbUpdates.result_image_url || dbUpdates.request_image_url) {
+            try {
+              const safeUpdates = { ...dbUpdates };
+              delete safeUpdates.result_image_url;
+              delete safeUpdates.request_image_url;
+              let retryQuery = supabase.from('repair_tickets').update(safeUpdates);
+              if (targetRequestId) {
+                retryQuery = retryQuery.eq('request_id', targetRequestId);
+              } else if (targetUuid) {
+                retryQuery = retryQuery.eq('id', targetUuid);
+              } else {
+                retryQuery = filterTicketQuery(retryQuery, id);
+              }
+              const safeRes = await retryQuery.select('*');
+              if (safeRes.data && safeRes.data.length > 0) {
+                data = safeRes.data;
+                error = null;
+              }
+            } catch (retryErr) {
+              console.warn('[TicketService] Safe payload retry failed:', retryErr);
+            }
+          }
+        }
+        
+        if (data && data.length > 0) {
           const serverTicket = dbToTicket(data[0]);
           if (existing) {
-            Object.assign(existing, serverTicket);
+            // Keep local base64 images if server row returned without them
+            Object.assign(existing, {
+              ...serverTicket,
+              requestImageUrl: serverTicket.requestImageUrl || existing.requestImageUrl || '',
+              resultImageUrl: serverTicket.resultImageUrl || existing.resultImageUrl || ''
+            });
             this.saveToLocalStorage();
           }
-          this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: serverTicket.id, requestId: serverTicket.requestId, ticket: serverTicket });
+          this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: serverTicket.id, requestId: serverTicket.requestId, ticket: existing || serverTicket });
         } else {
-          this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: targetUuid || id, requestId: targetRequestId });
+          this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: targetUuid || id, requestId: targetRequestId, ticket: existing });
         }
       } catch (e) {
         console.warn('[TicketService] Supabase update exception:', e);

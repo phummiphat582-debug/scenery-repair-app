@@ -68,46 +68,51 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
     custom: '🔍 กำหนดช่วงวันที่เอง'
   };
 
-  // Filter tickets by timeframe
+  // Filter tickets by timeframe (includes tickets created in timeframe OR completed in timeframe)
   const filteredByTimeframe = useMemo(() => {
     const now = new Date();
     
     return tickets.filter(t => {
       const createdDate = new Date(t.createdAt);
+      const completedDate = t.completedAt ? new Date(t.completedAt) : null;
       if (isNaN(createdDate.getTime())) return true;
 
-      switch (timeframe) {
-        case 'today': {
-          const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-          return createdDate >= startOfToday;
+      const checkDateInTimeframe = (targetDate: Date) => {
+        switch (timeframe) {
+          case 'today': {
+            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+            return targetDate >= startOfToday;
+          }
+          case 'yesterday': {
+            const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0);
+            const endOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
+            return targetDate >= startOfYesterday && targetDate <= endOfYesterday;
+          }
+          case 'week': {
+            const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            return targetDate >= startOfWeek;
+          }
+          case 'month': {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+            return targetDate >= startOfMonth;
+          }
+          case 'last_month': {
+            const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+            const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+            return targetDate >= startOfLastMonth && targetDate <= endOfLastMonth;
+          }
+          case 'custom': {
+            if (customStart && targetDate < new Date(customStart + 'T00:00:00')) return false;
+            if (customEnd && targetDate > new Date(customEnd + 'T23:59:59')) return false;
+            return true;
+          }
+          case 'all':
+          default:
+            return true;
         }
-        case 'yesterday': {
-          const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0);
-          const endOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
-          return createdDate >= startOfYesterday && createdDate <= endOfYesterday;
-        }
-        case 'week': {
-          const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          return createdDate >= startOfWeek;
-        }
-        case 'month': {
-          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-          return createdDate >= startOfMonth;
-        }
-        case 'last_month': {
-          const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
-          const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-          return createdDate >= startOfLastMonth && createdDate <= endOfLastMonth;
-        }
-        case 'custom': {
-          if (customStart && createdDate < new Date(customStart + 'T00:00:00')) return false;
-          if (customEnd && createdDate > new Date(customEnd + 'T23:59:59')) return false;
-          return true;
-        }
-        case 'all':
-        default:
-          return true;
-      }
+      };
+
+      return checkDateInTimeframe(createdDate) || (completedDate && !isNaN(completedDate.getTime()) && checkDateInTimeframe(completedDate));
     });
   }, [tickets, timeframe, customStart, customEnd]);
 
@@ -136,7 +141,8 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
   const metrics = useMemo(() => {
     const total = activeTickets.length;
     const completed = activeTickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length;
-    const inProgress = activeTickets.filter(t => t.status === 'in_progress' || t.status === 'waiting_parts').length;
+    const inProgress = activeTickets.filter(t => t.status === 'in_progress').length;
+    const waitingParts = activeTickets.filter(t => t.status === 'waiting_parts').length;
     const pending = activeTickets.filter(t => t.status === 'pending' || t.status === 'assigned').length;
     const cancelled = activeTickets.filter(t => t.status === 'cancelled').length;
     
@@ -175,6 +181,7 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
       total,
       completed,
       inProgress,
+      waitingParts,
       pending,
       cancelled,
       completionRate,
@@ -199,7 +206,8 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
       const deptTickets = baseList.filter(t => t.department === d.name);
       const total = deptTickets.length;
       const completed = deptTickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length;
-      const inProgress = deptTickets.filter(t => t.status === 'in_progress' || t.status === 'waiting_parts').length;
+      const inProgress = deptTickets.filter(t => t.status === 'in_progress').length;
+      const waitingParts = deptTickets.filter(t => t.status === 'waiting_parts').length;
       const pending = deptTickets.filter(t => t.status === 'pending' || t.status === 'assigned').length;
       const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
@@ -214,10 +222,40 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
         total,
         completed,
         inProgress,
+        waitingParts,
         pending,
         rate,
         recentTitle
       };
+    });
+
+    // Also include any tickets with department not matching known departments list
+    const knownDeptNames = new Set(departments.map(d => d.name));
+    const extraDeptNames = Array.from(new Set(baseList.map(t => t.department))).filter(name => name && !knownDeptNames.has(name));
+    extraDeptNames.forEach(extraName => {
+      const deptTickets = baseList.filter(t => t.department === extraName);
+      if (deptTickets.length > 0) {
+        const total = deptTickets.length;
+        const completed = deptTickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length;
+        const inProgress = deptTickets.filter(t => t.status === 'in_progress').length;
+        const waitingParts = deptTickets.filter(t => t.status === 'waiting_parts').length;
+        const pending = deptTickets.filter(t => t.status === 'pending' || t.status === 'assigned').length;
+        const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+        const recentTitle = deptTickets.find(t => t.status === 'completed' || t.status === 'waiting_inspect')?.title || deptTickets[0]?.title || '-';
+        stats.push({
+          id: 'extra-' + extraName,
+          name: extraName === 'all' ? 'งานส่วนกลางฟาร์ม' : extraName,
+          icon: '📌',
+          color: '#0f766e',
+          total,
+          completed,
+          inProgress,
+          waitingParts,
+          pending,
+          rate,
+          recentTitle
+        });
+      }
     });
 
     // แสดงแค่งานแผนกที่จบแล้วพอ (completed > 0) ตามคำขอ
@@ -263,7 +301,8 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
       `---------------------------------`,
       `📥 แจ้งซ่อมทั้งหมด: ${metrics.total} รายการ`,
       `✅ ซ่อมเสร็จสิ้น: ${metrics.completed} รายการ (${metrics.completionRate}%)`,
-      `🔧 กำลังซ่อม/รออะไหล่: ${metrics.inProgress} รายการ`,
+      `🔧 กำลังซ่อม: ${metrics.inProgress} รายการ`,
+      metrics.waitingParts > 0 ? `📦 รออะไหล่: ${metrics.waitingParts} รายการ` : '',
       `⏳ รอรับงาน: ${metrics.pending} รายการ`,
       metrics.avgDurationText !== '-' ? `⚡ เวลาเฉลี่ยในการซ่อมเสร็จ: ${metrics.avgDurationText}` : '',
       `---------------------------------`,
@@ -417,7 +456,7 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
     </div>
     <div class="kpi-card" style="border-color: #fed7aa; background: #fffbeb;">
       <div class="kpi-label" style="color: #92400e;">กำลังซ่อม / รออะไหล่</div>
-      <div class="kpi-val" style="color: #b45309;">${metrics.inProgress} <span style="font-size:11px; font-weight: normal;">งาน</span></div>
+      <div class="kpi-val" style="color: #b45309;">${metrics.inProgress + metrics.waitingParts} <span style="font-size:11px; font-weight: normal;">งาน</span></div>
     </div>
     <div class="kpi-card" style="border-color: #bae6fd; background: #f0f9ff;">
       <div class="kpi-label" style="color: #0369a1;">เวลาเฉลี่ยในการซ่อม</div>
@@ -741,16 +780,16 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
         {/* Card 3: In Progress / Waiting */}
         <div className="p-4 bg-surface-container-lowest rounded-3xl border border-slate-200/90 shadow-xs flex flex-col justify-between gap-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-amber-700">กำลังซ่อม / รออะไหล่</span>
+            <span className="text-xs font-bold text-amber-700">กำลังดำเนินการซ่อม</span>
             <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-sm">
               🔧
             </div>
           </div>
           <div className="text-2xl sm:text-3xl font-extrabold text-amber-700">
-            {metrics.inProgress} <span className="text-xs font-normal text-amber-600">รายการ</span>
+            {metrics.inProgress} <span className="text-xs font-normal text-amber-600">งาน</span>
           </div>
           <div className="text-[11px] text-amber-600 flex items-center gap-1 mt-0.5">
-            <span>รอรับงานใหม่: {metrics.pending} รายการ</span>
+            <span>รออะไหล่ {metrics.waitingParts} งาน • รอรับงาน {metrics.pending} งาน</span>
           </div>
         </div>
 
