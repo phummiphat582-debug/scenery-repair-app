@@ -178,7 +178,7 @@ export const QueueControls: React.FC<QueueControlsProps> = ({
                 : 'bg-blue-50 text-blue-900 border border-blue-200 hover:bg-blue-100/70'
             }`}
           >
-            <span>🔧 กำลังซ่อม</span>
+            <span>🛠️ งานที่รับไปแล้ว (กำลังทำ)</span>
             {statusCounts?.in_progress !== undefined && (
               <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
                 statusFilter === 'in_progress' ? 'bg-white/20 text-white' : 'bg-blue-200 text-blue-900'

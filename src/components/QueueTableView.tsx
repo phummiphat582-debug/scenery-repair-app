@@ -11,6 +11,7 @@ interface QueueTableViewProps {
   technicians?: Technician[];
   onSelectTicket: (ticket: Ticket) => void;
   onQuickAccept?: (ticket: Ticket) => void;
+  onOpenCompleteModal?: (ticket: Ticket) => void;
   onDeleteTicket?: (ticket: Ticket) => void;
 }
 
@@ -20,6 +21,7 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
   technicians,
   onSelectTicket,
   onQuickAccept,
+  onOpenCompleteModal,
   onDeleteTicket
 }) => {
   const [callConfirmTech, setCallConfirmTech] = useState<{ name: string; phone: string } | null>(null);
@@ -270,6 +272,17 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
                             title="กดรับงานนี้เองทันที"
                           >
                             กดรับงานเอง
+                          </button>
+                        )}
+                        {ticket.status === 'in_progress' && onOpenCompleteModal && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenCompleteModal(ticket)}
+                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-[11px] shadow-xs cursor-pointer active:scale-95 transition-all flex items-center gap-1 shrink-0"
+                            title="บันทึกซ่อมเสร็จและปิดงานนี้"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>ปิดงาน</span>
                           </button>
                         )}
                         <button

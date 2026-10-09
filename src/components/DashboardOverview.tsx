@@ -31,6 +31,7 @@ interface DashboardOverviewProps {
   technicians: Technician[];
   onSelectTicket: (ticket: Ticket) => void;
   onQuickAssign: (ticket: Ticket) => void;
+  onOpenCompleteModal?: (ticket: Ticket) => void;
   onOpenQRScanner: () => void;
   onRefresh: () => void;
 }
@@ -41,6 +42,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   technicians,
   onSelectTicket,
   onQuickAssign,
+  onOpenCompleteModal,
   onOpenQRScanner,
   onRefresh
 }) => {
@@ -83,6 +85,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     const overdue = divTickets.filter(t => (t.isOverdue || (t.priority === 'critical')) && t.status !== 'completed' && t.status !== 'cancelled').length;
     
     return { total, pending, inProgress, waitingParts, completed, active, overdue };
+  }, [tickets, selectedDivisionFilter]);
+
+  // Dedicated accepted (in-progress) tickets for technician category
+  const inProgressTickets = useMemo(() => {
+    return tickets.filter(t => 
+      t.status === 'in_progress' && 
+      (selectedDivisionFilter === 'all' || (t.division || '84') === selectedDivisionFilter)
+    );
   }, [tickets, selectedDivisionFilter]);
 
   // Filtered tickets for feed
@@ -191,14 +201,25 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   แจ้งโดย {emergencyTicket.requesterName} ({emergencyTicket.department}) • {emergencyTicket.description}
                 </p>
                 <div className="mt-space-sm flex items-center gap-space-xs">
-                  <button
-                    onClick={() => onQuickAssign(emergencyTicket)}
-                    className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-label-md text-label-md shadow active:scale-95 transition-transform min-h-[44px] cursor-pointer"
-                    type="button"
-                  >
-                    <Wrench className="w-4 h-4 shrink-0" />
-                    <span>กดรับงานเองเลย</span>
-                  </button>
+                  {emergencyTicket.status === 'in_progress' && onOpenCompleteModal ? (
+                    <button
+                      onClick={() => onOpenCompleteModal(emergencyTicket)}
+                      className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-label-md text-label-md shadow active:scale-95 transition-transform min-h-[44px] cursor-pointer"
+                      type="button"
+                    >
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <span>บันทึกปิดงาน</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => onQuickAssign(emergencyTicket)}
+                      className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-label-md text-label-md shadow active:scale-95 transition-transform min-h-[44px] cursor-pointer"
+                      type="button"
+                    >
+                      <Wrench className="w-4 h-4 shrink-0" />
+                      <span>กดรับงานเองเลย</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => onSelectTicket(emergencyTicket)}
                     className="flex items-center justify-center px-3 py-2 rounded-lg bg-surface-container-lowest/80 text-error font-label-md text-label-md hover:bg-surface-container-lowest min-h-[44px] cursor-pointer"
@@ -301,16 +322,24 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
 
           {/* Card: In Progress */}
-          <div className="min-w-[130px] flex-shrink-0 bg-surface-container-lowest rounded-xl p-space-sm shadow-sm flex flex-col justify-between border border-slate-200/40">
+          <div 
+            onClick={() => setSelectedStatusFilter('in_progress')}
+            className={`min-w-[130px] flex-shrink-0 rounded-xl p-space-sm shadow-sm flex flex-col justify-between border cursor-pointer transition-all ${
+              selectedStatusFilter === 'in_progress'
+                ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-300'
+                : 'bg-surface-container-lowest border-slate-200/40 hover:border-primary/40'
+            }`}
+            title="คลิกเพื่อดูหมวดงานที่รับไปแล้วทั้งหมด"
+          >
             <div className="flex items-center justify-between text-primary">
-              <span className="font-label-sm text-label-sm font-medium">กำลังซ่อม</span>
+              <span className="font-label-sm text-label-sm font-bold">งานที่รับไปแล้ว</span>
               <Hammer className="w-4 h-4 text-primary" />
             </div>
             <div className="mt-2 flex items-baseline gap-1">
               <span className="font-headline-lg-mobile text-headline-lg-mobile text-primary font-bold">
                 {kpis.inProgress}
               </span>
-              <span className="font-label-sm text-label-sm text-primary font-medium">ช่างทำอยู่</span>
+              <span className="font-label-sm text-label-sm text-primary font-medium">กำลังทำอยู่</span>
             </div>
           </div>
 
@@ -372,8 +401,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         <div className="flex items-center gap-1.5 overflow-x-auto py-1 scroll-smooth no-scrollbar">
           {[
             { id: 'active', label: `งานรอซ่อม (${kpis.active})` },
+            { id: 'in_progress', label: `🛠️ งานที่รับไปแล้ว (${kpis.inProgress})` },
             { id: 'pending', label: `รอรับงาน (${kpis.pending})` },
-            { id: 'in_progress', label: `กำลังทำ (${kpis.inProgress})` },
             { id: 'waiting_parts', label: `รออะไหล่ (${kpis.waitingParts})` },
             { id: 'completed', label: `เสร็จสิ้น (${kpis.completed})` }
           ].map(pill => (
@@ -392,6 +421,110 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           ))}
         </div>
       </section>
+
+      {/* 5.5 หมวดพิเศษ: งานที่รับไปแล้ว (กำลังทำอยู่) - Dedicated Accepted Jobs Category */}
+      {inProgressTickets.length > 0 && selectedStatusFilter !== 'in_progress' && (
+        <section className="px-margin my-space-sm">
+          <div className="bg-gradient-to-r from-blue-50/90 via-sky-50/80 to-emerald-50/80 rounded-2xl border-2 border-blue-200/90 p-4 shadow-xs">
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                  <Hammer className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                      หมวด: งานที่รับไปแล้ว (กำลังทำอยู่)
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full bg-blue-600 text-white text-[11px] font-bold">
+                      {inProgressTickets.length} งาน
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 font-medium">
+                    งานที่ช่างรับไว้แล้ว เมื่อซ่อมเสร็จสามารถกด [บันทึกปิดงาน] ได้ทันทีที่นี่
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedStatusFilter('in_progress')}
+                className="text-xs font-bold text-blue-700 hover:text-blue-900 bg-white/90 hover:bg-white px-2.5 py-1.5 rounded-lg border border-blue-200 transition-all cursor-pointer shrink-0 shadow-2xs"
+              >
+                ดูเฉพาะหมวดนี้ ({inProgressTickets.length}) →
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {inProgressTickets.slice(0, 4).map(ticket => {
+                const aging = getTicketAgingInfo(ticket);
+                return (
+                  <div
+                    key={ticket.id}
+                    className="bg-white rounded-xl p-3 border border-blue-100 shadow-2xs hover:shadow-xs transition-shadow flex flex-col justify-between gap-2"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono font-bold text-primary text-xs">
+                            #{ticket.requestId}
+                          </span>
+                          <DivisionBadge division={ticket.division} size="sm" />
+                          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-semibold ${aging.badgeClass}`}>
+                            {aging.badgeText}
+                          </span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[10px] font-bold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
+                          กำลังทำ
+                        </span>
+                      </div>
+
+                      <h4 className="font-bold text-slate-900 text-xs sm:text-sm mt-1.5 line-clamp-1">
+                        {ticket.title}
+                      </h4>
+
+                      <div className="flex items-center gap-1 text-[11px] text-slate-500 mt-1 truncate">
+                        <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="font-medium text-slate-700">{ticket.department}</span>
+                        <span>•</span>
+                        <span className="truncate">{ticket.location}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1 text-[11px] text-blue-800 font-semibold mt-1 bg-blue-50/60 px-2 py-0.5 rounded-md">
+                        <Wrench className="w-3 h-3 text-blue-600 shrink-0" />
+                        <span>ช่างผู้รับผิดชอบ: {ticket.technicianName || 'ยังไม่ระบุชื่อ'}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                      {onOpenCompleteModal && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenCompleteModal(ticket)}
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-1.5 text-xs font-bold flex items-center justify-center gap-1 shadow-xs cursor-pointer active:scale-95 transition-all"
+                          title="บันทึกซ่อมเสร็จและปิดงานนี้"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>✅ บันทึกปิดงาน</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onSelectTicket(ticket)}
+                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                        title="ดูรายละเอียดใบงาน"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>ดูรายละเอียด</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* 6. Work Orders Feed Header */}
       <div className="px-margin mt-space-sm mb-space-xs flex items-center justify-between">
@@ -554,6 +687,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
                   {/* Action Buttons */}
                   <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100">
+                    {ticket.status === 'in_progress' && onOpenCompleteModal && (
+                      <button
+                        onClick={() => onOpenCompleteModal(ticket)}
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-2 font-label-md text-label-md font-bold text-center shadow-xs active:scale-98 transition-all min-h-[42px] flex items-center justify-center gap-1.5 cursor-pointer"
+                        type="button"
+                        title="บันทึกซ่อมเสร็จและปิดงานนี้"
+                      >
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                        บันทึกปิดงาน
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         const targetName = ticket.technicianName || ticket.requesterName || 'ศูนย์ซ่อมฟาร์ม';

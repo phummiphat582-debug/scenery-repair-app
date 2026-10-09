@@ -8,6 +8,7 @@ interface DepartmentBoardProps {
   departments: Department[];
   onOpenEdit: (ticket: Ticket) => void;
   onQuickAccept: (ticket: Ticket) => void;
+  onOpenCompleteModal?: (ticket: Ticket) => void;
   onDeleteTicket?: (ticket: Ticket) => void;
 }
 
@@ -16,6 +17,7 @@ export const DepartmentBoard: React.FC<DepartmentBoardProps> = ({
   departments,
   onOpenEdit,
   onQuickAccept,
+  onOpenCompleteModal,
   onDeleteTicket
 }) => {
   const deptMap = React.useMemo(() => {
@@ -85,6 +87,7 @@ export const DepartmentBoard: React.FC<DepartmentBoardProps> = ({
                       departmentInfo={dept}
                       onOpenEdit={onOpenEdit}
                       onQuickAccept={onQuickAccept}
+                      onOpenCompleteModal={onOpenCompleteModal}
                       onDeleteTicket={onDeleteTicket}
                     />
                   ))

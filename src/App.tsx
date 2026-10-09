@@ -11,6 +11,7 @@ import { RoleLoginModal } from './components/RoleLoginModal';
 import { DailyDutyModal } from './components/DailyDutyModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { AcceptWorkModal } from './components/AcceptWorkModal';
+import { CompleteWorkModal } from './components/CompleteWorkModal';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { MigrationModal } from './components/MigrationModal';
 import { TechnicianRosterModal } from './components/TechnicianRosterModal';
@@ -70,6 +71,9 @@ export const App: React.FC = () => {
 
   // Confirmation Modal for Quick Accept
   const [quickAcceptTicket, setQuickAcceptTicket] = useState<Ticket | null>(null);
+
+  // Modal for Quick Complete Work (บันทึกปิดงานทันที)
+  const [completeModalTicket, setCompleteModalTicket] = useState<Ticket | null>(null);
 
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -356,6 +360,7 @@ export const App: React.FC = () => {
                     technicians={technicians}
                     onSelectTicket={handleSelectTicket}
                     onQuickAssign={handleQuickAssign}
+                    onOpenCompleteModal={(ticket) => setCompleteModalTicket(ticket)}
                     onOpenQRScanner={() => setIsQRScannerModalOpen(true)}
                     onRefresh={loadData}
                   />
@@ -380,6 +385,7 @@ export const App: React.FC = () => {
                     onQuickAccept={(ticket) => {
                       setQuickAcceptTicket(ticket);
                     }}
+                    onOpenCompleteModal={(ticket) => setCompleteModalTicket(ticket)}
                     onDeleteTicket={handleRequestDeleteTicket}
                   />
                 )}
@@ -489,6 +495,34 @@ export const App: React.FC = () => {
               remark: `ช่าง ${technicianName} กดรับงานแล้ว กำลังดำเนินการ`
             });
             setQuickAcceptTicket(null);
+          }}
+        />
+      )}
+
+      {/* 1-Click Complete Work Modal (บันทึกปิดงานทันที) */}
+      {completeModalTicket && (
+        <CompleteWorkModal
+          isOpen={!!completeModalTicket}
+          onClose={() => setCompleteModalTicket(null)}
+          ticket={completeModalTicket}
+          technicians={technicians}
+          onConfirmComplete={async (ticketId, data) => {
+            const finalTechName = data.technicianName || completeModalTicket.technicianName || '';
+            const finalTechPhone = data.technicianPhone || completeModalTicket.technicianPhone || '';
+            setCompleteModalTicket(null);
+            await handleUpdateTicket(ticketId, {
+              requestId: data.requestId || completeModalTicket.requestId,
+              status: 'completed',
+              technicianName: finalTechName,
+              technicianPhone: finalTechPhone,
+              diagnosticReason: data.diagnosticReason,
+              actionSteps: data.actionSteps,
+              repairResult: data.repairResult,
+              parts: data.parts,
+              resultImageUrl: data.resultImageUrl,
+              completedAt: new Date().toISOString(),
+              remark: `ช่าง ${finalTechName} บันทึกจบงานซ่อมเรียบร้อย`
+            });
           }}
         />
       )}

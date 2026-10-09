@@ -9,6 +9,7 @@ interface TicketCardProps {
   departmentInfo?: Department;
   onOpenEdit: (ticket: Ticket) => void;
   onQuickAccept: (ticket: Ticket) => void;
+  onOpenCompleteModal?: (ticket: Ticket) => void;
   onDeleteTicket?: (ticket: Ticket) => void;
 }
 
@@ -17,6 +18,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
   departmentInfo,
   onOpenEdit,
   onQuickAccept,
+  onOpenCompleteModal,
   onDeleteTicket
 }) => {
   const aging = getTicketAgingInfo(ticket);
@@ -151,6 +153,21 @@ export const TicketCard: React.FC<TicketCardProps> = ({
             >
               <Zap className="w-3 h-3" />
               <span>รับงาน</span>
+            </button>
+          )}
+
+          {ticket.status === 'in_progress' && onOpenCompleteModal && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenCompleteModal(ticket);
+              }}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 shadow-xs transition-all cursor-pointer"
+              title="บันทึกซ่อมเสร็จและปิดงานนี้"
+            >
+              <CheckCircle className="w-3.5 h-3.5" />
+              <span>ปิดงาน</span>
             </button>
           )}
 
