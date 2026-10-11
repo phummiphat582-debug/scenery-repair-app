@@ -3,6 +3,7 @@ import { INITIAL_DEPARTMENTS } from '../data/mockData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { getTicketAgingInfo } from '../lib/ticketAging';
 import { oneSignalService } from './oneSignalService';
+import { savePhotoToIdb, getPhotoFromIdb } from '../lib/photoStorage';
 
 const LOCAL_STORAGE_TICKETS = 'scenery_repair_v5_tickets';
 const LOCAL_STORAGE_DEPTS = 'scenery_repair_v5_departments';
@@ -290,10 +291,40 @@ class TicketService {
       const parsedTechs = savedTechs ? JSON.parse(savedTechs) : [];
       this.technicians = Array.isArray(parsedTechs) ? removeLegacyDemoTechnicians(parsedTechs) : [];
       this.saveToLocalStorage();
+      void this.hydratePhotosFromIdb();
     } catch (e) {
       this.tickets = [];
       this.departments = INITIAL_DEPARTMENTS;
       this.technicians = [];
+    }
+  }
+
+  private async hydratePhotosFromIdb() {
+    if (typeof window === 'undefined') return;
+    try {
+      let changed = false;
+      for (const t of this.tickets) {
+        const key = t.requestId || t.id;
+        if (!t.requestImageUrl && key) {
+          const photo = await getPhotoFromIdb(`${key}_req`);
+          if (photo) {
+            t.requestImageUrl = photo;
+            changed = true;
+          }
+        }
+        if (!t.resultImageUrl && key) {
+          const photo = await getPhotoFromIdb(`${key}_res`);
+          if (photo) {
+            t.resultImageUrl = photo;
+            changed = true;
+          }
+        }
+      }
+      if (changed) {
+        this.notify();
+      }
+    } catch (e) {
+      console.warn('[TicketService] IDB photo hydration failed:', e);
     }
   }
 
@@ -366,6 +397,7 @@ class TicketService {
         this.tickets = Array.from(mergedMap.values());
         this.notify();
       }
+      void this.hydratePhotosFromIdb();
     } catch (e) {
       console.warn('reloadFromLocalStorage error:', e);
     }
@@ -382,6 +414,19 @@ class TicketService {
   }
 
   private saveToLocalStorage() {
+    // 0. Ensure photos are safely backed up to IndexedDB (100MB+ persistent storage)
+    try {
+      this.tickets.forEach(t => {
+        const key = t.requestId || t.id;
+        if (t.requestImageUrl && t.requestImageUrl.startsWith('data:')) {
+          void savePhotoToIdb(`${key}_req`, t.requestImageUrl);
+        }
+        if (t.resultImageUrl && t.resultImageUrl.startsWith('data:')) {
+          void savePhotoToIdb(`${key}_res`, t.resultImageUrl);
+        }
+      });
+    } catch {}
+
     // 1. Always save the completed registry first (lightweight, vital for anti-reversion)
     try {
       localStorage.setItem(COMPLETED_REGISTRY_KEY, JSON.stringify(this.completedRegistry));

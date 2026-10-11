@@ -1,4 +1,4 @@
-const CACHE_NAME = 'scenery-repair-pwa-v3';
+const CACHE_NAME = 'scenery-repair-pwa-v5';
 
 // Static assets to pre-cache
 const PRECACHE_ASSETS = [
@@ -12,12 +12,13 @@ const PRECACHE_ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(PRECACHE_ASSETS).catch((err) => {
         console.warn('[SW] Pre-cache warning:', err);
       });
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -27,6 +28,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
+            console.log('[SW] Deleting old cache:', key);
             return caches.delete(key);
           }
         })
