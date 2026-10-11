@@ -44,6 +44,10 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleConfirmAcceptWork = async (ticketId: string, technicianName: string, technicianPhone?: string) => {
+    if (ticket.status === 'completed') {
+      setIsAcceptModalOpen(false);
+      return;
+    }
     setCurrentTechName(technicianName);
     if (technicianPhone) setCurrentTechPhone(technicianPhone);
     setIsAcceptModalOpen(false);
@@ -179,9 +183,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
       cancelText: 'ย้อนกลับ',
       confirmVariant: variant,
       onConfirm: async () => {
-        const updates: Partial<Ticket> = { requestId: ticket.requestId, status: newStatus };
+        const updates: Partial<Ticket> & { isReopen?: boolean } = { requestId: ticket.requestId, status: newStatus };
         if (newStatus === 'completed') {
           updates.completedAt = new Date().toISOString();
+        } else if (ticket.status === 'completed' && newStatus !== 'completed') {
+          updates.isReopen = true;
         }
         setConfirmConfig(null);
         onClose();

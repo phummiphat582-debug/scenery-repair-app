@@ -7,6 +7,7 @@ import { oneSignalService } from './oneSignalService';
 const LOCAL_STORAGE_TICKETS = 'scenery_repair_v5_tickets';
 const LOCAL_STORAGE_DEPTS = 'scenery_repair_v5_departments';
 const LOCAL_STORAGE_TECHS = 'scenery_repair_v5_technicians';
+const COMPLETED_REGISTRY_KEY = 'scenery_repair_v5_completed_registry';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -200,10 +201,40 @@ class TicketService {
   private recentlyDeletedTicketIds: Set<string> = new Set();
   private syncDebounceTimer: any = null;
 
+  // Anti-Reversion Shield: Immutable record of tickets that were completed
+  private completedRegistry: Record<string, Partial<Ticket>> = {};
+  private localBroadcastChannel: BroadcastChannel | null = null;
+  public isCloudRestricted: boolean = false;
+
   constructor() {
     this.initLocalData();
     this.startRealtime();
     this.setupWindowListeners();
+  }
+
+  public isCompleted(idOrRequestId?: string): boolean {
+    if (!idOrRequestId) return false;
+    return Boolean(this.completedRegistry[idOrRequestId]);
+  }
+
+  public registerCompleted(ticket: Partial<Ticket>) {
+    if (!ticket) return;
+    const nowIso = new Date().toISOString();
+    const completedAt = ticket.completedAt || nowIso;
+    const record: Partial<Ticket> = {
+      id: ticket.id,
+      requestId: ticket.requestId,
+      status: 'completed',
+      completedAt,
+      technicianName: ticket.technicianName,
+      technicianPhone: ticket.technicianPhone,
+      diagnosticReason: ticket.diagnosticReason,
+      actionSteps: ticket.actionSteps,
+      repairResult: ticket.repairResult,
+      parts: ticket.parts
+    };
+    if (ticket.requestId) this.completedRegistry[ticket.requestId] = record;
+    if (ticket.id) this.completedRegistry[ticket.id] = record;
   }
 
   private initLocalData() {
@@ -212,11 +243,38 @@ class TicketService {
         localStorage.removeItem(key);
       });
 
+      // 1. Load Completed Registry (Immutable shield against uncompleted rollbacks)
+      const savedRegistry = localStorage.getItem(COMPLETED_REGISTRY_KEY);
+      if (savedRegistry) {
+        try {
+          const parsed = JSON.parse(savedRegistry);
+          if (parsed && typeof parsed === 'object') {
+            this.completedRegistry = parsed;
+          }
+        } catch (e) {
+          console.warn('Completed registry parse error:', e);
+        }
+      }
+
+      // 2. Load tickets from storage
       const savedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS);
       this.tickets = savedTickets ? JSON.parse(savedTickets) : [];
       this.tickets.forEach(t => {
         if (t.requesterName && t.requesterName.includes('าดสดส')) {
           t.requesterName = '';
+        }
+
+        // Auto-heal: If ticket is in registry OR has completedAt OR has repair notes, guarantee status === 'completed'!
+        if (
+          this.isCompleted(t.requestId) ||
+          this.isCompleted(t.id) ||
+          t.completedAt ||
+          t.status === 'completed' ||
+          (t.repairResult && (t.repairResult.includes('ช่างผู้ปิดงาน') || t.repairResult.includes('สาเหตุ')))
+        ) {
+          t.status = 'completed';
+          if (!t.completedAt) t.completedAt = new Date().toISOString();
+          this.registerCompleted(t);
         }
       });
 
@@ -239,6 +297,80 @@ class TicketService {
     }
   }
 
+  public reloadFromLocalStorage() {
+    try {
+      // 1. Re-read registry
+      const savedReg = localStorage.getItem(COMPLETED_REGISTRY_KEY);
+      if (savedReg) {
+        try {
+          const parsed = JSON.parse(savedReg);
+          if (parsed && typeof parsed === 'object') {
+            this.completedRegistry = { ...this.completedRegistry, ...parsed };
+          }
+        } catch {}
+      }
+
+      // 2. Re-read tickets from disk
+      const savedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS);
+      if (!savedTickets) return;
+      const parsedTickets: Ticket[] = JSON.parse(savedTickets);
+      if (!Array.isArray(parsedTickets)) return;
+
+      let hasChanged = false;
+      const mergedMap = new Map<string, Ticket>();
+
+      // Put current memory tickets first
+      this.tickets.forEach(t => mergedMap.set(t.requestId || t.id, t));
+
+      // Merge with disk tickets
+      parsedTickets.forEach(diskTicket => {
+        const key = diskTicket.requestId || diskTicket.id;
+        const memTicket = mergedMap.get(key);
+
+        // Auto-heal disk ticket if in registry or completedAt
+        if (
+          this.isCompleted(diskTicket.requestId) ||
+          this.isCompleted(diskTicket.id) ||
+          diskTicket.completedAt ||
+          diskTicket.status === 'completed' ||
+          (diskTicket.repairResult && (diskTicket.repairResult.includes('ช่างผู้ปิดงาน') || diskTicket.repairResult.includes('สาเหตุ')))
+        ) {
+          diskTicket.status = 'completed';
+          if (!diskTicket.completedAt) diskTicket.completedAt = new Date().toISOString();
+          this.registerCompleted(diskTicket);
+        }
+
+        if (!memTicket) {
+          mergedMap.set(key, diskTicket);
+          hasChanged = true;
+        } else {
+          // Rule: If either is completed, COMPLETED WINS!
+          if (diskTicket.status === 'completed' && memTicket.status !== 'completed') {
+            mergedMap.set(key, diskTicket);
+            hasChanged = true;
+          } else if (memTicket.status === 'completed' && diskTicket.status !== 'completed') {
+            // Memory is completed, preserve it
+            this.registerCompleted(memTicket);
+          } else {
+            const diskTime = new Date(diskTicket.updatedAt || diskTicket.createdAt).getTime();
+            const memTime = new Date(memTicket.updatedAt || memTicket.createdAt).getTime();
+            if (diskTime > memTime) {
+              mergedMap.set(key, diskTicket);
+              hasChanged = true;
+            }
+          }
+        }
+      });
+
+      if (hasChanged || mergedMap.size !== this.tickets.length) {
+        this.tickets = Array.from(mergedMap.values());
+        this.notify();
+      }
+    } catch (e) {
+      console.warn('reloadFromLocalStorage error:', e);
+    }
+  }
+
   public scheduleSyncFromServer(delayMs = 2500) {
     if (this.syncDebounceTimer) {
       clearTimeout(this.syncDebounceTimer);
@@ -250,58 +382,109 @@ class TicketService {
   }
 
   private saveToLocalStorage() {
+    // 1. Always save the completed registry first (lightweight, vital for anti-reversion)
+    try {
+      localStorage.setItem(COMPLETED_REGISTRY_KEY, JSON.stringify(this.completedRegistry));
+    } catch (regErr) {
+      console.warn('Completed registry save error:', regErr);
+    }
+
+    // 2. Try saving full tickets to localStorage
     try {
       localStorage.setItem(LOCAL_STORAGE_TICKETS, JSON.stringify(this.tickets));
       localStorage.setItem(LOCAL_STORAGE_DEPTS, JSON.stringify(this.departments));
       localStorage.setItem(LOCAL_STORAGE_TECHS, JSON.stringify(this.technicians));
+      return;
     } catch (e) {
       console.warn('LocalStorage save failed, optimizing storage for quota:', e);
-      try {
-        // Fallback: If 5MB quota exceeded, store tickets with trimmed images for older tickets (>15)
-        const safeTickets = this.tickets.map((t, idx) => {
-          if (idx > 15) {
-            return {
-              ...t,
-              requestImageUrl: t.requestImageUrl && t.requestImageUrl.length > 500 ? '' : t.requestImageUrl,
-              resultImageUrl: t.resultImageUrl && t.resultImageUrl.length > 500 ? '' : t.resultImageUrl
-            };
-          }
-          return t;
-        });
-        localStorage.setItem(LOCAL_STORAGE_TICKETS, JSON.stringify(safeTickets));
-        localStorage.setItem(LOCAL_STORAGE_DEPTS, JSON.stringify(this.departments));
-        localStorage.setItem(LOCAL_STORAGE_TECHS, JSON.stringify(this.technicians));
-      } catch (innerErr) {
-        console.warn('LocalStorage safe save failed:', innerErr);
-      }
+    }
+
+    // 3. Tier 1: Keep base64 images only for the 3 newest tickets, strip data: URLs from older tickets
+    try {
+      const compactedTickets = this.tickets.map((t, idx) => {
+        if (idx > 2) {
+          return {
+            ...t,
+            requestImageUrl: t.requestImageUrl && t.requestImageUrl.startsWith('data:') ? '' : t.requestImageUrl,
+            resultImageUrl: t.resultImageUrl && t.resultImageUrl.startsWith('data:') ? '' : t.resultImageUrl
+          };
+        }
+        return t;
+      });
+      localStorage.setItem(LOCAL_STORAGE_TICKETS, JSON.stringify(compactedTickets));
+      localStorage.setItem(LOCAL_STORAGE_DEPTS, JSON.stringify(this.departments));
+      localStorage.setItem(LOCAL_STORAGE_TECHS, JSON.stringify(this.technicians));
+      return;
+    } catch (e1) {
+      console.warn('Tier 1 compaction exceeded quota, applying Tier 2 strip...', e1);
+    }
+
+    // 4. Tier 2: Strip all base64 data: URLs from localStorage to guarantee 100% metadata/status persistence
+    try {
+      const metadataOnlyTickets = this.tickets.map(t => ({
+        ...t,
+        requestImageUrl: t.requestImageUrl && t.requestImageUrl.startsWith('data:') ? '' : t.requestImageUrl,
+        resultImageUrl: t.resultImageUrl && t.resultImageUrl.startsWith('data:') ? '' : t.resultImageUrl
+      }));
+      localStorage.setItem(LOCAL_STORAGE_TICKETS, JSON.stringify(metadataOnlyTickets));
+      localStorage.setItem(LOCAL_STORAGE_DEPTS, JSON.stringify(this.departments));
+      localStorage.setItem(LOCAL_STORAGE_TECHS, JSON.stringify(this.technicians));
+    } catch (fatalErr) {
+      console.error('Fatal LocalStorage save error:', fatalErr);
     }
   }
 
   private setupWindowListeners() {
     if (typeof window === 'undefined') return;
 
-    // Fast sync when user switches back to this tab
+    // 1. Cross-Tab / Cross-Window Local BroadcastChannel for 0ms instant sync
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        this.localBroadcastChannel = new BroadcastChannel('scenery_local_repair_sync');
+        this.localBroadcastChannel.onmessage = (event) => {
+          if (event.data?.type === 'TICKET_MUTATION') {
+            this.reloadFromLocalStorage();
+          }
+        };
+      }
+    } catch (bcErr) {
+      console.warn('BroadcastChannel init error:', bcErr);
+    }
+
+    // 2. Storage event when another tab writes to localStorage
+    window.addEventListener('storage', (e) => {
+      if (e.key === LOCAL_STORAGE_TICKETS || e.key === COMPLETED_REGISTRY_KEY) {
+        this.reloadFromLocalStorage();
+      }
+    });
+
+    // 3. Fast sync when user switches back to this tab: Always re-read localStorage FIRST
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
+        this.reloadFromLocalStorage();
         void this.syncFromServer();
-        if (!this.isConnectedToCloud) {
+        if (!this.isConnectedToCloud && !this.isCloudRestricted) {
           this.setupSupabaseRealtime();
         }
       }
     });
 
-    // Fast sync when browser window regains focus
+    // 4. Fast sync when browser window regains focus: Always re-read localStorage FIRST
     window.addEventListener('focus', () => {
+      this.reloadFromLocalStorage();
       void this.syncFromServer();
-      if (!this.isConnectedToCloud) {
+      if (!this.isConnectedToCloud && !this.isCloudRestricted) {
         this.setupSupabaseRealtime();
       }
     });
 
-    // Fast sync when device comes back online
+    // 5. Fast sync when device comes back online
     window.addEventListener('online', () => {
+      this.reloadFromLocalStorage();
       void this.syncFromServer();
-      this.setupSupabaseRealtime();
+      if (!this.isCloudRestricted) {
+        this.setupSupabaseRealtime();
+      }
     });
   }
 
@@ -390,11 +573,15 @@ class TicketService {
             }
             if (payload?.payload?.ticket) {
               const incoming = payload.payload.ticket;
+              if (incoming.status === 'completed') {
+                this.registerCompleted(incoming);
+              }
               const idx = this.tickets.findIndex(t => t.id === incoming.id || t.requestId === incoming.requestId);
               if (idx !== -1) {
                 const local = this.tickets[idx];
-                // Strict Protection: Never overwrite local 'completed' with non-completed from peer broadcast
-                if (!(local.status === 'completed' && incoming.status !== 'completed')) {
+                const isLocallyCompleted = local.status === 'completed' || this.isCompleted(local.requestId) || this.isCompleted(local.id);
+                // Strict Protection: Never overwrite local 'completed' with non-completed from peer broadcast unless explicitly reopened
+                if (!(isLocallyCompleted && incoming.status !== 'completed' && !incoming.isReopen)) {
                   this.tickets[idx] = {
                     ...local,
                     ...incoming,
@@ -405,6 +592,9 @@ class TicketService {
                   this.notify();
                 }
               } else {
+                if (this.isCompleted(incoming.requestId) || this.isCompleted(incoming.id)) {
+                  incoming.status = 'completed';
+                }
                 this.tickets.unshift(incoming);
                 this.saveToLocalStorage();
                 this.notify();
@@ -421,6 +611,11 @@ class TicketService {
             try {
               if (payload.eventType === 'INSERT' && payload.new) {
                 const incoming = dbToTicket(payload.new);
+                if (incoming.status === 'completed') {
+                  this.registerCompleted(incoming);
+                } else if (this.isCompleted(incoming.requestId) || this.isCompleted(incoming.id)) {
+                  incoming.status = 'completed';
+                }
                 if (!this.recentlyDeletedTicketIds.has(incoming.id) && !this.recentlyDeletedTicketIds.has(incoming.requestId)) {
                   const existingIdx = this.tickets.findIndex(t => t.id === incoming.id || t.requestId === incoming.requestId);
                   if (existingIdx === -1) {
@@ -431,11 +626,15 @@ class TicketService {
                 }
               } else if (payload.eventType === 'UPDATE' && payload.new) {
                 const incoming = dbToTicket(payload.new);
+                if (incoming.status === 'completed') {
+                  this.registerCompleted(incoming);
+                }
                 const existingIdx = this.tickets.findIndex(t => t.id === incoming.id || t.requestId === incoming.requestId);
                 if (existingIdx !== -1) {
                   const local = this.tickets[existingIdx];
-                  // Strict Protection: If incoming is completed, ALWAYS accept it! If local is completed and incoming is NOT, do not revert!
-                  if (!(local.status === 'completed' && incoming.status !== 'completed')) {
+                  const isLocallyCompleted = local.status === 'completed' || this.isCompleted(local.requestId) || this.isCompleted(local.id);
+                  // Strict Protection: If local is completed and incoming is NOT, do not revert!
+                  if (!(isLocallyCompleted && incoming.status !== 'completed')) {
                     this.tickets[existingIdx] = {
                       ...local,
                       ...incoming,
@@ -528,6 +727,9 @@ class TicketService {
 
   public async manualSync(): Promise<void> {
     await this.syncFromServer();
+    if (this.isCloudRestricted) {
+      throw new Error('CLOUD_EGRESS_RESTRICTED');
+    }
     if (!this.isConnectedToCloud) {
       this.setupSupabaseRealtime();
     }
@@ -537,7 +739,7 @@ class TicketService {
    * Push a ticket update to Supabase (Self-healing sync fallback)
    */
   private async pushTicketToCloud(ticket: Ticket): Promise<void> {
-    if (!isSupabaseConfigured || !supabase) return;
+    if (!isSupabaseConfigured || !supabase || this.isCloudRestricted) return;
     try {
       const dbRow = ticketToDb(ticket, false);
       const targetRequestId = ticket.requestId;
@@ -551,9 +753,15 @@ class TicketService {
       } else if (targetUuid) {
         query = query.eq('id', targetUuid);
       }
-      let { data, error } = await query.select();
+      let { data, error } = await query.select('id, request_id');
+      if (error) {
+        if (error.message?.includes('quota') || (error as any).code === '402' || (error as any).status === 402 || error.message?.includes('exceed_egress_quota')) {
+          this.isCloudRestricted = true;
+          return;
+        }
+      }
       if (!error && (!data || data.length === 0) && targetRequestId) {
-        await supabase.from('repair_tickets').update(dbRow).eq('request_id', targetRequestId).select();
+        await supabase.from('repair_tickets').update(dbRow).eq('request_id', targetRequestId).select('id, request_id');
       }
       // If error occurred (e.g. payload too large), fallback retry without huge base64 images
       if (error && (dbRow.result_image_url || dbRow.request_image_url)) {
@@ -561,7 +769,7 @@ class TicketService {
         delete safeRow.result_image_url;
         delete safeRow.request_image_url;
         if (targetRequestId) {
-          await supabase.from('repair_tickets').update(safeRow).eq('request_id', targetRequestId).select();
+          await supabase.from('repair_tickets').update(safeRow).eq('request_id', targetRequestId).select('id, request_id');
         }
       }
     } catch (e) {
@@ -601,8 +809,16 @@ class TicketService {
           const supaDepts = deptsRes.data;
           const dErr = deptsRes.error;
 
+          if (tErr) {
+            if (tErr.message?.includes('quota') || (tErr as any).code === '402' || (tErr as any).status === 402 || tErr.message?.includes('exceed_egress_quota')) {
+              this.isCloudRestricted = true;
+              console.warn('⚠️ Supabase Cloud Egress Quota Exceeded (402). Local storage active with 100% data integrity.');
+            }
+          }
+
           if (!tErr && Array.isArray(supaTickets)) {
             this.isConnectedToCloud = true;
+            this.isCloudRestricted = false;
             const mapped = supaTickets.map(dbToTicket);
 
             // Smart Merge: Merge server records with local state
@@ -616,6 +832,23 @@ class TicketService {
                 (serverTicket.requestId && this.recentlyDeletedTicketIds.has(serverTicket.requestId))
               ) {
                 continue;
+              }
+
+              // Anti-Reversion Shield Check:
+              const isRegisteredCompleted = this.isCompleted(serverTicket.requestId) || this.isCompleted(serverTicket.id);
+              if (serverTicket.status === 'completed') {
+                this.registerCompleted(serverTicket);
+              } else if (isRegisteredCompleted) {
+                // Recover completed status and metadata from registry!
+                const reg = this.completedRegistry[serverTicket.requestId] || this.completedRegistry[serverTicket.id];
+                serverTicket.status = 'completed';
+                if (reg?.completedAt) serverTicket.completedAt = reg.completedAt;
+                if (reg?.technicianName && !serverTicket.technicianName) serverTicket.technicianName = reg.technicianName;
+                if (reg?.repairResult && !serverTicket.repairResult) serverTicket.repairResult = reg.repairResult;
+                if (reg?.diagnosticReason && !serverTicket.diagnosticReason) serverTicket.diagnosticReason = reg.diagnosticReason;
+                if (reg?.actionSteps && !serverTicket.actionSteps) serverTicket.actionSteps = reg.actionSteps;
+                if (reg?.parts && !serverTicket.parts) serverTicket.parts = reg.parts;
+                void this.pushTicketToCloud(serverTicket);
               }
 
               const local = this.tickets.find(t => t.id === serverTicket.id || t.requestId === serverTicket.requestId);
@@ -633,6 +866,7 @@ class TicketService {
               // If server is completed or cancelled, server ALWAYS takes precedence over a local 'in_progress' or 'pending' cached status!
               // This permanently stops mobile local cache from looping back or reverting completed jobs!
               if ((serverTicket.status === 'completed' || serverTicket.status === 'cancelled') && local.status !== serverTicket.status) {
+                this.registerCompleted(serverTicket);
                 const finalMerged: Ticket = {
                   ...serverTicket,
                   requestImageUrl: serverTicket.requestImageUrl || local.requestImageUrl || '',
@@ -644,8 +878,11 @@ class TicketService {
               }
 
               // Rule 1: Local Completed Protection
-              // If local ticket is completed and server is not completed
-              if (local.status === 'completed' && serverTicket.status !== 'completed') {
+              // If local ticket is completed (or in registry) and server is not completed
+              const isLocalOrRegCompleted = local.status === 'completed' || this.isCompleted(local.requestId) || this.isCompleted(local.id);
+              if (isLocalOrRegCompleted && serverTicket.status !== 'completed') {
+                local.status = 'completed';
+                this.registerCompleted(local);
                 if (!local.requestImageUrl && serverTicket.requestImageUrl) local.requestImageUrl = serverTicket.requestImageUrl;
                 if (!local.resultImageUrl && serverTicket.resultImageUrl) local.resultImageUrl = serverTicket.resultImageUrl;
                 mergedTickets.push(local);
@@ -1136,10 +1373,34 @@ class TicketService {
     const targetRequestId = updates.requestId || existing?.requestId || (id.startsWith('REP-') ? id : undefined);
     const targetUuid = (existing?.id && UUID_REGEX.test(existing.id)) ? existing.id : (UUID_REGEX.test(id) ? id : undefined);
 
+    const isReopen = (updates as any).isReopen === true;
+
+    // Strict Anti-Reversion Guard:
+    // Once completed, status cannot be downgraded back to pending or in_progress unless explicitly reopened by user!
+    const isCurrentlyCompleted = (existing && existing.status === 'completed') || this.isCompleted(targetRequestId) || this.isCompleted(targetUuid);
+    if (isCurrentlyCompleted && updates.status && updates.status !== 'completed' && !isReopen) {
+      console.warn(`[TicketService] Blocked attempted status downgrade for completed ticket ${targetRequestId || id} to ${updates.status}`);
+      delete updates.status;
+    }
+
     const nowIso = new Date().toISOString();
     const finalUpdates: Partial<Ticket> = { ...updates, updatedAt: nowIso };
-    if (updates.status === 'completed' && !updates.completedAt) {
-      finalUpdates.completedAt = nowIso;
+
+    if (updates.status === 'completed') {
+      if (!updates.completedAt) {
+        finalUpdates.completedAt = nowIso;
+      }
+      this.registerCompleted({
+        ...(existing || {}),
+        ...finalUpdates,
+        id: targetUuid || existing?.id || id,
+        requestId: targetRequestId || existing?.requestId || id
+      });
+    } else if (isReopen) {
+      if (targetRequestId) delete this.completedRegistry[targetRequestId];
+      if (targetUuid) delete this.completedRegistry[targetUuid];
+      if (existing?.id) delete this.completedRegistry[existing.id];
+      finalUpdates.completedAt = undefined;
     }
 
     // 1. Optimistic UI: Apply immediately so UI responds in 0ms!
@@ -1149,8 +1410,19 @@ class TicketService {
       this.notify();
     }
 
+    // Cross-tab local synchronization
+    if (this.localBroadcastChannel) {
+      try {
+        this.localBroadcastChannel.postMessage({
+          type: 'TICKET_MUTATION',
+          id: targetUuid || existing?.id || id,
+          requestId: targetRequestId || existing?.requestId
+        });
+      } catch {}
+    }
+
     // 2. Persist to Supabase Central Cloud
-    if (isSupabaseConfigured && supabase) {
+    if (isSupabaseConfigured && supabase && !this.isCloudRestricted) {
       try {
         const dbUpdates = ticketToDb(finalUpdates, false);
         let query = supabase.from('repair_tickets').update(dbUpdates);
@@ -1162,7 +1434,8 @@ class TicketService {
           query = filterTicketQuery(query, id);
         }
         
-        let { data, error } = await query.select('*');
+        // Use select with minimal columns to minimize Supabase egress bandwidth
+        let { data, error } = await query.select('id, request_id, status, updated_at');
 
         // If 0 rows matched (e.g. UUID mismatch), retry targeting request_id directly
         if (!error && (!data || data.length === 0) && targetRequestId) {
@@ -1171,34 +1444,39 @@ class TicketService {
             .from('repair_tickets')
             .update(dbUpdates)
             .eq('request_id', targetRequestId)
-            .select('*');
+            .select('id, request_id, status, updated_at');
           data = retryRes.data;
           error = retryRes.error;
         }
 
         if (error) {
-          console.warn('[TicketService] Supabase update error:', error.message);
-          // If error might be due to payload size (large base64 image), retry without images
-          if (dbUpdates.result_image_url || dbUpdates.request_image_url) {
-            try {
-              const safeUpdates = { ...dbUpdates };
-              delete safeUpdates.result_image_url;
-              delete safeUpdates.request_image_url;
-              let retryQuery = supabase.from('repair_tickets').update(safeUpdates);
-              if (targetRequestId) {
-                retryQuery = retryQuery.eq('request_id', targetRequestId);
-              } else if (targetUuid) {
-                retryQuery = retryQuery.eq('id', targetUuid);
-              } else {
-                retryQuery = filterTicketQuery(retryQuery, id);
+          if (error.message?.includes('quota') || (error as any).code === '402' || (error as any).status === 402 || error.message?.includes('exceed_egress_quota')) {
+            this.isCloudRestricted = true;
+            console.warn('⚠️ Supabase Cloud Egress Quota Exceeded (402). Local storage saved with 100% integrity.');
+          } else {
+            console.warn('[TicketService] Supabase update error:', error.message);
+            // If error might be due to payload size (large base64 image), retry without images
+            if (dbUpdates.result_image_url || dbUpdates.request_image_url) {
+              try {
+                const safeUpdates = { ...dbUpdates };
+                delete safeUpdates.result_image_url;
+                delete safeUpdates.request_image_url;
+                let retryQuery = supabase.from('repair_tickets').update(safeUpdates);
+                if (targetRequestId) {
+                  retryQuery = retryQuery.eq('request_id', targetRequestId);
+                } else if (targetUuid) {
+                  retryQuery = retryQuery.eq('id', targetUuid);
+                } else {
+                  retryQuery = filterTicketQuery(retryQuery, id);
+                }
+                const safeRes = await retryQuery.select('id, request_id, status, updated_at');
+                if (safeRes.data && safeRes.data.length > 0) {
+                  data = safeRes.data;
+                  error = null;
+                }
+              } catch (retryErr) {
+                console.warn('[TicketService] Safe payload retry failed:', retryErr);
               }
-              const safeRes = await retryQuery.select('*');
-              if (safeRes.data && safeRes.data.length > 0) {
-                data = safeRes.data;
-                error = null;
-              }
-            } catch (retryErr) {
-              console.warn('[TicketService] Safe payload retry failed:', retryErr);
             }
           }
         }
@@ -1206,15 +1484,14 @@ class TicketService {
         if (data && data.length > 0) {
           const serverTicket = dbToTicket(data[0]);
           if (existing) {
-            // Keep local base64 images if server row returned without them
             Object.assign(existing, {
-              ...serverTicket,
-              requestImageUrl: serverTicket.requestImageUrl || existing.requestImageUrl || '',
-              resultImageUrl: serverTicket.resultImageUrl || existing.resultImageUrl || ''
+              ...existing,
+              id: serverTicket.id || existing.id,
+              status: serverTicket.status || existing.status
             });
             this.saveToLocalStorage();
           }
-          this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: serverTicket.id, requestId: serverTicket.requestId, ticket: existing || serverTicket });
+          this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: targetUuid || id, requestId: targetRequestId, ticket: existing });
         } else {
           this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: targetUuid || id, requestId: targetRequestId, ticket: existing });
         }

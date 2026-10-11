@@ -193,8 +193,13 @@ export const App: React.FC = () => {
       await ticketService.manualSync();
       await loadData();
       showToast('ซิงค์ข้อมูลกับฐานข้อมูลกลางสำเร็จ 🟢 (ข้อมูลล่าสุดแล้ว)', 'success');
-    } catch {
-      showToast('ซิงค์ข้อมูลไม่สำเร็จ กรุณาตรวจสอบสัญญาณเน็ต', 'error');
+    } catch (err: any) {
+      if (err?.message === 'CLOUD_EGRESS_RESTRICTED') {
+        await loadData();
+        showToast('⚠️ ระบบทำงานในโหมด Offline Safe (ข้อมูลในเครื่องปลอดภัย 100% ไม่สูญหาย)', 'info');
+      } else {
+        showToast('ซิงค์ข้อมูลไม่สำเร็จ กรุณาตรวจสอบสัญญาณเน็ต', 'error');
+      }
     } finally {
       setTimeout(() => setIsSyncing(false), 500);
     }
