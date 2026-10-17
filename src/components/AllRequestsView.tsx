@@ -30,7 +30,7 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
 }) => {
   const [selectedDivision, setSelectedDivision] = useState<string>('all');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('active');
   const [onlyUrgent, setOnlyUrgent] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortOrder, setSortOrder] = useState<SortOrder>('fifo');
@@ -43,7 +43,8 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
       (selectedDivision === 'all' || (t.division || '84') === selectedDivision) &&
       (t.priority === 'critical' || t.priority === 'high' || t.isOverdue) &&
       t.status !== 'completed' && 
-      t.status !== 'cancelled'
+      t.status !== 'cancelled' &&
+      t.status !== 'waiting_inspect'
     );
   }, [tickets, selectedDivision]);
 
@@ -55,7 +56,7 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
 
     return {
       all: divTickets.length,
-      active: divTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length,
+      active: divTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled' && t.status !== 'waiting_inspect').length,
       pending: divTickets.filter(t => t.status === 'pending' || t.status === 'assigned').length,
       in_progress: divTickets.filter(t => t.status === 'in_progress').length,
       waiting_parts: divTickets.filter(t => t.status === 'waiting_parts').length,
@@ -77,7 +78,7 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
     }
 
     if (statusFilter === 'active') {
-      result = result.filter(t => t.status !== 'completed' && t.status !== 'cancelled');
+      result = result.filter(t => t.status !== 'completed' && t.status !== 'cancelled' && t.status !== 'waiting_inspect');
     } else if (statusFilter === 'pending') {
       result = result.filter(t => t.status === 'pending' || t.status === 'assigned');
     } else if (statusFilter === 'in_progress') {

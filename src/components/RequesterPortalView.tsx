@@ -125,7 +125,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
   const allActiveTickets = useMemo(() => {
     return tickets
-      .filter(t => t.status !== 'completed' && t.status !== 'cancelled')
+      .filter(t => t.status !== 'completed' && t.status !== 'cancelled' && t.status !== 'waiting_inspect')
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }, [tickets]);
 
@@ -140,7 +140,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
   const myDeptActiveTickets = useMemo(() => {
     const list = isAllDepts ? tickets : tickets.filter(t => t.department === myDepartment);
     return list
-      .filter(t => t.status !== 'completed' && t.status !== 'cancelled')
+      .filter(t => t.status !== 'completed' && t.status !== 'cancelled' && t.status !== 'waiting_inspect')
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }, [tickets, myDepartment, isAllDepts]);
 
@@ -194,10 +194,10 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       }
 
       if (filterStatus === 'all') {
-        return t.status !== 'completed' && t.status !== 'cancelled';
+        return t.status !== 'completed' && t.status !== 'cancelled' && t.status !== 'waiting_inspect';
       }
       if (filterStatus === 'active') {
-        return t.status !== 'completed' && t.status !== 'cancelled';
+        return t.status !== 'completed' && t.status !== 'cancelled' && t.status !== 'waiting_inspect';
       }
       if (filterStatus === 'pending') return t.status === 'pending' || t.status === 'assigned';
       if (filterStatus === 'in_progress') return t.status === 'in_progress' || t.status === 'waiting_parts';

@@ -66,7 +66,16 @@ function dbToTicket(row: any): Ticket {
     remark: row.remark || '',
     requestImageUrl: row.request_image_url || row.requestImageUrl || '',
     resultImageUrl: row.result_image_url || row.resultImageUrl || '',
-    division: (row.division as DivisionId) || '84',
+    division: ((): DivisionId => {
+      if (row.division === '84' || row.division === '85' || row.division === '86') return row.division;
+      const dept = row.department || '';
+      if (dept.includes('85') || dept.includes('ก่อสร้าง')) return '85';
+      if (dept.includes('86') || dept.includes('ศิลป์')) return '86';
+      const tech = row.technician_name || '';
+      if (tech.includes('[85]')) return '85';
+      if (tech.includes('[86]')) return '86';
+      return '84';
+    })(),
     createdAt: row.created_at || row.createdAt || new Date().toISOString(),
     updatedAt: row.updated_at || row.updatedAt || new Date().toISOString(),
     completedAt: row.completed_at || row.completedAt || undefined,
@@ -98,11 +107,6 @@ function ticketToDb(t: Partial<Ticket>, isNewTicket: boolean = false): any {
     row.id = t.id;
   }
   if (t.requestId !== undefined) row.request_id = t.requestId;
-  if (t.division !== undefined) {
-    row.division = t.division;
-  } else if (isNewTicket) {
-    row.division = '84';
-  }
   if (t.title !== undefined) row.title = t.title;
   if (t.description !== undefined) row.description = t.description;
   if (t.department !== undefined) {
@@ -911,7 +915,7 @@ class TicketService {
           const [ticketsRes, techsRes, deptsRes] = await Promise.all([
             supabase
               .from('repair_tickets')
-              .select('id, request_id, title, description, department, location, requester_name, requester_phone, priority, status, technician_name, technician_phone, repair_result, remark, division, created_at, updated_at, completed_at, diagnostic_reason, action_steps, parts')
+              .select('id, request_id, title, description, department, location, requester_name, requester_phone, priority, status, technician_name, technician_phone, repair_result, remark, created_at, updated_at, completed_at')
               .order('created_at', { ascending: false }),
             supabase
               .from('technicians')
@@ -1561,16 +1565,26 @@ class TicketService {
       this.notify();
     }
 
-    // Cross-tab local synchronization
+    // Cross-tab local synchronization immediately
     if (this.localBroadcastChannel) {
       try {
         this.localBroadcastChannel.postMessage({
           type: 'TICKET_MUTATION',
+          action: 'UPDATE',
           id: targetUuid || existing?.id || id,
-          requestId: targetRequestId || existing?.requestId
+          requestId: targetRequestId || existing?.requestId,
+          ticket: existing
         });
       } catch {}
     }
+
+    // Realtime Supabase broadcast to all connected devices immediately!
+    this.broadcastEvent('TICKET_MUTATION', {
+      action: 'UPDATE',
+      id: targetUuid || existing?.id || id,
+      requestId: targetRequestId,
+      ticket: existing
+    });
 
     // 2. Persist to Supabase Central Cloud
     if (isSupabaseConfigured && supabase && !this.isCloudRestricted) {

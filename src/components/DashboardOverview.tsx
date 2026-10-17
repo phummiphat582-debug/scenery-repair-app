@@ -65,8 +65,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   // Most critical urgent ticket for emergency banner (ONLY if real emergency exists)
   const emergencyTicket = useMemo(() => {
     return (
-      tickets.find(t => t.priority === 'critical' && t.status !== 'completed' && t.status !== 'cancelled') ||
-      tickets.find(t => t.priority === 'high' && t.status !== 'completed' && t.status !== 'cancelled') ||
+      tickets.find(t => t.priority === 'critical' && t.status !== 'completed' && t.status !== 'cancelled' && t.status !== 'waiting_inspect') ||
+      tickets.find(t => t.priority === 'high' && t.status !== 'completed' && t.status !== 'cancelled' && t.status !== 'waiting_inspect') ||
       null
     );
   }, [tickets]);
@@ -81,8 +81,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     const inProgress = divTickets.filter(t => t.status === 'in_progress').length;
     const waitingParts = divTickets.filter(t => t.status === 'waiting_parts').length;
     const completed = divTickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length;
-    const active = divTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length;
-    const overdue = divTickets.filter(t => (t.isOverdue || (t.priority === 'critical')) && t.status !== 'completed' && t.status !== 'cancelled').length;
+    const active = divTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled' && t.status !== 'waiting_inspect').length;
+    const overdue = divTickets.filter(t => (t.isOverdue || (t.priority === 'critical')) && t.status !== 'completed' && t.status !== 'cancelled' && t.status !== 'waiting_inspect').length;
     
     return { total, pending, inProgress, waitingParts, completed, active, overdue };
   }, [tickets, selectedDivisionFilter]);
@@ -117,7 +117,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
       // Status: active excludes completed & cancelled; completed only shows completed
       if (selectedStatusFilter === 'active') {
-        if (ticket.status === 'completed' || ticket.status === 'cancelled') return false;
+        if (ticket.status === 'completed' || ticket.status === 'cancelled' || ticket.status === 'waiting_inspect') return false;
       } else if (selectedStatusFilter === 'all') {
         // 'all' includes all tickets
       } else if (selectedStatusFilter === 'pending') {
