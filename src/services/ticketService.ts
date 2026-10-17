@@ -270,10 +270,6 @@ class TicketService {
 
   private initLocalData() {
     try {
-      ['scenery_repair_tickets', 'scenery_repair_v2_tickets', 'scenery_repair_v3_tickets', 'scenery_repair_v4_tickets'].forEach(key => {
-        localStorage.removeItem(key);
-      });
-
       // 1. Load Completed Registry (Immutable shield against uncompleted rollbacks)
       const savedRegistry = localStorage.getItem(COMPLETED_REGISTRY_KEY);
       if (savedRegistry) {
@@ -290,6 +286,10 @@ class TicketService {
       // 2. Load tickets from storage
       const savedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS);
       this.tickets = savedTickets ? JSON.parse(savedTickets) : [];
+
+      // 3. Harvest any real tickets from previous storage versions if present
+      this.harvestLegacyTickets();
+
       this.tickets.forEach(t => {
         if (t.requesterName && t.requesterName.includes('าดสดส')) {
           t.requesterName = '';
@@ -326,6 +326,53 @@ class TicketService {
       this.tickets = [];
       this.departments = INITIAL_DEPARTMENTS;
       this.technicians = [];
+    }
+  }
+
+  /**
+   * Safely salvages any user tickets from previous local storage keys without resurrecting old mock demo data
+   */
+  private harvestLegacyTickets() {
+    const legacyKeys = ['scenery_repair_v4_tickets', 'scenery_repair_v3_tickets', 'scenery_repair_v2_tickets', 'scenery_repair_tickets'];
+    let harvestedCount = 0;
+    legacyKeys.forEach(key => {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            parsed.forEach((item: any) => {
+              if (!item || !item.requestId) return;
+              // Ignore legacy demo tickets from early September (e.g. t-1 to t-23 with REP-202609-)
+              const isDemo = item.id?.startsWith('t-') && item.requestId?.startsWith('REP-202609-');
+              if (isDemo) return;
+
+              const exists = this.tickets.some(t => t.id === item.id || t.requestId === item.requestId);
+              if (!exists) {
+                if (
+                  this.isCompleted(item.requestId) ||
+                  this.isCompleted(item.id) ||
+                  item.completedAt ||
+                  item.status === 'completed' ||
+                  (item.repairResult && (item.repairResult.includes('ช่างผู้ปิดงาน') || item.repairResult.includes('สาเหตุ')))
+                ) {
+                  item.status = 'completed';
+                  if (!item.completedAt) item.completedAt = new Date().toISOString();
+                  this.registerCompleted(item);
+                }
+                this.tickets.push(item);
+                harvestedCount++;
+              }
+            });
+          }
+          localStorage.removeItem(key);
+        }
+      } catch (e) {
+        try { localStorage.removeItem(key); } catch {}
+      }
+    });
+    if (harvestedCount > 0) {
+      console.log(`[TicketService] Harvested ${harvestedCount} legacy tickets from local device storage.`);
     }
   }
 
@@ -746,6 +793,9 @@ class TicketService {
                     this.tickets.unshift(incoming);
                     this.saveToLocalStorage();
                     this.notify();
+                    if (typeof window !== 'undefined' && incoming.status !== 'completed') {
+                      window.dispatchEvent(new CustomEvent('SCENERY_NEW_TICKET', { detail: incoming }));
+                    }
                   }
                 }
               } else if (payload.eventType === 'UPDATE' && payload.new) {
@@ -902,6 +952,60 @@ class TicketService {
   }
 
   /**
+   * Auto-upload stranded tickets that exist locally on this device but not yet on Supabase Central Cloud.
+   * This guarantees that when any of the >10 mobile devices reconnects or submits a ticket,
+   * it gets pushed to the cloud database and instantly broadcasted to all other devices in real-time.
+   */
+  private async uploadStrandedTicketToCloud(ticket: Ticket): Promise<void> {
+    if (!isSupabaseConfigured || !supabase || this.isCloudRestricted) return;
+    try {
+      console.log(`[TicketService] Auto-uploading stranded ticket to cloud: ${ticket.requestId} (${ticket.title})`);
+      const row = ticketToDb(ticket, true);
+      const { data, error } = await supabase
+        .from('repair_tickets')
+        .insert([row])
+        .select()
+        .single();
+      if (!error && data) {
+        const serverTicket = dbToTicket(data);
+        const idx = this.tickets.findIndex(t => t.id === ticket.id || t.requestId === ticket.requestId);
+        if (idx !== -1) {
+          this.tickets[idx] = { ...this.tickets[idx], ...serverTicket };
+          this.saveToLocalStorage();
+        }
+        // Broadcast to all other >10 devices immediately!
+        this.broadcastEvent('TICKET_MUTATION', {
+          action: 'CREATE',
+          id: serverTicket.id,
+          requestId: serverTicket.requestId,
+          ticket: this.tickets[idx] || serverTicket
+        });
+        try {
+          this.localBroadcastChannel?.postMessage({
+            type: 'TICKET_MUTATION',
+            action: 'CREATE',
+            id: serverTicket.id,
+            requestId: serverTicket.requestId,
+            ticket: this.tickets[idx] || serverTicket
+          });
+        } catch {}
+        if (typeof window !== 'undefined' && serverTicket.status !== 'completed') {
+          window.dispatchEvent(new CustomEvent('SCENERY_NEW_TICKET', { detail: serverTicket }));
+        }
+      } else if (error) {
+        if (error.code === '23505') {
+          // Already exists in DB, push state update instead
+          void this.pushTicketToCloud(ticket);
+        } else {
+          console.warn(`[TicketService] Stranded upload error for ${ticket.requestId}:`, error.message);
+        }
+      }
+    } catch (e) {
+      console.warn('[TicketService] uploadStrandedTicketToCloud exception:', e);
+    }
+  }
+
+  /**
    * Fetch latest state from Supabase Cloud (Central single source of truth)
    */
   public async syncFromServer(): Promise<void> {
@@ -1047,14 +1151,28 @@ class TicketService {
             }
 
             // Keep locally created tickets that have not yet arrived in server query
+            // and auto-upload stranded tickets to Central Cloud so all >10 devices receive them!
             for (const local of this.tickets) {
               const inMerged = mergedTickets.some(t => t.id === local.id || t.requestId === local.requestId);
               if (!inMerged && !this.recentlyDeletedTicketIds.has(local.id) && !this.recentlyDeletedTicketIds.has(local.requestId)) {
-                const localCreatedTime = new Date(local.createdAt).getTime();
-                if (Date.now() - localCreatedTime < 5 * 60 * 1000) {
-                  mergedTickets.push(local);
-                  stateChanged = true;
+                // Anti-Reversion Shield: If ticket was marked completed locally, guarantee it remains completed!
+                if (
+                  this.isCompleted(local.requestId) ||
+                  this.isCompleted(local.id) ||
+                  local.completedAt ||
+                  local.status === 'completed' ||
+                  (local.repairResult && (local.repairResult.includes('ช่างผู้ปิดงาน') || local.repairResult.includes('สาเหตุ')))
+                ) {
+                  local.status = 'completed';
+                  if (!local.completedAt) local.completedAt = new Date().toISOString();
+                  this.registerCompleted(local);
                 }
+
+                mergedTickets.push(local);
+                stateChanged = true;
+
+                // Self-Healing: Automatically push stranded local ticket to Central Cloud!
+                void this.uploadStrandedTicketToCloud(local);
               }
             }
 
@@ -1430,8 +1548,13 @@ class TicketService {
 
   public async createTicket(ticket: Omit<Ticket, 'id' | 'requestId' | 'createdAt' | 'updatedAt'>): Promise<Ticket> {
     const nowIso = new Date().toISOString();
-    const count = this.tickets.length + 1;
     const yearMonth = nowIso.slice(0, 7).replace('-', '');
+    const existingNums = this.tickets.map(t => {
+      const m = t.requestId?.match(/REP-\d{6}-(\d+)/);
+      return m ? parseInt(m[1], 10) : 0;
+    });
+    const maxNum = existingNums.length > 0 ? Math.max(0, ...existingNums) : 0;
+    const count = Math.max(this.tickets.length + 1, maxNum + 1);
     const newId = `REP-${yearMonth}-${String(count).padStart(3, '0')}`;
 
     let created: Ticket = {
