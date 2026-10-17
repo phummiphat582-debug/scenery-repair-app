@@ -3,6 +3,7 @@ import { X, Wrench, Clock, MapPin, User, CheckCircle, AlertTriangle, Send } from
 import { Ticket, Technician, TicketStatus, Priority, DivisionId } from '../types';
 import { DIVISION_LIST } from '../data/divisionData';
 import { DivisionBadge } from './DivisionBadge';
+import { formatDepartmentName } from '../lib/departmentUtils';
 
 interface EditTicketModalProps {
   ticket: Ticket | null;
@@ -82,7 +83,7 @@ export const EditTicketModal: React.FC<EditTicketModalProps> = ({
               <h3 className="font-bold text-base sm:text-lg">บันทึกผลการซ่อมและอัปเดตงาน</h3>
               <DivisionBadge division={ticket.division} size="sm" />
             </div>
-            <p className="text-xs text-teal-100 mt-0.5 font-mono">{ticket.requestId} · {ticket.department}</p>
+            <p className="text-xs text-teal-100 mt-0.5 font-mono">{ticket.requestId} · {formatDepartmentName(ticket.department)}</p>
           </div>
           <button onClick={onClose} className="text-teal-100 hover:text-white cursor-pointer">
             <X className="w-5 h-5" />

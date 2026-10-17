@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Ticket, PartItem, Technician } from '../types';
 import { compressImage } from '../lib/imageCompress';
 import { ticketService } from '../services/ticketService';
+import { formatDepartmentName } from '../lib/departmentUtils';
 import { 
   CheckCircle2, 
   X, 
@@ -308,7 +309,7 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
                   #{ticket.requestId}
                 </span>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-surface-container text-on-surface">
-                  {ticket.department}
+                  {formatDepartmentName(ticket.department)}
                 </span>
               </div>
               {ticket.technicianName && (

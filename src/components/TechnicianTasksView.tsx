@@ -5,6 +5,7 @@ import { AcceptWorkModal } from './AcceptWorkModal';
 import { CompleteWorkModal } from './CompleteWorkModal';
 import { Phone, CheckCircle2, Clock, Wrench, AlertTriangle, AlertCircle, Eye, Check, ChevronRight, Package, RefreshCw, MapPin, Image as ImageIcon } from 'lucide-react';
 import { getTicketAgingInfo } from '../lib/ticketAging';
+import { formatDepartmentName, isSameDepartment } from '../lib/departmentUtils';
 
 interface TechnicianTasksViewProps {
   tickets: Ticket[];
@@ -78,8 +79,9 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
       .filter(t => t.status !== 'completed' && t.status !== 'cancelled')
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
       .forEach(ticket => {
-        const next = (counters.get(ticket.department) || 0) + 1;
-        counters.set(ticket.department, next);
+        const deptKey = formatDepartmentName(ticket.department);
+        const next = (counters.get(deptKey) || 0) + 1;
+        counters.set(deptKey, next);
         numbers.set(ticket.id, next);
       });
     return numbers;
@@ -87,14 +89,14 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
 
   // Distinct departments in tickets for filter
   const availableDepts = useMemo(() => {
-    const set = new Set(tickets.map(t => t.department).filter(Boolean));
+    const set = new Set(tickets.map(t => formatDepartmentName(t.department)).filter(Boolean));
     return Array.from(set);
   }, [tickets]);
 
   // Final filtered list
   const finalTasks = useMemo(() => {
     if (selectedZone === 'all') return tabFilteredTasks;
-    return tabFilteredTasks.filter(t => t.department === selectedZone);
+    return tabFilteredTasks.filter(t => isSameDepartment(t.department, selectedZone));
   }, [tabFilteredTasks, selectedZone]);
 
   const handleOpenAcceptModal = (ticket: Ticket) => {
@@ -311,7 +313,7 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
             ทุกแผนก ({tabFilteredTasks.length})
           </button>
           {availableDepts.map(dept => {
-            const cnt = tabFilteredTasks.filter(t => t.department === dept).length;
+            const cnt = tabFilteredTasks.filter(t => isSameDepartment(t.department, dept)).length;
             return (
               <button
                 key={dept}
@@ -323,7 +325,7 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
                 }`}
                 type="button"
               >
-                {dept} ({cnt})
+                {formatDepartmentName(dept)} ({cnt})
               </button>
             );
           })}
@@ -380,7 +382,7 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
                     </span>
 
                     <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface">
-                      {ticket.department}
+                      {formatDepartmentName(ticket.department)}
                     </span>
 
                     {/* Aging Badge (งานค้างกี่วัน) */}

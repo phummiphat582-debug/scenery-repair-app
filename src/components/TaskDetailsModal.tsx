@@ -7,6 +7,7 @@ import { DivisionBadge } from './DivisionBadge';
 import { getDivisionInfo } from '../data/divisionData';
 import { Clock } from 'lucide-react';
 import { getTicketAgingInfo } from '../lib/ticketAging';
+import { formatDepartmentName } from '../lib/departmentUtils';
 
 interface TaskDetailsModalProps {
   ticket: Ticket | null;
@@ -344,7 +345,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   {ticket.requesterName || 'ไม่ระบุชื่อผู้แจ้ง'}
                 </span>
                 <span className="font-body-sm text-body-sm text-on-surface-variant">
-                  {ticket.department} • โทร {ticket.requesterPhone || 'ไม่ได้ระบุเบอร์โทร'}
+                  {formatDepartmentName(ticket.department)} • โทร {ticket.requesterPhone || 'ไม่ได้ระบุเบอร์โทร'}
                 </span>
               </div>
             </div>
@@ -474,7 +475,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                         </span>
                       </div>
                       <span className="font-body-sm text-body-sm text-on-surface-variant truncate">
-                        {matchedTech?.role || 'ช่างเทคนิค'} • {ticket.department || 'ทีมซ่อมบำรุง'}
+                        {matchedTech?.role || 'ช่างเทคนิค'} • {formatDepartmentName(ticket.department) || 'ทีมซ่อมบำรุง'}
                       </span>
                       {currentTechPhone ? (
                         <div className="flex items-center gap-2 mt-1">

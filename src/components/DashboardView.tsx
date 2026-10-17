@@ -1,6 +1,7 @@
 import React from 'react';
 import { Ticket, Department, Technician } from '../types';
 import { CheckCircle2, Clock, AlertTriangle, Building2, Wrench, ShieldAlert, Zap, TrendingUp } from 'lucide-react';
+import { formatDepartmentName, isSameDepartment } from '../lib/departmentUtils';
 
 interface DashboardViewProps {
   tickets: Ticket[];
@@ -30,10 +31,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     departments.forEach(d => { counts[d.name] = { total: 0, active: 0, completed: 0 }; });
 
     tickets.forEach(t => {
-      if (!counts[t.department]) counts[t.department] = { total: 0, active: 0, completed: 0 };
-      counts[t.department].total++;
-      if (t.status === 'completed') counts[t.department].completed++;
-      else if (t.status !== 'cancelled') counts[t.department].active++;
+      const matchedDept = departments.find(d => isSameDepartment(d.name, t.department));
+      const key = matchedDept ? matchedDept.name : t.department;
+      if (!counts[key]) counts[key] = { total: 0, active: 0, completed: 0 };
+      counts[key].total++;
+      if (t.status === 'completed') counts[key].completed++;
+      else if (t.status !== 'cancelled') counts[key].active++;
     });
 
     return counts;
@@ -112,7 +115,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5 font-bold text-slate-800">
                       <span>{d.icon}</span>
-                      <span>{d.name}</span>
+                      <span>{formatDepartmentName(d.name)}</span>
                     </div>
                     <div className="flex items-center gap-2 font-mono">
                       <span className="text-teal-700 font-bold">{stat.active} งานค้าง</span>
@@ -194,7 +197,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               >
                 <div>
                   <div className="font-bold text-slate-900">{t.requestId} · {t.title}</div>
-                  <div className="text-[11px] text-slate-600 mt-0.5">🏢 {t.department} · 📍 {t.location}</div>
+                  <div className="text-[11px] text-slate-600 mt-0.5">🏢 {formatDepartmentName(t.department)} · 📍 {t.location}</div>
                 </div>
                 <div className="text-right">
                   <span className="font-bold text-rose-700 bg-white px-2 py-1 rounded-md border border-rose-200">

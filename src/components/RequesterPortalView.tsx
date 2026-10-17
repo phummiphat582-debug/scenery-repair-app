@@ -11,6 +11,7 @@ import { DivisionBadge } from './DivisionBadge';
 import { DivisionFilterTabs } from './DivisionFilterTabs';
 import { RepairSummaryView } from './RepairSummaryView';
 import { getTicketAgingInfo } from '../lib/ticketAging';
+import { formatDepartmentName, isSameDepartment } from '../lib/departmentUtils';
 
 interface RequesterPortalViewProps {
   tickets: Ticket[];
@@ -113,14 +114,14 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
   };
 
   const currentDeptObj = useMemo(() => {
-    return departments.find(d => d.name === myDepartment);
+    return departments.find(d => isSameDepartment(d.name, myDepartment));
   }, [departments, myDepartment]);
 
   const isAllDepts = !myDepartment || myDepartment === 'all';
 
   const myDeptTickets = useMemo(() => {
     if (isAllDepts) return tickets;
-    return tickets.filter(t => t.department === myDepartment);
+    return tickets.filter(t => isSameDepartment(t.department, myDepartment));
   }, [tickets, myDepartment, isAllDepts]);
 
   const allActiveTickets = useMemo(() => {
@@ -138,7 +139,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
   }, [allActiveTickets]);
 
   const myDeptActiveTickets = useMemo(() => {
-    const list = isAllDepts ? tickets : tickets.filter(t => t.department === myDepartment);
+    const list = isAllDepts ? tickets : tickets.filter(t => isSameDepartment(t.department, myDepartment));
     return list
       .filter(t => t.status !== 'completed' && t.status !== 'cancelled' && t.status !== 'waiting_inspect')
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
@@ -171,7 +172,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
   // Filter tickets for tracking (scoped to department or all departments)
   const filteredTickets = useMemo(() => {
     return tickets.filter(t => {
-      if (!isAllDepts && t.department !== myDepartment) {
+      if (!isAllDepts && !isSameDepartment(t.department, myDepartment)) {
         return false;
       }
 
@@ -184,6 +185,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
         t.requestId.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.requesterName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        formatDepartmentName(t.department).toLowerCase().includes(searchQuery.toLowerCase()) ||
         (t.department && t.department.toLowerCase().includes(searchQuery.toLowerCase()));
 
       if (!matchSearch) return false;
@@ -215,7 +217,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
     return departments.map(department => ({
       department,
-      tickets: activeTickets.filter(ticket => ticket.department === department.name)
+      tickets: activeTickets.filter(ticket => isSameDepartment(ticket.department, department.name))
     }));
   }, [tickets, departments]);
 
@@ -226,8 +228,9 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       .filter(t => t.status !== 'completed' && t.status !== 'cancelled')
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
       .forEach(ticket => {
-        const next = (counters.get(ticket.department) || 0) + 1;
-        counters.set(ticket.department, next);
+        const deptKey = formatDepartmentName(ticket.department);
+        const next = (counters.get(deptKey) || 0) + 1;
+        counters.set(deptKey, next);
         numbers.set(ticket.id, next);
       });
     return numbers;
@@ -238,7 +241,8 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
     tickets
       .filter(t => t.status !== 'completed' && t.status !== 'cancelled')
       .forEach(t => {
-        map.set(t.department, (map.get(t.department) || 0) + 1);
+        const deptKey = formatDepartmentName(t.department);
+        map.set(deptKey, (map.get(deptKey) || 0) + 1);
       });
     return map;
   }, [tickets]);
@@ -603,9 +607,9 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                   )
                   .map(dept => {
                     const deptActiveCount = tickets.filter(
-                      t => t.department === dept.name && t.status !== 'completed' && t.status !== 'cancelled'
+                      t => isSameDepartment(t.department, dept.name) && t.status !== 'completed' && t.status !== 'cancelled'
                     ).length;
-                    const isSelected = dept.name === myDepartment;
+                    const isSelected = isSameDepartment(dept.name, myDepartment);
 
                     return (
                       <button
@@ -627,7 +631,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                           </span>
                           <div className="min-w-0">
                             <div className="font-bold text-xs sm:text-sm text-on-surface truncate">
-                              {dept.name}
+                              {formatDepartmentName(dept.name)}
                             </div>
                             <div className="text-[11px] text-on-surface-variant">
                               {deptActiveCount > 0 ? (
@@ -672,8 +676,8 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                   type="button"
                   onClick={() => {
                     if (isAllDepts) {
-                      const deptWithTickets = departments.find(d => tickets.some(t => t.department === d.name && t.status !== 'completed' && t.status !== 'cancelled'));
-                      handleSelectDepartment(deptWithTickets ? deptWithTickets.name : (departments[0]?.name || '84 ซ่อมบำรุง'));
+                      const deptWithTickets = departments.find(d => tickets.some(t => isSameDepartment(t.department, d.name) && t.status !== 'completed' && t.status !== 'cancelled'));
+                      handleSelectDepartment(deptWithTickets ? deptWithTickets.name : (departments[0]?.name || 'ฟร้อน'));
                     }
                   }}
                   className={`py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
@@ -719,7 +723,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                   </div>
                   <div className="min-w-0">
                     <h2 className="font-extrabold text-sm sm:text-base text-on-surface truncate">
-                      {isAllDepts ? 'คิวงานแจ้งซ่อมของ "ทุกแผนก (ทั้งหมด)"' : `คิวงานแจ้งซ่อมของ "${myDepartment}"`}
+                      {isAllDepts ? 'คิวงานแจ้งซ่อมของ "ทุกแผนก (ทั้งหมด)"' : `คิวงานแจ้งซ่อมของ "${formatDepartmentName(myDepartment)}"`}
                     </h2>
                     <p className="text-[11px] text-on-surface-variant">
                       {isAllDepts
@@ -738,7 +742,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                   >
                     <option value="all">🏢 ทุกแผนก (แสดงคิวทั้งหมด)</option>
                     {departments.map(d => (
-                      <option key={d.id} value={d.name}>{d.name}</option>
+                      <option key={d.id} value={d.name}>{formatDepartmentName(d.name)}</option>
                     ))}
                   </select>
 
@@ -778,9 +782,9 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
                 {departments.map(dept => {
                   const deptCount = tickets.filter(
-                    t => t.department === dept.name && t.status !== 'completed' && t.status !== 'cancelled'
+                    t => isSameDepartment(t.department, dept.name) && t.status !== 'completed' && t.status !== 'cancelled'
                   ).length;
-                  const isCurrent = dept.name === myDepartment;
+                  const isCurrent = isSameDepartment(dept.name, myDepartment);
 
                   return (
                     <button
@@ -794,7 +798,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                       }`}
                     >
                       <span>{dept.icon}</span>
-                      <span>{dept.name}</span>
+                      <span>{formatDepartmentName(dept.name)}</span>
                       {deptCount > 0 && (
                         <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
                           isCurrent ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'
@@ -1071,7 +1075,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                             </span>
                             <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200 flex items-center gap-1">
                               <span>🏢</span>
-                              <span>{ticket.department}</span>
+                              <span>{formatDepartmentName(ticket.department)}</span>
                             </span>
                             {queueNum === 1 ? (
                               <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
@@ -1142,7 +1146,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                               {ticket.location}
                             </span>
                             <span>•</span>
-                            <span className="font-medium text-primary">{ticket.department}</span>
+                            <span className="font-medium text-primary">{formatDepartmentName(ticket.department)}</span>
                             <span>•</span>
                             <span>ผู้แจ้ง: {ticket.requesterName}</span>
                           </div>
@@ -1360,9 +1364,9 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                   )
                   .map(dept => {
                     const deptActiveCount = tickets.filter(
-                      t => t.department === dept.name && t.status !== 'completed' && t.status !== 'cancelled'
+                      t => isSameDepartment(t.department, dept.name) && t.status !== 'completed' && t.status !== 'cancelled'
                     ).length;
-                    const isSelected = dept.name === myDepartment;
+                    const isSelected = isSameDepartment(dept.name, myDepartment);
 
                     return (
                       <button
@@ -1384,7 +1388,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                           </span>
                           <div className="min-w-0">
                             <div className="font-bold text-xs sm:text-sm text-on-surface truncate">
-                              {dept.name}
+                              {formatDepartmentName(dept.name)}
                             </div>
                             <div className="text-[11px] text-on-surface-variant">
                               {deptActiveCount > 0 ? (
@@ -1435,7 +1439,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                   >
                     <option value="all">🏢 ทุกแผนก (แสดงทั้งหมด)</option>
                     {departments.map(d => (
-                      <option key={d.id} value={d.name}>{d.name}</option>
+                      <option key={d.id} value={d.name}>{formatDepartmentName(d.name)}</option>
                     ))}
                   </select>
 
@@ -1472,8 +1476,8 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                 </button>
 
                 {departments.map(dept => {
-                  const deptCount = tickets.filter(t => t.department === dept.name).length;
-                  const isCurrent = dept.name === myDepartment;
+                  const deptCount = tickets.filter(t => isSameDepartment(t.department, dept.name)).length;
+                  const isCurrent = isSameDepartment(dept.name, myDepartment);
 
                   return (
                     <button
@@ -1487,7 +1491,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                       }`}
                     >
                       <span>{dept.icon}</span>
-                      <span>{dept.name}</span>
+                      <span>{formatDepartmentName(dept.name)}</span>
                       {deptCount > 0 && (
                         <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
                           isCurrent ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
@@ -1728,7 +1732,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                           {ticket.location}
                         </span>
                         <span>•</span>
-                        <span className="font-medium text-primary">{ticket.department}</span>
+                        <span className="font-medium text-primary">{formatDepartmentName(ticket.department)}</span>
                         <span>•</span>
                         <span>ผู้แจ้ง: {ticket.requesterName}</span>
                       </div>

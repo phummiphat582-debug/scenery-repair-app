@@ -2,6 +2,7 @@ import React from 'react';
 import { Ticket, Department } from '../types';
 import { TicketCard } from './TicketCard';
 import { Building2, AlertCircle } from 'lucide-react';
+import { formatDepartmentName, isSameDepartment } from '../lib/departmentUtils';
 
 interface DepartmentBoardProps {
   tickets: Ticket[];
@@ -22,7 +23,10 @@ export const DepartmentBoard: React.FC<DepartmentBoardProps> = ({
 }) => {
   const deptMap = React.useMemo(() => {
     const map = new Map<string, Department>();
-    departments.forEach(d => map.set(d.name, d));
+    departments.forEach(d => {
+      map.set(d.name, d);
+      map.set(formatDepartmentName(d.name), d);
+    });
     return map;
   }, [departments]);
 
@@ -32,8 +36,10 @@ export const DepartmentBoard: React.FC<DepartmentBoardProps> = ({
     departments.forEach(d => { groups[d.name] = []; });
 
     tickets.forEach(ticket => {
-      if (!groups[ticket.department]) groups[ticket.department] = [];
-      groups[ticket.department].push(ticket);
+      const matchedDept = departments.find(d => isSameDepartment(d.name, ticket.department));
+      const key = matchedDept ? matchedDept.name : ticket.department;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(ticket);
     });
 
     return groups;
@@ -56,7 +62,7 @@ export const DepartmentBoard: React.FC<DepartmentBoardProps> = ({
                 <div className="flex items-center gap-2">
                   <span className="text-xl">{dept.icon}</span>
                   <div>
-                    <h3 className="font-bold text-slate-900 text-sm">{dept.name}</h3>
+                    <h3 className="font-bold text-slate-900 text-sm">{formatDepartmentName(dept.name)}</h3>
                     <p className="text-[11px] text-slate-500 font-light truncate max-w-[170px]">{dept.description}</p>
                   </div>
                 </div>

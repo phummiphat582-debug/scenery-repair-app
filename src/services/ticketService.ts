@@ -4,6 +4,7 @@ import { supabase, isSupabaseConfigured, realtimeSupabase } from '../lib/supabas
 import { getTicketAgingInfo } from '../lib/ticketAging';
 import { oneSignalService } from './oneSignalService';
 import { savePhotoToIdb, getPhotoFromIdb } from '../lib/photoStorage';
+import { isSameDepartment, formatDepartmentName, getDepartmentCode } from '../lib/departmentUtils';
 
 const LOCAL_STORAGE_TICKETS = 'scenery_repair_v5_tickets';
 const LOCAL_STORAGE_DEPTS = 'scenery_repair_v5_departments';
@@ -38,6 +39,7 @@ function dbToTicket(row: any): Ticket {
   let actionSteps = row.action_steps || row.actionSteps;
   const parts = row.parts;
   const repairResult = row.repair_result || row.repairResult || '';
+  const rawRemark = row.remark || '';
 
   // Extract from combined repairResult if not directly present in columns
   if (!diagnosticReason && repairResult) {
@@ -49,12 +51,48 @@ function dbToTicket(row: any): Ticket {
     if (actionMatch) actionSteps = actionMatch[1].trim();
   }
 
+  // Accurate Division Recovery (84 ซ่อมบำรุง / 85 ก่อสร้าง / 86 ศิลป์)
+  let division: DivisionId = '84';
+  const divRemarkMatch = rawRemark.match(/\[DIV:(84|85|86)\]/);
+  if (divRemarkMatch) {
+    division = divRemarkMatch[1] as DivisionId;
+  } else if (row.division === '84' || row.division === '85' || row.division === '86') {
+    division = row.division as DivisionId;
+  } else {
+    const titleText = `${row.title || ''}`.toLowerCase();
+    const titleTagMatch = titleText.match(/\[(84|85|86)\]/);
+    if (titleTagMatch) {
+      division = titleTagMatch[1] as DivisionId;
+    } else if (titleText.includes('85') || titleText.includes('ก่อสร้าง') || titleText.includes('ปูน') || titleText.includes('โครงสร้าง') || titleText.includes('เทพื้น') || titleText.includes('หลังคา') || titleText.includes('เชื่อม') || titleText.includes('รั้ว')) {
+      division = '85';
+    } else if (titleText.includes('86') || titleText.includes('ศิลป์') || titleText.includes('เพ้นท์') || titleText.includes('ป้าย') || titleText.includes('พร็อพ') || titleText.includes('ตกแต่ง') || titleText.includes('ทาสี')) {
+      division = '86';
+    } else {
+      const tech = `${row.technician_name || ''}`;
+      if (tech.includes('[85]')) division = '85';
+      else if (tech.includes('[86]')) division = '86';
+      else {
+        const desc = `${row.description || ''}`.toLowerCase();
+        if (desc.includes('[85]') || desc.includes('ก่อสร้าง')) division = '85';
+        else if (desc.includes('[86]') || desc.includes('ศิลป์')) division = '86';
+        else {
+          const dept = `${row.department || ''}`;
+          if (dept.includes('85') || dept.includes('ก่อสร้าง')) division = '85';
+          else if (dept.includes('86') || dept.includes('ศิลป์')) division = '86';
+          else division = '84';
+        }
+      }
+    }
+  }
+
+  const cleanRemark = rawRemark.replace(/\[DIV:(84|85|86)\]\s*/g, '').trim();
+
   return {
     id: String(row.id),
     requestId: row.request_id || row.requestId || String(row.id),
     title: row.title || '',
     description: row.description || '',
-    department: row.department || '',
+    department: formatDepartmentName(row.department || ''),
     location: row.location || '',
     requesterName: row.requester_name || row.requesterName || '',
     requesterPhone: row.requester_phone || row.requesterPhone || '',
@@ -63,19 +101,10 @@ function dbToTicket(row: any): Ticket {
     technicianName: row.technician_name || row.technicianName || '',
     technicianPhone: row.technician_phone || row.technicianPhone || '',
     repairResult,
-    remark: row.remark || '',
+    remark: cleanRemark,
     requestImageUrl: row.request_image_url || row.requestImageUrl || '',
     resultImageUrl: row.result_image_url || row.resultImageUrl || '',
-    division: ((): DivisionId => {
-      if (row.division === '84' || row.division === '85' || row.division === '86') return row.division;
-      const dept = row.department || '';
-      if (dept.includes('85') || dept.includes('ก่อสร้าง')) return '85';
-      if (dept.includes('86') || dept.includes('ศิลป์')) return '86';
-      const tech = row.technician_name || '';
-      if (tech.includes('[85]')) return '85';
-      if (tech.includes('[86]')) return '86';
-      return '84';
-    })(),
+    division,
     createdAt: row.created_at || row.createdAt || new Date().toISOString(),
     updatedAt: row.updated_at || row.updatedAt || new Date().toISOString(),
     completedAt: row.completed_at || row.completedAt || undefined,
@@ -110,9 +139,9 @@ function ticketToDb(t: Partial<Ticket>, isNewTicket: boolean = false): any {
   if (t.title !== undefined) row.title = t.title;
   if (t.description !== undefined) row.description = t.description;
   if (t.department !== undefined) {
-    row.department = t.department || '0 ฟร้อน';
+    row.department = formatDepartmentName(t.department) || 'ฟร้อน';
   } else if (isNewTicket) {
-    row.department = '0 ฟร้อน';
+    row.department = 'ฟร้อน';
   }
   if (t.location !== undefined) row.location = t.location;
   if (t.requesterName !== undefined) row.requester_name = t.requesterName;
@@ -122,7 +151,15 @@ function ticketToDb(t: Partial<Ticket>, isNewTicket: boolean = false): any {
   if (t.technicianName !== undefined) row.technician_name = t.technicianName;
   if (t.technicianPhone !== undefined) row.technician_phone = t.technicianPhone;
   if (t.repairResult !== undefined) row.repair_result = t.repairResult;
-  if (t.remark !== undefined) row.remark = t.remark;
+
+  // Preserve division tag in remark so cloud database retains division 84/85/86
+  if (isNewTicket || t.remark !== undefined || t.division !== undefined) {
+    const div = t.division || '84';
+    const rawRemark = t.remark !== undefined ? t.remark : '';
+    const cleanRemark = rawRemark.replace(/\[DIV:(84|85|86)\]\s*/g, '').trim();
+    row.remark = `[DIV:${div}] ${cleanRemark}`.trim();
+  }
+
   if (t.requestImageUrl !== undefined) {
     row.request_image_url = t.requestImageUrl && t.requestImageUrl.length > 2500 ? '[ATTACHED]' : t.requestImageUrl;
   }
@@ -174,8 +211,8 @@ function dbToTechnician(row: any): Technician {
 function dbToDepartment(row: any): Department {
   return {
     id: String(row.id),
-    name: row.name,
-    code: row.code,
+    name: formatDepartmentName(row.name),
+    code: row.code || getDepartmentCode(row.name),
     icon: row.icon || '📌',
     color: row.color || '#0f766e',
     description: row.description || ''
@@ -294,6 +331,9 @@ class TicketService {
         if (t.requesterName && t.requesterName.includes('าดสดส')) {
           t.requesterName = '';
         }
+        if (t.department) {
+          t.department = formatDepartmentName(t.department);
+        }
 
         // Auto-heal: If ticket is in registry OR has completedAt OR has repair notes, guarantee status === 'completed'!
         if (
@@ -312,7 +352,11 @@ class TicketService {
       const savedDepts = localStorage.getItem(LOCAL_STORAGE_DEPTS);
       const parsedDepts = savedDepts ? JSON.parse(savedDepts) : null;
       if (Array.isArray(parsedDepts) && parsedDepts.some(d => d.code === '0' || d.name?.includes('ฟร้อน'))) {
-        this.departments = sortDepartments(parsedDepts);
+        this.departments = sortDepartments(parsedDepts.map(d => ({
+          ...d,
+          name: formatDepartmentName(d.name),
+          code: d.code || getDepartmentCode(d.name)
+        })));
       } else {
         this.departments = INITIAL_DEPARTMENTS;
       }
@@ -432,6 +476,9 @@ class TicketService {
 
       // Merge with disk tickets
       parsedTickets.forEach(diskTicket => {
+        if (diskTicket.department) {
+          diskTicket.department = formatDepartmentName(diskTicket.department);
+        }
         const key = diskTicket.requestId || diskTicket.id;
         const memTicket = mergedMap.get(key);
 
@@ -1492,7 +1539,7 @@ class TicketService {
 
     // 1. Filter by Department
     if (options?.department && options.department !== 'all') {
-      list = list.filter(t => t.department === options.department);
+      list = list.filter(t => isSameDepartment(t.department, options.department));
     }
 
     // 2. Filter by Status
@@ -1517,7 +1564,8 @@ class TicketService {
         t.requestId.toLowerCase().includes(q) ||
         t.location.toLowerCase().includes(q) ||
         t.requesterName.toLowerCase().includes(q) ||
-        t.department.toLowerCase().includes(q)
+        t.department.toLowerCase().includes(q) ||
+        formatDepartmentName(t.department).toLowerCase().includes(q)
       );
     }
 
@@ -1663,6 +1711,11 @@ class TicketService {
 
     const nowIso = new Date().toISOString();
     const finalUpdates: Partial<Ticket> = { ...updates, updatedAt: nowIso };
+
+    if (updates.division !== undefined || updates.remark !== undefined) {
+      finalUpdates.division = updates.division || existing?.division || '84';
+      finalUpdates.remark = updates.remark !== undefined ? updates.remark : (existing?.remark || '');
+    }
 
     if (updates.status === 'completed') {
       if (!updates.completedAt) {

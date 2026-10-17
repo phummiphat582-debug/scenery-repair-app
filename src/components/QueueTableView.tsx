@@ -4,6 +4,7 @@ import { Phone, CheckCircle2, Clock, Wrench, AlertTriangle, ChevronRight, Eye, T
 import { ConfirmModal } from './ConfirmModal';
 import { DivisionBadge } from './DivisionBadge';
 import { getTicketAgingInfo } from '../lib/ticketAging';
+import { formatDepartmentName } from '../lib/departmentUtils';
 
 interface QueueTableViewProps {
   tickets: Ticket[];
@@ -28,7 +29,10 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
 
   const deptMap = React.useMemo(() => {
     const map = new Map<string, Department>();
-    departments.forEach(d => map.set(d.name, d));
+    departments.forEach(d => {
+      map.set(d.name, d);
+      map.set(formatDepartmentName(d.name), d);
+    });
     return map;
   }, [departments]);
 
@@ -39,8 +43,9 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
       .filter(t => t.status !== 'completed' && t.status !== 'cancelled')
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
       .forEach(ticket => {
-        const next = (counters.get(ticket.department) || 0) + 1;
-        counters.set(ticket.department, next);
+        const deptKey = formatDepartmentName(ticket.department);
+        const next = (counters.get(deptKey) || 0) + 1;
+        counters.set(deptKey, next);
         numbers.set(ticket.id, next);
       });
     return numbers;
@@ -176,7 +181,7 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
                     {/* แผนก & สถานที่ */}
                     <td className="py-3.5 px-4">
                       <div className="font-bold text-on-surface truncate max-w-[170px]">
-                        {ticket.department}
+                        {formatDepartmentName(ticket.department)}
                       </div>
                       <div className="text-[11px] text-on-surface-variant truncate max-w-[170px] mt-0.5">
                         📍 {ticket.location}

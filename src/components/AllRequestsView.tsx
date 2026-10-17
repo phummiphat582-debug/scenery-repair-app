@@ -8,6 +8,7 @@ import { QueueTableView } from './QueueTableView';
 import { DivisionFilterTabs } from './DivisionFilterTabs';
 import { RepairSummaryView } from './RepairSummaryView';
 import { BarChart2 } from 'lucide-react';
+import { isSameDepartment } from '../lib/departmentUtils';
 
 interface AllRequestsViewProps {
   tickets: Ticket[];
@@ -74,7 +75,7 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
     }
 
     if (selectedDepartment !== 'all') {
-      result = result.filter(t => t.department === selectedDepartment);
+      result = result.filter(t => isSameDepartment(t.department, selectedDepartment));
     }
 
     if (statusFilter === 'active') {

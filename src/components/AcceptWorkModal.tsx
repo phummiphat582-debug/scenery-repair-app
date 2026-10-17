@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Ticket, Technician } from '../types';
 import { Wrench, X, Check, Phone, User, AlertCircle, Sparkles, Building2, MapPin } from 'lucide-react';
+import { formatDepartmentName } from '../lib/departmentUtils';
 
 interface AcceptWorkModalProps {
   isOpen: boolean;
@@ -140,7 +141,7 @@ export const AcceptWorkModal: React.FC<AcceptWorkModalProps> = ({
                 #{ticket.requestId}
               </span>
               <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface">
-                {ticket.department}
+                {formatDepartmentName(ticket.department)}
               </span>
             </div>
 

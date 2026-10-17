@@ -1,4 +1,5 @@
 import { Ticket } from '../types';
+import { isSameDepartment } from './departmentUtils';
 
 export interface TicketAgingInfo {
   days: number;
@@ -172,7 +173,7 @@ export function getTicketDepartmentQueue(
     .filter(t => t.status !== 'completed' && t.status !== 'cancelled')
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
-  const deptTickets = activeTickets.filter(t => t.department === ticketDepartment);
+  const deptTickets = activeTickets.filter(t => isSameDepartment(t.department, ticketDepartment));
   const deptIdx = deptTickets.findIndex(t => t.id === ticketId);
   const departmentQueueNumber = deptIdx >= 0 ? deptIdx + 1 : 1;
   const totalInDepartment = deptTickets.length;

@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { formatDepartmentName } from '../lib/departmentUtils';
 
 type OneSignalInstance = {
   init: (options: {
@@ -141,7 +142,7 @@ export const oneSignalService = {
             id: ticket.id,
             requestId: ticket.requestId,
             title: ticket.title || 'รายการแจ้งซ่อม',
-            department: ticket.department || '',
+            department: formatDepartmentName(ticket.department || ''),
             location: ticket.location || '',
             priority: ticket.priority || 'normal'
           }
@@ -171,7 +172,7 @@ export const oneSignalService = {
     priority?: string;
   }, requesterName?: string): Promise<boolean> {
     const requesterText = requesterName ? ` (ผู้แจ้ง: ${requesterName})` : '';
-    const followUpTitle = `🔔 [ตามงานค้าง] ${ticket.department} เร่งงาน #${ticket.requestId}${requesterText}`;
+    const followUpTitle = `🔔 [ตามงานค้าง] ${formatDepartmentName(ticket.department)} เร่งงาน #${ticket.requestId}${requesterText}`;
     return this.notifyTechnicians({
       ...ticket,
       title: followUpTitle,

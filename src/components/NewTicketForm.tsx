@@ -4,6 +4,7 @@ import { ConfirmModal } from './ConfirmModal';
 import { compressImage } from '../lib/imageCompress';
 import { DIVISION_LIST, getDivisionInfo } from '../data/divisionData';
 import { DivisionBadge } from './DivisionBadge';
+import { formatDepartmentName, isSameDepartment } from '../lib/departmentUtils';
 import { 
   Wrench, 
   Check, 
@@ -83,9 +84,9 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
   });
   const [department, setDepartment] = useState(() => {
     try {
-      return defaultDepartment || localStorage.getItem('scenery_selected_dept') || departments[0]?.name || '0 ฟร้อน';
+      return defaultDepartment || localStorage.getItem('scenery_selected_dept') || departments[0]?.name || 'ฟร้อน';
     } catch {
-      return defaultDepartment || departments[0]?.name || '0 ฟร้อน';
+      return defaultDepartment || departments[0]?.name || 'ฟร้อน';
     }
   });
 
@@ -121,7 +122,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
   const deptPendingTickets = React.useMemo(() => {
     if (!department) return [];
     return tickets
-      .filter(t => t.department === department && t.status !== 'completed' && t.status !== 'cancelled')
+      .filter(t => isSameDepartment(t.department, department) && t.status !== 'completed' && t.status !== 'cancelled')
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }, [tickets, department]);
 
@@ -228,7 +229,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
     const payload = {
       title: `${divInfo.name}: ${locText}`,
       division: selectedDivision,
-      department: department.trim() || departments[0]?.name || '0 ฟร้อน',
+      department: formatDepartmentName(department.trim()) || departments[0]?.name || 'ฟร้อน',
       location: locText,
       description: problemDetail.trim(),
       requesterName: requesterName.trim() || 'พนักงานฟาร์ม (ไม่ระบุชื่อ)',
@@ -372,7 +373,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
               >
                 {departments.map(d => (
                   <option key={d.id} value={d.name}>
-                    {d.icon ? `${d.icon} ` : ''}{d.name}
+                    {d.icon ? `${d.icon} ` : ''}{formatDepartmentName(d.name)}
                   </option>
                 ))}
               </select>
@@ -382,7 +383,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
             </div>
             <div className="flex items-center gap-1.5 text-xs text-primary bg-primary/10 px-3 py-1.5 rounded-lg font-semibold mt-0.5">
               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-              <span>ใบแจ้งซ่อมจะถูกส่งในนามแผนก: <strong>{department}</strong></span>
+              <span>ใบแจ้งซ่อมจะถูกส่งในนามแผนก: <strong>{formatDepartmentName(department)}</strong></span>
             </div>
 
             {/* Live Queue Status Preview for selected department */}
@@ -393,7 +394,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
                     📋
                   </span>
                   <span className="text-xs font-bold text-on-surface">
-                    คิวงานแจ้งซ่อมของแผนก "{department}"
+                    คิวงานแจ้งซ่อมของแผนก "{formatDepartmentName(department)}"
                   </span>
                 </div>
                 {deptPendingTickets.length > 0 ? (
@@ -897,7 +898,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
             <div className="rounded-xl bg-surface-container-low p-3">
               <span className="text-xs text-on-surface-variant block">แผนกที่แจ้งงาน</span>
-              <strong className="text-primary font-bold text-sm block">{department}</strong>
+              <strong className="text-primary font-bold text-sm block">{formatDepartmentName(department)}</strong>
               <div className="text-xs text-on-surface-variant mt-0.5">{requesterName} • {requesterPhone}</div>
             </div>
             <div className="rounded-xl bg-surface-container-low p-3">
@@ -995,7 +996,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
         <ConfirmModal
           isOpen={showConfirmSubmit}
           title="ยืนยันการส่งใบแจ้งซ่อม"
-          message={`คุณต้องการส่งแจ้งซ่อม "${pendingPayload.title}" แผนก "${pendingPayload.department}" ใช่หรือไม่?`}
+          message={`คุณต้องการส่งแจ้งซ่อม "${pendingPayload.title}" แผนก "${formatDepartmentName(pendingPayload.department)}" ใช่หรือไม่?`}
           confirmText="ยืนยันส่งข้อมูล"
           cancelText="ตรวจสอบอีกครั้ง"
           confirmVariant="primary"

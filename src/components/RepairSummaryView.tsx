@@ -23,6 +23,7 @@ import {
   Printer
 } from 'lucide-react';
 import { DivisionBadge } from './DivisionBadge';
+import { formatDepartmentName, isSameDepartment } from '../lib/departmentUtils';
 
 export type TimeframeMode = 'today' | 'yesterday' | 'week' | 'month' | 'last_month' | 'all' | 'custom';
 
@@ -122,7 +123,7 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
       if (selectedDivision !== 'all' && (t.division || '84') !== selectedDivision) {
         return false;
       }
-      if (selectedDept !== 'all' && t.department !== selectedDept) {
+      if (selectedDept !== 'all' && !isSameDepartment(t.department, selectedDept)) {
         return false;
       }
       return true;
@@ -203,7 +204,7 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
     });
 
     const stats = departments.map(d => {
-      const deptTickets = baseList.filter(t => t.department === d.name);
+      const deptTickets = baseList.filter(t => isSameDepartment(t.department, d.name));
       const total = deptTickets.length;
       const completed = deptTickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length;
       const inProgress = deptTickets.filter(t => t.status === 'in_progress').length;
@@ -216,7 +217,7 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
 
       return {
         id: d.id,
-        name: d.name,
+        name: formatDepartmentName(d.name),
         icon: d.icon,
         color: d.color,
         total,
@@ -230,10 +231,10 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
     });
 
     // Also include any tickets with department not matching known departments list
-    const knownDeptNames = new Set(departments.map(d => d.name));
-    const extraDeptNames = Array.from(new Set(baseList.map(t => t.department))).filter(name => name && !knownDeptNames.has(name));
+    const knownDeptNames = new Set(departments.map(d => formatDepartmentName(d.name)));
+    const extraDeptNames = Array.from(new Set(baseList.map(t => formatDepartmentName(t.department)))).filter(name => name && !knownDeptNames.has(name));
     extraDeptNames.forEach(extraName => {
-      const deptTickets = baseList.filter(t => t.department === extraName);
+      const deptTickets = baseList.filter(t => isSameDepartment(t.department, extraName));
       if (deptTickets.length > 0) {
         const total = deptTickets.length;
         const completed = deptTickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length;
@@ -343,7 +344,7 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
       `"${t.requestId}"`,
       `"${new Date(t.createdAt).toLocaleString('th-TH')}"`,
       t.completedAt ? `"${new Date(t.completedAt).toLocaleString('th-TH')}"` : '""',
-      `"${t.department}"`,
+      `"${formatDepartmentName(t.department)}"`,
       `"${t.division || '84'}"`,
       `"${(t.title || '').replace(/"/g, '""')}"`,
       `"${(t.location || '').replace(/"/g, '""')}"`,
@@ -384,7 +385,7 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
       <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
         <td style="padding: 6px 8px; text-align: center; font-weight: bold; color: #184e38;">#${t.requestId}</td>
         <td style="padding: 6px 8px;">${new Date(t.createdAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
-        <td style="padding: 6px 8px; font-weight: 600;">${t.department}</td>
+        <td style="padding: 6px 8px; font-weight: 600;">${formatDepartmentName(t.department)}</td>
         <td style="padding: 6px 8px;">${t.title}</td>
         <td style="padding: 6px 8px;">${t.location}</td>
         <td style="padding: 6px 8px;">${t.technicianName || '-'}</td>
@@ -692,16 +693,16 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
             >
               <option value="all">
                 {onlyCompletedDepts 
-                  ? `🏢 แผนกที่มีงานจบแล้ว (${departments.filter(d => filteredByTimeframe.some(t => t.department === d.name && (t.status === 'completed' || t.status === 'waiting_inspect'))).length} แผนก)`
+                  ? `🏢 แผนกที่มีงานจบแล้ว (${departments.filter(d => filteredByTimeframe.some(t => isSameDepartment(t.department, d.name) && (t.status === 'completed' || t.status === 'waiting_inspect'))).length} แผนก)`
                   : '🏢 ทุกแผนก (ภาพรวมทั้งฟาร์ม)'}
               </option>
               {departments
-                .filter(d => !onlyCompletedDepts || filteredByTimeframe.some(t => t.department === d.name && (t.status === 'completed' || t.status === 'waiting_inspect')))
+                .filter(d => !onlyCompletedDepts || filteredByTimeframe.some(t => isSameDepartment(t.department, d.name) && (t.status === 'completed' || t.status === 'waiting_inspect')))
                 .map(d => {
-                  const doneCount = filteredByTimeframe.filter(t => t.department === d.name && (t.status === 'completed' || t.status === 'waiting_inspect')).length;
+                  const doneCount = filteredByTimeframe.filter(t => isSameDepartment(t.department, d.name) && (t.status === 'completed' || t.status === 'waiting_inspect')).length;
                   return (
                     <option key={d.id} value={d.name}>
-                      {d.icon} {d.name} {doneCount > 0 ? `(เสร็จ ${doneCount} งาน)` : '(0)'}
+                      {d.icon} {formatDepartmentName(d.name)} {doneCount > 0 ? `(เสร็จ ${doneCount} งาน)` : '(0)'}
                     </option>
                   );
                 })}
@@ -1099,7 +1100,7 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
                         <DivisionBadge division={t.division} size="sm" />
                       </div>
                       <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span>🏢 {t.department}</span>
+                        <span>🏢 {formatDepartmentName(t.department)}</span>
                         <span>•</span>
                         <span>ผู้แจ้ง: {t.requesterName}</span>
                         {t.technicianName && (

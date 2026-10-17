@@ -2,6 +2,7 @@ import React from 'react';
 import { Ticket, Department } from '../types';
 import { TicketCard } from './TicketCard';
 import { CheckCircle2, Wrench } from 'lucide-react';
+import { formatDepartmentName } from '../lib/departmentUtils';
 
 interface TicketListProps {
   tickets: Ticket[];
@@ -22,7 +23,10 @@ export const TicketList: React.FC<TicketListProps> = ({
 }) => {
   const deptMap = React.useMemo(() => {
     const map = new Map<string, Department>();
-    departments.forEach(d => map.set(d.name, d));
+    departments.forEach(d => {
+      map.set(d.name, d);
+      map.set(formatDepartmentName(d.name), d);
+    });
     return map;
   }, [departments]);
 
@@ -49,7 +53,7 @@ export const TicketList: React.FC<TicketListProps> = ({
           <TicketCard
             key={ticket.id}
             ticket={ticket}
-            departmentInfo={deptMap.get(ticket.department)}
+            departmentInfo={deptMap.get(ticket.department) || deptMap.get(formatDepartmentName(ticket.department))}
             onOpenEdit={onOpenEdit}
             onQuickAccept={onQuickAccept}
             onOpenCompleteModal={onOpenCompleteModal}

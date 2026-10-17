@@ -3,6 +3,7 @@ import { Clock, MapPin, User, CheckCircle, AlertTriangle, Zap, Wrench, ChevronRi
 import { Ticket, Department } from '../types';
 import { DivisionBadge } from './DivisionBadge';
 import { getTicketAgingInfo } from '../lib/ticketAging';
+import { formatDepartmentName } from '../lib/departmentUtils';
 
 interface TicketCardProps {
   ticket: Ticket;
@@ -88,7 +89,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
             }}
           >
             <span>{departmentInfo?.icon || '📌'}</span>
-            <span>{ticket.department}</span>
+            <span>{formatDepartmentName(ticket.department)}</span>
           </span>
         </div>
 

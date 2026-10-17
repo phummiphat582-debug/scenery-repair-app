@@ -5,6 +5,7 @@ import { DivisionBadge } from './DivisionBadge';
 import { DivisionFilterTabs } from './DivisionFilterTabs';
 import { RepairSummaryView } from './RepairSummaryView';
 import { getTicketAgingInfo } from '../lib/ticketAging';
+import { formatDepartmentName } from '../lib/departmentUtils';
 import {
   Wrench,
   AlertTriangle,
@@ -106,6 +107,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           ticket.title.toLowerCase().includes(q) ||
           ticket.location.toLowerCase().includes(q) ||
           ticket.department.toLowerCase().includes(q) ||
+          formatDepartmentName(ticket.department).toLowerCase().includes(q) ||
           (ticket.technicianName && ticket.technicianName.toLowerCase().includes(q));
         if (!match) return false;
       }
@@ -198,7 +200,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   {emergencyTicket.title}
                 </h2>
                 <p className="font-body-sm text-body-sm text-on-error-container/85 mt-1 line-clamp-2">
-                  แจ้งโดย {emergencyTicket.requesterName} ({emergencyTicket.department}) • {emergencyTicket.description}
+                  แจ้งโดย {emergencyTicket.requesterName} ({formatDepartmentName(emergencyTicket.department)}) • {emergencyTicket.description}
                 </p>
                 <div className="mt-space-sm flex items-center gap-space-xs">
                   {emergencyTicket.status === 'in_progress' && onOpenCompleteModal ? (
@@ -485,7 +487,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
                       <div className="flex items-center gap-1 text-[11px] text-slate-500 mt-1 truncate">
                         <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                        <span className="font-medium text-slate-700">{ticket.department}</span>
+                        <span className="font-medium text-slate-700">{formatDepartmentName(ticket.department)}</span>
                         <span>•</span>
                         <span className="truncate">{ticket.location}</span>
                       </div>
@@ -633,7 +635,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   {/* Location */}
                   <div className="flex items-center gap-1.5 text-on-surface-variant font-label-sm text-label-sm">
                     <MapPin className="w-4 h-4 text-secondary shrink-0" />
-                    <span className="font-semibold text-on-surface">{ticket.department}</span>
+                    <span className="font-semibold text-on-surface">{formatDepartmentName(ticket.department)}</span>
                     <span className="text-outline">•</span>
                     <span>{ticket.location}</span>
                   </div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Department } from '../types';
 import { Building2 } from 'lucide-react';
+import { formatDepartmentName, isSameDepartment } from '../lib/departmentUtils';
 
 interface DepartmentTabsProps {
   departments: Department[];
@@ -42,8 +43,8 @@ export const DepartmentTabs: React.FC<DepartmentTabsProps> = ({
 
           {/* Department Pills */}
           {departments.map(dept => {
-            const counts = departmentCounts[dept.name] || { total: 0, urgent: 0 };
-            const isSelected = selectedDepartment === dept.name;
+            const counts = departmentCounts[dept.name] || departmentCounts[formatDepartmentName(dept.name)] || { total: 0, urgent: 0 };
+            const isSelected = isSameDepartment(selectedDepartment, dept.name);
 
             return (
               <button
@@ -56,7 +57,7 @@ export const DepartmentTabs: React.FC<DepartmentTabsProps> = ({
                 }`}
               >
                 <span>{dept.icon}</span>
-                <span>{dept.name}</span>
+                <span>{formatDepartmentName(dept.name)}</span>
                 
                 {counts.total > 0 && (
                   <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${

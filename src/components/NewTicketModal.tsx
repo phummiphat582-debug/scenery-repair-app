@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Plus, AlertTriangle, Image as ImageIcon } from 'lucide-react';
 import { Department, Priority, Ticket, DivisionId } from '../types';
 import { DIVISION_LIST } from '../data/divisionData';
+import { formatDepartmentName } from '../lib/departmentUtils';
 
 interface NewTicketModalProps {
   isOpen: boolean;
@@ -18,7 +19,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({
 }) => {
   const [division, setDivision] = useState<DivisionId>('84');
   const [title, setTitle] = useState('');
-  const [department, setDepartment] = useState(departments[0]?.name || '0 ฟร้อน');
+  const [department, setDepartment] = useState(departments[0]?.name || 'ฟร้อน');
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
   const [requesterName, setRequesterName] = useState('');
@@ -140,7 +141,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({
             >
               {departments.map(d => (
                 <option key={d.id} value={d.name}>
-                  {d.icon} {d.name}
+                  {d.icon} {formatDepartmentName(d.name)}
                 </option>
               ))}
             </select>
