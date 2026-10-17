@@ -109,7 +109,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
   const isEmergency = ticket.priority === 'critical' || ticket.priority === 'high';
   const aging = getTicketAgingInfo(ticket);
-  const requestImageUrl = ticket.requestImageUrl && ticket.requestImageUrl !== '-'
+  const requestImageUrl = ticket.requestImageUrl && ticket.requestImageUrl !== '-' && ticket.requestImageUrl !== '[ATTACHED]'
     ? ticket.requestImageUrl
     : '';
   const createdAtText = new Date(ticket.createdAt).toLocaleString('th-TH', {
@@ -399,7 +399,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
           </div>
 
           {/* Section 2.1: After-Repair Photo (ภาพถ่ายหลังการแก้ไข) */}
-          {ticket.resultImageUrl && (
+          {ticket.resultImageUrl && ticket.resultImageUrl !== '-' && ticket.resultImageUrl !== '[ATTACHED]' && (
             <div className="p-4 rounded-xl bg-surface-container-lowest shadow-sm flex flex-col gap-3 border border-emerald-300">
               <div className="flex items-center justify-between">
                 <span className="font-label-lg text-label-lg text-emerald-800 flex items-center gap-2 font-bold">

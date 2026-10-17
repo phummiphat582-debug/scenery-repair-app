@@ -124,7 +124,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
         </div>
 
         {/* Request Image Link */}
-        {ticket.requestImageUrl && ticket.requestImageUrl !== '-' && (
+        {ticket.requestImageUrl && ticket.requestImageUrl !== '-' && ticket.requestImageUrl !== '[ATTACHED]' && (
           <div className="mb-2">
             <a
               href={ticket.requestImageUrl}

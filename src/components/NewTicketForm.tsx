@@ -236,7 +236,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
       requesterPhone: requesterPhone.trim(),
       priority,
       status: 'pending',
-      requestImageUrl: photos[0]?.url || '-',
+      requestImageUrl: photos[0]?.url || '',
       category: divInfo.name
     };
 

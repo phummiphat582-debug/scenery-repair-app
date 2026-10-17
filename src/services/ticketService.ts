@@ -143,8 +143,22 @@ function ticketToDb(t: Partial<Ticket>, isNewTicket: boolean = false): any {
   } else if (isNewTicket) {
     row.department = 'ฟร้อน';
   }
-  if (t.location !== undefined) row.location = t.location;
-  if (t.requesterName !== undefined) row.requester_name = t.requesterName;
+
+  // Guaranteed NOT NULL protection for PostgreSQL constraints
+  if (t.location !== undefined) {
+    row.location = t.location?.trim() || (isNewTicket ? 'พื้นที่ฟาร์ม' : undefined);
+  } else if (isNewTicket) {
+    row.location = 'พื้นที่ฟาร์ม';
+  }
+  if (row.location === undefined && isNewTicket) row.location = 'พื้นที่ฟาร์ม';
+
+  if (t.requesterName !== undefined) {
+    row.requester_name = t.requesterName?.trim() || (isNewTicket ? 'พนักงานฟาร์ม' : undefined);
+  } else if (isNewTicket) {
+    row.requester_name = 'พนักงานฟาร์ม';
+  }
+  if (row.requester_name === undefined && isNewTicket) row.requester_name = 'พนักงานฟาร์ม';
+
   if (t.requesterPhone !== undefined) row.requester_phone = t.requesterPhone;
   if (t.priority !== undefined) row.priority = t.priority;
   if (t.status !== undefined) row.status = t.status;
@@ -160,11 +174,22 @@ function ticketToDb(t: Partial<Ticket>, isNewTicket: boolean = false): any {
     row.remark = `[DIV:${div}] ${cleanRemark}`.trim();
   }
 
+  // Direct persistence of compressed images in PostgreSQL TEXT column (never replace with [ATTACHED])
   if (t.requestImageUrl !== undefined) {
-    row.request_image_url = t.requestImageUrl && t.requestImageUrl.length > 2500 ? '[ATTACHED]' : t.requestImageUrl;
+    const val = t.requestImageUrl;
+    if (!val || val === '-' || val === '[ATTACHED]') {
+      row.request_image_url = null;
+    } else {
+      row.request_image_url = val;
+    }
   }
   if (t.resultImageUrl !== undefined) {
-    row.result_image_url = t.resultImageUrl && t.resultImageUrl.length > 2500 ? '[ATTACHED]' : t.resultImageUrl;
+    const val = t.resultImageUrl;
+    if (!val || val === '-' || val === '[ATTACHED]') {
+      row.result_image_url = null;
+    } else {
+      row.result_image_url = val;
+    }
   }
   if (t.createdAt !== undefined) row.created_at = t.createdAt;
   if (t.updatedAt !== undefined) row.updated_at = t.updatedAt;
@@ -379,6 +404,8 @@ class TicketService {
   private harvestLegacyTickets() {
     const legacyKeys = ['scenery_repair_v4_tickets', 'scenery_repair_v3_tickets', 'scenery_repair_v2_tickets', 'scenery_repair_tickets'];
     let harvestedCount = 0;
+    const harvestedList: Ticket[] = [];
+
     legacyKeys.forEach(key => {
       try {
         const raw = localStorage.getItem(key);
@@ -405,6 +432,7 @@ class TicketService {
                   this.registerCompleted(item);
                 }
                 this.tickets.push(item);
+                harvestedList.push(item);
                 harvestedCount++;
               }
             });
@@ -415,8 +443,14 @@ class TicketService {
         try { localStorage.removeItem(key); } catch {}
       }
     });
+
     if (harvestedCount > 0) {
       console.log(`[TicketService] Harvested ${harvestedCount} legacy tickets from local device storage.`);
+      this.saveToLocalStorage();
+      // Auto-upload harvested tickets to Central Cloud so other devices receive them
+      harvestedList.forEach(t => {
+        void this.uploadStrandedTicketToCloud(t);
+      });
     }
   }
 
@@ -426,22 +460,28 @@ class TicketService {
       let changed = false;
       for (const t of this.tickets) {
         const key = t.requestId || t.id;
-        if (!t.requestImageUrl && key) {
+        const needsReqPhoto = (!t.requestImageUrl || t.requestImageUrl === '-' || t.requestImageUrl === '[ATTACHED]') && key;
+        if (needsReqPhoto) {
           const photo = await getPhotoFromIdb(`${key}_req`);
-          if (photo) {
+          if (photo && photo.startsWith('data:')) {
             t.requestImageUrl = photo;
             changed = true;
+            // Push recovered photo to Central Cloud so technicians and all other devices see it
+            void this.pushTicketToCloud(t);
           }
         }
-        if (!t.resultImageUrl && key) {
+        const needsResPhoto = (!t.resultImageUrl || t.resultImageUrl === '-' || t.resultImageUrl === '[ATTACHED]') && key;
+        if (needsResPhoto) {
           const photo = await getPhotoFromIdb(`${key}_res`);
-          if (photo) {
+          if (photo && photo.startsWith('data:')) {
             t.resultImageUrl = photo;
             changed = true;
+            void this.pushTicketToCloud(t);
           }
         }
       }
       if (changed) {
+        this.saveToLocalStorage();
         this.notify();
       }
     } catch (e) {
@@ -724,8 +764,8 @@ class TicketService {
             ...payload,
             ticket: {
               ...rest,
-              requestImageUrl: requestImageUrl && requestImageUrl.length > 200 ? '[ATTACHED]' : requestImageUrl,
-              resultImageUrl: resultImageUrl && resultImageUrl.length > 200 ? '[ATTACHED]' : resultImageUrl
+              requestImageUrl: (requestImageUrl && requestImageUrl !== '-' && requestImageUrl !== '[ATTACHED]') ? requestImageUrl : '',
+              resultImageUrl: (resultImageUrl && resultImageUrl !== '-' && resultImageUrl !== '[ATTACHED]') ? resultImageUrl : ''
             }
           };
         }
@@ -1007,6 +1047,20 @@ class TicketService {
     if (!isSupabaseConfigured || !supabase || this.isCloudRestricted) return;
     try {
       console.log(`[TicketService] Auto-uploading stranded ticket to cloud: ${ticket.requestId} (${ticket.title})`);
+      const key = ticket.requestId || ticket.id;
+      if ((!ticket.requestImageUrl || ticket.requestImageUrl === '-' || ticket.requestImageUrl === '[ATTACHED]') && key) {
+        try {
+          const idbPhoto = await getPhotoFromIdb(`${key}_req`);
+          if (idbPhoto) ticket.requestImageUrl = idbPhoto;
+        } catch {}
+      }
+      if ((!ticket.resultImageUrl || ticket.resultImageUrl === '-' || ticket.resultImageUrl === '[ATTACHED]') && key) {
+        try {
+          const idbPhoto = await getPhotoFromIdb(`${key}_res`);
+          if (idbPhoto) ticket.resultImageUrl = idbPhoto;
+        } catch {}
+      }
+
       const row = ticketToDb(ticket, true);
       const { data, error } = await supabase
         .from('repair_tickets')
@@ -1066,7 +1120,7 @@ class TicketService {
           const [ticketsRes, techsRes, deptsRes] = await Promise.all([
             supabase
               .from('repair_tickets')
-              .select('id, request_id, title, description, department, location, requester_name, requester_phone, priority, status, technician_name, technician_phone, repair_result, remark, created_at, updated_at, completed_at')
+              .select('id, request_id, title, description, department, location, requester_name, requester_phone, priority, status, technician_name, technician_phone, repair_result, remark, request_image_url, result_image_url, created_at, updated_at, completed_at')
               .order('created_at', { ascending: false }),
             supabase
               .from('technicians')
@@ -1137,6 +1191,15 @@ class TicketService {
               const localTime = new Date(local.updatedAt).getTime();
               const serverTime = new Date(serverTicket.updatedAt).getTime();
 
+              // Safe image resolution: Never let '[ATTACHED]' overwrite a real local photo
+              const finalReqImg = (local.requestImageUrl && local.requestImageUrl.startsWith('data:') && (!serverTicket.requestImageUrl || serverTicket.requestImageUrl === '[ATTACHED]'))
+                ? local.requestImageUrl
+                : (serverTicket.requestImageUrl && serverTicket.requestImageUrl !== '[ATTACHED]' ? serverTicket.requestImageUrl : (local.requestImageUrl || ''));
+
+              const finalResImg = (local.resultImageUrl && local.resultImageUrl.startsWith('data:') && (!serverTicket.resultImageUrl || serverTicket.resultImageUrl === '[ATTACHED]'))
+                ? local.resultImageUrl
+                : (serverTicket.resultImageUrl && serverTicket.resultImageUrl !== '[ATTACHED]' ? serverTicket.resultImageUrl : (local.resultImageUrl || ''));
+
               // Rule 0: Server Completed Protection
               // If server is completed or cancelled, server ALWAYS takes precedence over a local 'in_progress' or 'pending' cached status!
               // This permanently stops mobile local cache from looping back or reverting completed jobs!
@@ -1144,8 +1207,8 @@ class TicketService {
                 this.registerCompleted(serverTicket);
                 const finalMerged: Ticket = {
                   ...serverTicket,
-                  requestImageUrl: serverTicket.requestImageUrl || local.requestImageUrl || '',
-                  resultImageUrl: serverTicket.resultImageUrl || local.resultImageUrl || ''
+                  requestImageUrl: finalReqImg,
+                  resultImageUrl: finalResImg
                 };
                 mergedTickets.push(finalMerged);
                 stateChanged = true;
@@ -1158,8 +1221,8 @@ class TicketService {
               if (isLocalOrRegCompleted && serverTicket.status !== 'completed') {
                 local.status = 'completed';
                 this.registerCompleted(local);
-                if (!local.requestImageUrl && serverTicket.requestImageUrl) local.requestImageUrl = serverTicket.requestImageUrl;
-                if (!local.resultImageUrl && serverTicket.resultImageUrl) local.resultImageUrl = serverTicket.resultImageUrl;
+                if (!local.requestImageUrl && finalReqImg) local.requestImageUrl = finalReqImg;
+                if (!local.resultImageUrl && finalResImg) local.resultImageUrl = finalResImg;
                 mergedTickets.push(local);
                 // Self-healing: Push completed to Supabase Central Cloud
                 void this.pushTicketToCloud(local);
@@ -1169,8 +1232,8 @@ class TicketService {
               // Rule 2: Last-Write-Wins based on timestamps (local is newer by >1s)
               // Only apply for non-completed state transitions
               if (localTime > serverTime + 1000 && local.status !== 'completed') {
-                if (!local.requestImageUrl && serverTicket.requestImageUrl) local.requestImageUrl = serverTicket.requestImageUrl;
-                if (!local.resultImageUrl && serverTicket.resultImageUrl) local.resultImageUrl = serverTicket.resultImageUrl;
+                if (!local.requestImageUrl && finalReqImg) local.requestImageUrl = finalReqImg;
+                if (!local.resultImageUrl && finalResImg) local.resultImageUrl = finalResImg;
                 mergedTickets.push(local);
                 continue;
               }
@@ -1178,9 +1241,15 @@ class TicketService {
               // Server is authoritative (newer or equal)
               const finalMerged: Ticket = {
                 ...serverTicket,
-                requestImageUrl: serverTicket.requestImageUrl || local.requestImageUrl || '',
-                resultImageUrl: serverTicket.resultImageUrl || local.resultImageUrl || ''
+                requestImageUrl: finalReqImg,
+                resultImageUrl: finalResImg
               };
+
+              // Self-healing: If local has real base64 photo and server has [ATTACHED], update cloud
+              if (local.requestImageUrl && local.requestImageUrl.startsWith('data:') && serverTicket.requestImageUrl === '[ATTACHED]') {
+                void this.pushTicketToCloud(finalMerged);
+              }
+
               mergedTickets.push(finalMerged);
               if (
                 local.status !== finalMerged.status ||
@@ -1670,19 +1739,36 @@ class TicketService {
           } else if (error) {
             console.warn('[TicketService] Supabase insert error:', error.message);
             if (error.code === '23505') {
-              const fallbackId = `REP-${yearMonth}-${Date.now().toString().slice(-4)}`;
-              dbRow.request_id = fallbackId;
-              created.requestId = fallbackId;
-              const retryRes = await supabase.from('repair_tickets').insert([dbRow]).select().single();
-              if (retryRes.data) {
-                const serverTicket = dbToTicket(retryRes.data);
-                const idx = this.tickets.findIndex(t => t.id === created.id);
-                if (idx !== -1) {
-                  this.tickets[idx] = { ...this.tickets[idx], ...serverTicket };
-                  this.saveToLocalStorage();
+              // Clean Sequential Numbering: Find actual latest server number
+              try {
+                const { data: latestRows } = await supabase
+                  .from('repair_tickets')
+                  .select('request_id')
+                  .order('created_at', { ascending: false })
+                  .limit(25);
+                const serverNums = (latestRows || []).map((r: any) => {
+                  const m = r.request_id?.match(/REP-\d{6}-(\d+)/);
+                  return m ? parseInt(m[1], 10) : 0;
+                });
+                const maxSeq = Math.max(count + 1, ...serverNums, ...existingNums);
+                const nextSeqId = `REP-${yearMonth}-${String(maxSeq).padStart(3, '0')}`;
+                dbRow.request_id = nextSeqId;
+                created.requestId = nextSeqId;
+                const retryRes = await supabase.from('repair_tickets').insert([dbRow]).select().single();
+                if (retryRes.data) {
+                  const serverTicket = dbToTicket(retryRes.data);
+                  const idx = this.tickets.findIndex(t => t.id === created.id);
+                  if (idx !== -1) {
+                    this.tickets[idx] = { ...this.tickets[idx], ...serverTicket };
+                    this.saveToLocalStorage();
+                  }
+                  this.broadcastEvent('TICKET_MUTATION', { action: 'CREATE', id: serverTicket.id, requestId: serverTicket.requestId, ticket: this.tickets[idx] || serverTicket });
                 }
-                this.broadcastEvent('TICKET_MUTATION', { action: 'CREATE', id: serverTicket.id, requestId: serverTicket.requestId, ticket: this.tickets[idx] || serverTicket });
+              } catch (retryErr) {
+                console.warn('[TicketService] Sequential retry error:', retryErr);
               }
+            } else {
+              console.warn('[TicketService] Insert will be automatically retried by stranded sync:', created.requestId);
             }
           }
         } catch (e) {

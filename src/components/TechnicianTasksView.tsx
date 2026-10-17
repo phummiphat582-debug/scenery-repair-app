@@ -423,6 +423,31 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
                       {ticket.description}
                     </p>
                   )}
+
+                  {/* Attached Photo Thumbnail (ภาพจุดชำรุดที่ผู้แจ้งแนบมา) */}
+                  {ticket.requestImageUrl && ticket.requestImageUrl !== '-' && ticket.requestImageUrl !== '[ATTACHED]' && (
+                    <div className="mt-2.5">
+                      <a
+                        href={ticket.requestImageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2.5 p-1.5 bg-teal-50/80 border border-teal-200/80 hover:border-teal-400 rounded-xl transition-all max-w-full group"
+                      >
+                        <img
+                          src={ticket.requestImageUrl}
+                          alt="ภาพจุดชำรุด"
+                          className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg shrink-0 border border-teal-200 shadow-2xs"
+                        />
+                        <div className="flex flex-col text-xs text-teal-800 pr-2">
+                          <span className="font-bold flex items-center gap-1 group-hover:underline">
+                            <ImageIcon className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                            รูปที่ผู้แจ้งแนบ
+                          </span>
+                          <span className="text-[10px] text-teal-600/80">แตะเพื่อขยายดูภาพถ่าย</span>
+                        </div>
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 {/* Requester Info */}
@@ -507,7 +532,7 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
                         </div>
                       )}
 
-                      {ticket.resultImageUrl && (
+                      {ticket.resultImageUrl && ticket.resultImageUrl !== '-' && ticket.resultImageUrl !== '[ATTACHED]' && (
                         <div className="pt-1">
                           <span className="block font-bold text-slate-800 mb-1">รูปภาพหลังแก้ไข:</span>
                           <a

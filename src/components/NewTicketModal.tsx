@@ -49,7 +49,7 @@ export const NewTicketModal: React.FC<NewTicketModalProps> = ({
         requesterPhone: requesterPhone.trim(),
         priority,
         status: 'pending',
-        requestImageUrl: requestImageUrl.trim() || '-'
+        requestImageUrl: requestImageUrl.trim() || ''
       });
       onClose();
     } finally {

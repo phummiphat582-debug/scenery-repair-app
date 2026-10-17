@@ -1152,7 +1152,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                           </div>
 
                           {/* Attached Photo Thumbnail */}
-                          {ticket.requestImageUrl && (
+                          {ticket.requestImageUrl && ticket.requestImageUrl !== '-' && ticket.requestImageUrl !== '[ATTACHED]' && (
                             <div className="mt-2.5 flex items-center gap-2">
                               <span className="text-[11px] font-bold text-slate-500">รูปที่แนบ:</span>
                               <a href={ticket.requestImageUrl} target="_blank" rel="noreferrer" className="block">
@@ -1738,7 +1738,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                       </div>
 
                       {/* Attached Photo Thumbnail (for active/pending tickets) */}
-                      {ticket.requestImageUrl && ticket.status !== 'completed' && (
+                      {ticket.requestImageUrl && ticket.requestImageUrl !== '-' && ticket.requestImageUrl !== '[ATTACHED]' && ticket.status !== 'completed' && (
                         <div className="mt-2.5 flex items-center gap-2">
                           <span className="text-[11px] font-bold text-slate-500">รูปที่แนบ:</span>
                           <a href={ticket.requestImageUrl} target="_blank" rel="noreferrer" className="block">
@@ -1884,9 +1884,9 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                         )}
 
                         {/* Before & After Photos */}
-                        {(ticket.requestImageUrl || ticket.resultImageUrl) && (
+                        {((ticket.requestImageUrl && ticket.requestImageUrl !== '-' && ticket.requestImageUrl !== '[ATTACHED]') || (ticket.resultImageUrl && ticket.resultImageUrl !== '-' && ticket.resultImageUrl !== '[ATTACHED]')) && (
                           <div className="flex items-center gap-3 pt-1 flex-wrap">
-                            {ticket.requestImageUrl && (
+                            {ticket.requestImageUrl && ticket.requestImageUrl !== '-' && ticket.requestImageUrl !== '[ATTACHED]' && (
                               <div className="space-y-1">
                                 <div className="text-[10px] font-bold text-slate-500">รูปภาพก่อนซ่อม:</div>
                                 <a href={ticket.requestImageUrl} target="_blank" rel="noreferrer" className="block">
@@ -1898,7 +1898,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                                 </a>
                               </div>
                             )}
-                            {ticket.resultImageUrl && (
+                            {ticket.resultImageUrl && ticket.resultImageUrl !== '-' && ticket.resultImageUrl !== '[ATTACHED]' && (
                               <div className="space-y-1">
                                 <div className="text-[10px] font-bold text-emerald-700">รูปภาพหลังซ่อมเสร็จ:</div>
                                 <a href={ticket.resultImageUrl} target="_blank" rel="noreferrer" className="block">
