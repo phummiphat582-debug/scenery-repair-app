@@ -91,6 +91,7 @@ export interface Ticket {
   diagnosticReason?: string;
   actionSteps?: string;
   extraPhotos?: string[];
+  isReopen?: boolean;
 
   // Computed fields for UI
   queueNumber?: number;

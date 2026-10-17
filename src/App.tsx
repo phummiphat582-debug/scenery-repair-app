@@ -23,6 +23,7 @@ import { PwaInstallPrompt } from './components/PwaInstallPrompt';
 import { TechnicianPushPrompt } from './components/TechnicianPushPrompt';
 import { ticketService } from './services/ticketService';
 import { oneSignalService } from './services/oneSignalService';
+import { playNewTicketChime } from './lib/soundAlert';
 import { Ticket, Department, Technician, NavTab, UserRole } from './types';
 import confetti from 'canvas-confetti';
 import { RotateCw, Trash2 } from 'lucide-react';
@@ -128,9 +129,27 @@ export const App: React.FC = () => {
     };
     window.addEventListener('SCENERY_FOLLOW_UP', handleFollowUpEvent);
 
+    const handleNewTicketEvent = (e: any) => {
+      const ticket = e.detail?.ticket || e.detail;
+      if (!ticket) return;
+      playNewTicketChime();
+      try {
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          navigator.vibrate([200, 100, 200]);
+        }
+      } catch {}
+      const dept = ticket.department ? ` [${ticket.department}]` : '';
+      const title = ticket.title ? ` - ${ticket.title}` : '';
+      const reqId = ticket.requestId ? `#${ticket.requestId}` : '';
+      showToast(`🔔 มีงานแจ้งซ่อมใหม่เข้ามา! ${reqId}${dept}${title}`, 'info');
+      updateStateFromCache();
+    };
+    window.addEventListener('SCENERY_NEW_TICKET', handleNewTicketEvent);
+
     return () => {
       unsubscribe();
       window.removeEventListener('SCENERY_FOLLOW_UP', handleFollowUpEvent);
+      window.removeEventListener('SCENERY_NEW_TICKET', handleNewTicketEvent);
     };
   }, []);
 

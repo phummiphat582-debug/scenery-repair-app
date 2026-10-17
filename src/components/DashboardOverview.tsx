@@ -47,7 +47,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onRefresh
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDivisionFilter, setSelectedDivisionFilter] = useState<string>('84');
+  const [selectedDivisionFilter, setSelectedDivisionFilter] = useState<string>('all');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('active');
   const [selectedZoneFilter, setSelectedZoneFilter] = useState<string>('all');
   const [callConfirmTech, setCallConfirmTech] = useState<{ name: string; phone: string } | null>(null);

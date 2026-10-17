@@ -1,6 +1,6 @@
 import { Ticket, Department, Technician, SortOrder, DivisionId } from '../types';
 import { INITIAL_DEPARTMENTS } from '../data/mockData';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, realtimeSupabase } from '../lib/supabase';
 import { getTicketAgingInfo } from '../lib/ticketAging';
 import { oneSignalService } from './oneSignalService';
 import { savePhotoToIdb, getPhotoFromIdb } from '../lib/photoStorage';
@@ -119,8 +119,12 @@ function ticketToDb(t: Partial<Ticket>, isNewTicket: boolean = false): any {
   if (t.technicianPhone !== undefined) row.technician_phone = t.technicianPhone;
   if (t.repairResult !== undefined) row.repair_result = t.repairResult;
   if (t.remark !== undefined) row.remark = t.remark;
-  if (t.requestImageUrl !== undefined) row.request_image_url = t.requestImageUrl;
-  if (t.resultImageUrl !== undefined) row.result_image_url = t.resultImageUrl;
+  if (t.requestImageUrl !== undefined) {
+    row.request_image_url = t.requestImageUrl && t.requestImageUrl.length > 2500 ? '[ATTACHED]' : t.requestImageUrl;
+  }
+  if (t.resultImageUrl !== undefined) {
+    row.result_image_url = t.resultImageUrl && t.resultImageUrl.length > 2500 ? '[ATTACHED]' : t.resultImageUrl;
+  }
   if (t.createdAt !== undefined) row.created_at = t.createdAt;
   if (t.updatedAt !== undefined) row.updated_at = t.updatedAt;
   if (t.completedAt !== undefined) row.completed_at = t.completedAt;
@@ -218,7 +222,7 @@ class TicketService {
     return Boolean(this.completedRegistry[idOrRequestId]);
   }
 
-  public registerCompleted(ticket: Partial<Ticket>) {
+  public registerCompleted(ticket: Partial<Ticket>, shouldBroadcast: boolean = true) {
     if (!ticket) return;
     const nowIso = new Date().toISOString();
     const completedAt = ticket.completedAt || nowIso;
@@ -236,6 +240,28 @@ class TicketService {
     };
     if (ticket.requestId) this.completedRegistry[ticket.requestId] = record;
     if (ticket.id) this.completedRegistry[ticket.id] = record;
+
+    try {
+      localStorage.setItem(COMPLETED_REGISTRY_KEY, JSON.stringify(this.completedRegistry));
+    } catch {}
+
+    if (shouldBroadcast) {
+      this.broadcastEvent('TICKET_MUTATION', {
+        action: 'REGISTER_COMPLETED',
+        id: ticket.id,
+        requestId: ticket.requestId,
+        ticket: record
+      });
+      try {
+        this.localBroadcastChannel?.postMessage({
+          type: 'TICKET_MUTATION',
+          action: 'REGISTER_COMPLETED',
+          id: ticket.id,
+          requestId: ticket.requestId,
+          ticket: record
+        });
+      } catch {}
+    }
   }
 
   private initLocalData() {
@@ -487,8 +513,33 @@ class TicketService {
       if (typeof BroadcastChannel !== 'undefined') {
         this.localBroadcastChannel = new BroadcastChannel('scenery_local_repair_sync');
         this.localBroadcastChannel.onmessage = (event) => {
-          if (event.data?.type === 'TICKET_MUTATION') {
-            this.reloadFromLocalStorage();
+          const data = event.data;
+          if (data?.type === 'TICKET_MUTATION') {
+            if (data.action === 'CREATE' && data.ticket) {
+              const incoming = data.ticket as Ticket;
+              const exists = this.tickets.some(t => t.id === incoming.id || t.requestId === incoming.requestId);
+              if (!exists) {
+                if (this.isCompleted(incoming.requestId) || this.isCompleted(incoming.id)) {
+                  incoming.status = 'completed';
+                }
+                this.tickets.unshift(incoming);
+                this.saveToLocalStorage();
+                this.notify();
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('SCENERY_NEW_TICKET', { detail: incoming }));
+                }
+              }
+            } else if (data.action === 'REGISTER_COMPLETED') {
+              this.registerCompleted(data.ticket || { id: data.id, requestId: data.requestId }, false);
+              const idx = this.tickets.findIndex(t => t.id === data.id || t.requestId === data.requestId);
+              if (idx !== -1) {
+                this.tickets[idx] = { ...this.tickets[idx], ...(data.ticket || {}), status: 'completed' };
+                this.saveToLocalStorage();
+                this.notify();
+              }
+            } else {
+              this.reloadFromLocalStorage();
+            }
           }
         };
       }
@@ -566,7 +617,7 @@ class TicketService {
   }
 
   private broadcastEvent(event: string, payload: any) {
-    if (this.supabaseChannel && this.isConnectedToCloud) {
+    if (this.supabaseChannel) {
       try {
         let cleanPayload = payload;
         if (payload?.ticket) {
@@ -592,17 +643,15 @@ class TicketService {
   }
 
   private setupSupabaseRealtime() {
-    if (!isSupabaseConfigured || !supabase) return;
-
     if (this.supabaseChannel) {
       try {
-        supabase.removeChannel(this.supabaseChannel);
+        realtimeSupabase.removeChannel(this.supabaseChannel);
       } catch {}
       this.supabaseChannel = null;
     }
 
     try {
-      this.supabaseChannel = supabase
+      this.supabaseChannel = realtimeSupabase
         .channel('scenery_realtime_db_channel', {
           config: {
             broadcast: { self: false }
@@ -612,14 +661,40 @@ class TicketService {
           'broadcast',
           { event: 'TICKET_MUTATION' },
           (payload) => {
-            console.log('⚡ [Realtime Broadcast] Mutation from peer received:', payload);
-            if (payload?.payload?.action === 'FOLLOW_UP' && typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('SCENERY_FOLLOW_UP', { detail: payload.payload }));
+            const data = payload?.payload;
+            if (!data) return;
+            console.log('⚡ [Realtime Broadcast] Mutation from peer received:', data);
+
+            if (data.action === 'FOLLOW_UP' && typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('SCENERY_FOLLOW_UP', { detail: data }));
             }
-            if (payload?.payload?.ticket) {
-              const incoming = payload.payload.ticket;
+
+            if (data.action === 'CREATE' && data.ticket) {
+              const incoming = data.ticket as Ticket;
+              const exists = this.tickets.some(t => t.id === incoming.id || t.requestId === incoming.requestId);
+              if (!exists) {
+                if (this.isCompleted(incoming.requestId) || this.isCompleted(incoming.id)) {
+                  incoming.status = 'completed';
+                }
+                this.tickets.unshift(incoming);
+                this.saveToLocalStorage();
+                this.notify();
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('SCENERY_NEW_TICKET', { detail: incoming }));
+                }
+              }
+            } else if (data.action === 'REGISTER_COMPLETED') {
+              this.registerCompleted(data.ticket || { id: data.id, requestId: data.requestId }, false);
+              const idx = this.tickets.findIndex(t => t.id === data.id || t.requestId === data.requestId);
+              if (idx !== -1) {
+                this.tickets[idx] = { ...this.tickets[idx], ...(data.ticket || {}), status: 'completed' };
+                this.saveToLocalStorage();
+                this.notify();
+              }
+            } else if (data.ticket) {
+              const incoming = data.ticket as Ticket;
               if (incoming.status === 'completed') {
-                this.registerCompleted(incoming);
+                this.registerCompleted(incoming, false);
               }
               const idx = this.tickets.findIndex(t => t.id === incoming.id || t.requestId === incoming.requestId);
               if (idx !== -1) {
@@ -645,7 +720,7 @@ class TicketService {
                 this.notify();
               }
             }
-            void this.syncFromServer();
+            void this.scheduleSyncFromServer(3000);
           }
         )
         .on(
@@ -836,7 +911,7 @@ class TicketService {
           const [ticketsRes, techsRes, deptsRes] = await Promise.all([
             supabase
               .from('repair_tickets')
-              .select('*')
+              .select('id, request_id, title, description, department, location, requester_name, requester_phone, priority, status, technician_name, technician_phone, repair_result, remark, division, created_at, updated_at, completed_at, diagnostic_reason, action_steps, parts')
               .order('created_at', { ascending: false }),
             supabase
               .from('technicians')
@@ -1368,7 +1443,38 @@ class TicketService {
     this.saveToLocalStorage();
     this.notify();
 
-    // 2. Persist to Supabase Central Cloud in background without blocking UI
+    // 2. Cross-tab local broadcast immediately
+    if (this.localBroadcastChannel) {
+      try {
+        this.localBroadcastChannel.postMessage({
+          type: 'TICKET_MUTATION',
+          action: 'CREATE',
+          id: created.id,
+          requestId: created.requestId,
+          ticket: created
+        });
+      } catch {}
+    }
+
+    // 3. Realtime Supabase broadcast to all connected devices immediately!
+    this.broadcastEvent('TICKET_MUTATION', {
+      action: 'CREATE',
+      id: created.id,
+      requestId: created.requestId,
+      ticket: created
+    });
+
+    // 4. Trigger alert chime/toast if on same window
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new CustomEvent('SCENERY_NEW_TICKET', { detail: created }));
+      } catch {}
+    }
+
+    // 5. Notify technicians via OneSignal Web Push Function
+    void oneSignalService.notifyTechnicians(created);
+
+    // 6. Persist to Supabase Central Cloud in background without blocking UI
     if (isSupabaseConfigured && supabase) {
       void (async () => {
         try {
@@ -1385,7 +1491,7 @@ class TicketService {
               this.tickets[idx] = { ...this.tickets[idx], ...serverTicket };
               this.saveToLocalStorage();
             }
-            this.broadcastEvent('TICKET_MUTATION', { action: 'CREATE', id: serverTicket.id, requestId: serverTicket.requestId });
+            this.broadcastEvent('TICKET_MUTATION', { action: 'CREATE', id: serverTicket.id, requestId: serverTicket.requestId, ticket: this.tickets[idx] || serverTicket });
           } else if (error) {
             console.warn('[TicketService] Supabase insert error:', error.message);
             if (error.code === '23505') {
@@ -1400,7 +1506,7 @@ class TicketService {
                   this.tickets[idx] = { ...this.tickets[idx], ...serverTicket };
                   this.saveToLocalStorage();
                 }
-                this.broadcastEvent('TICKET_MUTATION', { action: 'CREATE', id: serverTicket.id, requestId: serverTicket.requestId });
+                this.broadcastEvent('TICKET_MUTATION', { action: 'CREATE', id: serverTicket.id, requestId: serverTicket.requestId, ticket: this.tickets[idx] || serverTicket });
               }
             }
           }
