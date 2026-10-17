@@ -60,7 +60,7 @@ export const DivisionFilterTabs: React.FC<DivisionFilterTabsProps> = ({
             }`}
           >
             <span className="text-sm shrink-0">{div.id === '84' ? '🛠️' : div.id === '85' ? '🏗️' : '🎨'}</span>
-            <span>{div.name}</span>
+            <span>{div.shortName || div.name.replace(/\s*(84|85|86)\s*/g, '').trim()}</span>
             <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
               isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
             }`}>

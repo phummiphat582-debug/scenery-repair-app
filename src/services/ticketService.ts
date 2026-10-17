@@ -399,29 +399,51 @@ class TicketService {
   }
 
   /**
-   * Safely salvages any user tickets from previous local storage keys without resurrecting old mock demo data
+   * Safely salvages any user tickets from all local storage keys without resurrecting old mock demo data
    */
-  private harvestLegacyTickets() {
-    const legacyKeys = ['scenery_repair_v4_tickets', 'scenery_repair_v3_tickets', 'scenery_repair_v2_tickets', 'scenery_repair_tickets'];
+  public harvestLegacyTickets(): { harvestedCount: number; harvestedList: Ticket[] } {
+    const legacyKeys = new Set([
+      'scenery_repair_v4_tickets',
+      'scenery_repair_v3_tickets',
+      'scenery_repair_v2_tickets',
+      'scenery_repair_tickets',
+      'offline_tickets',
+      'repair_tickets'
+    ]);
+    
+    // Also discover any key in localStorage containing array of tickets
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.includes('ticket') || k.includes('repair'))) {
+            legacyKeys.add(k);
+          }
+        }
+      } catch {}
+    }
+
     let harvestedCount = 0;
     const harvestedList: Ticket[] = [];
 
     legacyKeys.forEach(key => {
+      if (key === LOCAL_STORAGE_TICKETS) return; // skip current active key
       try {
         const raw = localStorage.getItem(key);
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) {
             parsed.forEach((item: any) => {
-              if (!item || !item.requestId) return;
+              if (!item || (!item.requestId && !item.id)) return;
               // Ignore legacy demo tickets from early September (e.g. t-1 to t-23 with REP-202609-)
               const isDemo = item.id?.startsWith('t-') && item.requestId?.startsWith('REP-202609-');
               if (isDemo) return;
 
-              const exists = this.tickets.some(t => t.id === item.id || t.requestId === item.requestId);
+              const reqId = item.requestId || item.id;
+              const exists = this.tickets.some(t => t.id === item.id || t.requestId === reqId);
               if (!exists) {
                 if (
-                  this.isCompleted(item.requestId) ||
+                  this.isCompleted(reqId) ||
                   this.isCompleted(item.id) ||
                   item.completedAt ||
                   item.status === 'completed' ||
@@ -430,6 +452,9 @@ class TicketService {
                   item.status = 'completed';
                   if (!item.completedAt) item.completedAt = new Date().toISOString();
                   this.registerCompleted(item);
+                }
+                if (item.department) {
+                  item.department = formatDepartmentName(item.department);
                 }
                 this.tickets.push(item);
                 harvestedList.push(item);
@@ -452,6 +477,33 @@ class TicketService {
         void this.uploadStrandedTicketToCloud(t);
       });
     }
+
+    return { harvestedCount, harvestedList };
+  }
+
+  /**
+   * Public one-click Sync & Restore method:
+   * Harvests stranded tickets from local storage, pushes them to Supabase, and forces server pull
+   */
+  public async salvageAndSyncAll(): Promise<{ found: number; synced: number; total: number }> {
+    const { harvestedCount, harvestedList } = this.harvestLegacyTickets();
+    
+    // Also re-check all tickets in memory: if any ticket is offline-only, upload it
+    for (const t of this.tickets) {
+      if (t.id?.startsWith('offline_') || t.requestId?.startsWith('OFF-')) {
+        void this.uploadStrandedTicketToCloud(t);
+      }
+    }
+
+    // Force full server sync
+    await this.syncFromServer();
+    this.saveToLocalStorage();
+
+    return {
+      found: harvestedCount,
+      synced: harvestedList.length,
+      total: this.tickets.length
+    };
   }
 
   private async hydratePhotosFromIdb() {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Ticket } from '../types';
+import { formatTicketTitle } from '../lib/departmentUtils';
 
 interface PartsModalProps {
   isOpen: boolean;
@@ -39,7 +40,7 @@ export const PartsModal: React.FC<PartsModalProps> = ({ isOpen, onClose, ticket 
           <div>
             <label className="font-label-sm text-label-sm text-on-surface-variant">สำหรับใบงาน</label>
             <div className="p-2 rounded-lg bg-surface-container-low text-xs font-bold text-primary">
-              {ticket ? `#${ticket.requestId}: ${ticket.title}` : 'ระบุใบงานทั่วไป (ศูนย์ซ่อมบำรุง)'}
+              {ticket ? `#${ticket.requestId}: ${formatTicketTitle(ticket.title)}` : 'ระบุใบงานทั่วไป (ศูนย์ซ่อมบำรุง)'}
             </div>
           </div>
 

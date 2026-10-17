@@ -3,7 +3,7 @@ import { X, Wrench, Clock, MapPin, User, CheckCircle, AlertTriangle, Send } from
 import { Ticket, Technician, TicketStatus, Priority, DivisionId } from '../types';
 import { DIVISION_LIST } from '../data/divisionData';
 import { DivisionBadge } from './DivisionBadge';
-import { formatDepartmentName } from '../lib/departmentUtils';
+import { formatDepartmentName, formatTicketTitle } from '../lib/departmentUtils';
 
 interface EditTicketModalProps {
   ticket: Ticket | null;
@@ -92,7 +92,7 @@ export const EditTicketModal: React.FC<EditTicketModalProps> = ({
 
         {/* Ticket Summary Box */}
         <div className="bg-slate-50 border-b border-slate-200 p-5 space-y-2 text-xs text-slate-700">
-          <div className="font-bold text-sm text-slate-900">{ticket.title}</div>
+          <div className="font-bold text-sm text-slate-900">{formatTicketTitle(ticket.title)}</div>
           <div className="grid grid-cols-2 gap-2 text-slate-600">
             <div>📍 <strong>สถานที่:</strong> {ticket.location}</div>
             <div>👤 <strong>ผู้แจ้ง:</strong> {ticket.requesterName}</div>

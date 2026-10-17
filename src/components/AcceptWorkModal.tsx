@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Ticket, Technician } from '../types';
 import { Wrench, X, Check, Phone, User, AlertCircle, Sparkles, Building2, MapPin } from 'lucide-react';
-import { formatDepartmentName } from '../lib/departmentUtils';
+import { formatDepartmentName, formatTicketTitle } from '../lib/departmentUtils';
 
 interface AcceptWorkModalProps {
   isOpen: boolean;
@@ -146,7 +146,7 @@ export const AcceptWorkModal: React.FC<AcceptWorkModalProps> = ({
             </div>
 
             <h4 className="font-bold text-sm sm:text-base text-on-surface leading-snug">
-              {ticket.title}
+              {formatTicketTitle(ticket.title)}
             </h4>
 
             <div className="flex items-center gap-2 text-xs text-on-surface-variant flex-wrap pt-1 border-t border-slate-200/60">

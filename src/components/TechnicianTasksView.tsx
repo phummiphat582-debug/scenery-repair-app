@@ -5,7 +5,7 @@ import { AcceptWorkModal } from './AcceptWorkModal';
 import { CompleteWorkModal } from './CompleteWorkModal';
 import { Phone, CheckCircle2, Clock, Wrench, AlertTriangle, AlertCircle, Eye, Check, ChevronRight, Package, RefreshCw, MapPin, Image as ImageIcon } from 'lucide-react';
 import { getTicketAgingInfo } from '../lib/ticketAging';
-import { formatDepartmentName, isSameDepartment } from '../lib/departmentUtils';
+import { formatDepartmentName, isSameDepartment, formatTicketTitle } from '../lib/departmentUtils';
 
 interface TechnicianTasksViewProps {
   tickets: Ticket[];
@@ -412,7 +412,7 @@ export const TechnicianTasksView: React.FC<TechnicianTasksViewProps> = ({
                 {/* Title & Location */}
                 <div className="pl-1.5">
                   <h2 className="font-bold text-sm sm:text-base text-on-surface leading-tight">
-                    {ticket.title}
+                    {formatTicketTitle(ticket.title)}
                   </h2>
                   <div className="flex items-center gap-1.5 text-on-surface-variant text-xs mt-1">
                     <MapPin className="w-4 h-4 text-primary shrink-0" />

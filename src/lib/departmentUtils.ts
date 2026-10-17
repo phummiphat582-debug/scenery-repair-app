@@ -5,11 +5,23 @@
  */
 
 /**
- * Strips code prefix from department name (e.g. "0 ฟร้อน" -> "ฟร้อน", "H13 หอพักพนักงาน" -> "หอพักพนักงาน")
+ * Strips code prefix from department name (e.g. "0 ฟร้อน" -> "ฟร้อน", "H13 หอพักพนักงาน" -> "หอพักพนักงาน", "all" -> "ทุกแผนก")
  */
 export function formatDepartmentName(name?: string): string {
   if (!name) return '';
+  if (name.toLowerCase() === 'all') return 'ทุกแผนก';
   return name.replace(/^(H\d+|\d+)\s+/, '').trim();
+}
+
+/**
+ * Strips division code prefixes from ticket titles (e.g. "ซ่อมบำรุง 84: หน้าเกมส์" -> "หน้าเกมส์", "[DIV:84] แอร์เสีย" -> "แอร์เสีย")
+ */
+export function formatTicketTitle(title?: string): string {
+  if (!title) return '';
+  return title
+    .replace(/^(?:ซ่อมบำรุง|งานก่อสร้าง|งานศิลป์)\s*(?:84|85|86):?\s*/i, '')
+    .replace(/^\[DIV:(?:84|85|86)\]\s*/i, '')
+    .trim() || title;
 }
 
 /**

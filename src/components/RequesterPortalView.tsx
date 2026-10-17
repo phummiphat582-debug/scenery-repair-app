@@ -6,12 +6,12 @@ import { ConfirmModal } from './ConfirmModal';
 import { RoleLoginModal } from './RoleLoginModal';
 import { Toast } from './Toast';
 import { ticketService } from '../services/ticketService';
-import { Phone, Search, Wrench, Clock, CheckCircle2, ChevronRight, User, MapPin, Plus, Shield, CalendarCheck, AlertTriangle, ListOrdered, ClipboardList, ArrowRightLeft, X, Building2, Sparkles, Filter, Bell, BarChart2 } from 'lucide-react';
+import { Phone, Search, Wrench, Clock, CheckCircle2, ChevronRight, User, MapPin, Plus, Shield, CalendarCheck, AlertTriangle, ListOrdered, ClipboardList, ArrowRightLeft, X, Building2, Sparkles, Filter, Bell, BarChart2, RefreshCw } from 'lucide-react';
 import { DivisionBadge } from './DivisionBadge';
 import { DivisionFilterTabs } from './DivisionFilterTabs';
 import { RepairSummaryView } from './RepairSummaryView';
 import { getTicketAgingInfo } from '../lib/ticketAging';
-import { formatDepartmentName, isSameDepartment } from '../lib/departmentUtils';
+import { formatDepartmentName, isSameDepartment, formatTicketTitle } from '../lib/departmentUtils';
 
 interface RequesterPortalViewProps {
   tickets: Ticket[];
@@ -48,9 +48,27 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
   const [followingUpIds, setFollowingUpIds] = useState<Set<string>>(new Set());
   const [toastMessage, setToastMessage] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     setToastMessage({ message, type });
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleSalvageAndSync = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await ticketService.salvageAndSyncAll();
+      onDataChanged?.();
+      showToast(
+        `✅ ซิงค์ใบงานสำเร็จ! ข้อมูลทั้งหมด ${res.total} ใบงาน (กู้คืนใหม่ ${res.found} รายการ)`,
+        'success'
+      );
+    } catch (err) {
+      showToast('⚠️ การซิงค์ขัดข้อง กรุณาตรวจสอบสัญญาณอินเทอร์เน็ต', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleFollowUp = async (ticket: Ticket) => {
@@ -361,15 +379,28 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleOpenDutyModal}
-            className="px-3 py-1.5 bg-surface-container hover:bg-surface-container-high text-primary rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
-            title="สำหรับช่างเช็คชื่อเข้าเวรหรืออัปเดตเบอร์โทร (ต้องใช้รหัส 1234)"
-          >
-            <CalendarCheck className="w-3.5 h-3.5 text-primary" />
-            <span>ช่างอัปเดตเวร/เข้างาน 🔒</span>
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleSalvageAndSync}
+              disabled={isSyncing}
+              className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
+              title="กดเพื่อดึงใบงานล่าสุดจากฐานข้อมูลส่วนกลาง และกู้คืนใบงานที่อาจตกค้างในเครื่องนี้"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-primary ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'กำลังดึงข้อมูล...' : '🔄 ดึง/กู้คืนใบงาน'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenDutyModal}
+              className="px-3 py-1.5 bg-surface-container hover:bg-surface-container-high text-primary rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
+              title="สำหรับช่างเช็คชื่อเข้าเวรหรืออัปเดตเบอร์โทร (ต้องใช้รหัส 1234)"
+            >
+              <CalendarCheck className="w-3.5 h-3.5 text-primary" />
+              <span>ช่างอัปเดตเวร/เข้างาน 🔒</span>
+            </button>
+          </div>
         </div>
 
         {/* Technicians Grid */}
@@ -451,7 +482,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
           }`}
         >
           <ListOrdered className="w-4 h-4" />
-          <span>{myDepartment && myDepartment !== 'all' ? `คิวงาน ${myDepartment}` : 'คิวงาน'}</span>
+          <span>{myDepartment && myDepartment !== 'all' ? `คิวงาน ${formatDepartmentName(myDepartment)}` : 'คิวงาน'}</span>
           <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
             activeSubTab === 'queue' ? 'bg-white text-primary' : 'bg-surface-container-highest text-on-surface'
           }`}>
@@ -469,7 +500,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
           }`}
         >
           <Clock className="w-4 h-4" />
-          <span>{myDepartment && myDepartment !== 'all' ? `งานแผนก ${myDepartment}` : 'งานทั้งหมด'}</span>
+          <span>{myDepartment && myDepartment !== 'all' ? `งานแผนก ${formatDepartmentName(myDepartment)}` : 'งานทั้งหมด'}</span>
           <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
             activeSubTab === 'track' ? 'bg-white text-primary' : 'bg-surface-container-highest text-on-surface'
           }`}>
@@ -546,7 +577,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                     className="text-xs text-primary hover:underline font-bold cursor-pointer inline-flex items-center gap-1 mt-1"
                   >
                     <X className="w-3.5 h-3.5" />
-                    <span>ยกเลิก (คงไว้ที่ "{myDepartment}")</span>
+                    <span>ยกเลิก (คงไว้ที่ "{formatDepartmentName(myDepartment)}")</span>
                   </button>
                 )}
               </div>
@@ -687,7 +718,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                   }`}
                 >
                   <span className="text-sm">📌</span>
-                  <span className="truncate">คิวเฉพาะแผนก {!isAllDepts ? `(${myDepartment})` : ''}</span>
+                  <span className="truncate">คิวเฉพาะแผนก {!isAllDepts ? `(${formatDepartmentName(myDepartment)})` : ''}</span>
                   {!isAllDepts && (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-white/20 text-white">
                       {myDeptActiveTickets.length}
@@ -700,7 +731,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                 <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-3 text-xs text-amber-900 flex-wrap">
                   <div className="flex items-center gap-2">
                     <span className="text-base">💡</span>
-                    <span>แผนก "{myDepartment}" ไม่มีงานค้างในคิว แต่ทั่วทั้งฟาร์มมีงานรอซ่อม <strong>{allActiveTickets.length} รายการ</strong></span>
+                    <span>แผนก "{formatDepartmentName(myDepartment)}" ไม่มีงานค้างในคิว แต่ทั่วทั้งฟาร์มมีงานรอซ่อม <strong>{allActiveTickets.length} รายการ</strong></span>
                   </div>
                   <button
                     type="button"
@@ -912,7 +943,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                     <div className="flex items-center justify-between gap-2 text-xs font-bold text-teal-900 flex-wrap">
                       <span className="flex items-center gap-1.5">
                         <Sparkles className="w-4 h-4 text-teal-600" />
-                        สถานะคิวงานของคุณ ({isAllDepts ? 'ทุกแผนก' : `แผนก ${myDepartment}`}): {userActiveTicketsInDept.length} รายการ
+                        สถานะคิวงานของคุณ ({isAllDepts ? 'ทุกแผนก' : `แผนก ${formatDepartmentName(myDepartment)}`}): {userActiveTicketsInDept.length} รายการ
                       </span>
                       <span className="text-[11px] text-teal-700 font-medium">
                         งานคอยซ่อมทั้งหมด {myDeptActiveTickets.length} คิว
@@ -930,8 +961,8 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                             className="p-3 bg-white rounded-xl border border-teal-200/90 shadow-2xs flex flex-col gap-1.5 hover:border-teal-400 transition-colors"
                           >
                             <div className="flex items-center justify-between gap-1">
-                              <span className="font-bold text-xs text-on-surface truncate" title={ticket.title}>
-                                {ticket.title}
+                              <span className="font-bold text-xs text-on-surface truncate" title={formatTicketTitle(ticket.title)}>
+                                {formatTicketTitle(ticket.title)}
                               </span>
                               <span className="font-mono text-[10px] font-bold text-primary bg-primary-fixed/40 px-1.5 py-0.5 rounded">
                                 #{ticket.requestId}
@@ -988,7 +1019,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                   <span className="text-sm font-semibold">
                     {filterMyTicketsOnly 
                       ? `ไม่พบงานแจ้งซ่อมที่รอคิวของ "${activeRequesterName}" ในแผนกนี้`
-                      : `แผนก "${myDepartment}" ยังไม่มีงานค้างในคิว`}
+                      : `แผนก "${formatDepartmentName(myDepartment)}" ยังไม่มีงานค้างในคิว`}
                   </span>
                   <p className="text-xs text-slate-400 max-w-sm">
                     {filterMyTicketsOnly 
@@ -1133,7 +1164,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                         {/* Middle Row: Title and Location */}
                         <div>
                           <h3 className="font-bold text-sm sm:text-base text-on-surface">
-                            {ticket.title}
+                            {formatTicketTitle(ticket.title)}
                           </h3>
                           {ticket.description && (
                             <p className="text-xs text-on-surface-variant mt-1 line-clamp-2">
@@ -1303,7 +1334,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                     className="text-xs text-primary hover:underline font-bold cursor-pointer inline-flex items-center gap-1 mt-1"
                   >
                     <X className="w-3.5 h-3.5" />
-                    <span>ยกเลิก (คงไว้ที่ "{myDepartment}")</span>
+                    <span>ยกเลิก (คงไว้ที่ "{formatDepartmentName(myDepartment)}")</span>
                   </button>
                 )}
               </div>
@@ -1420,7 +1451,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                   </div>
                   <div className="min-w-0">
                     <h2 className="font-extrabold text-sm sm:text-base text-on-surface truncate">
-                      {isAllDepts ? 'งานแจ้งซ่อมของ "ทุกแผนก (ทั้งหมด)"' : `งานแจ้งซ่อมของ "${myDepartment}"`}
+                      {isAllDepts ? 'งานแจ้งซ่อมของ "ทุกแผนก (ทั้งหมด)"' : `งานแจ้งซ่อมของ "${formatDepartmentName(myDepartment)}"`}
                     </h2>
                     <p className="text-[11px] text-on-surface-variant">
                       {isAllDepts
@@ -1583,12 +1614,12 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                   <span className="text-sm font-semibold">
                     {filterMyTicketsOnly
                       ? `ไม่พบงานแจ้งซ่อมของ "${activeRequesterName}" ในหมวดนี้`
-                      : `ยังไม่มีรายการแจ้งซ่อมของ "${myDepartment}" ${filterStatus === 'completed' ? 'ที่เสร็จสิ้น' : 'ในหมวดนี้'}`}
+                      : `ยังไม่มีรายการแจ้งซ่อมของ "${formatDepartmentName(myDepartment)}" ${filterStatus === 'completed' ? 'ที่เสร็จสิ้น' : 'ในหมวดนี้'}`}
                   </span>
                   <p className="text-xs text-slate-400 max-w-sm">
                     {filterMyTicketsOnly
                       ? 'คุณสามารถกดปิดตัวกรองงานของฉัน เพื่อดูรายการทั้งหมดของแผนก'
-                      : `เมื่อแผนก ${myDepartment} ส่งใบแจ้งซ่อม รายการจะแสดงสถานะ คิวงาน และชื่อช่างผู้รับผิดชอบตรงนี้`}
+                      : `เมื่อแผนก ${formatDepartmentName(myDepartment)} ส่งใบแจ้งซ่อม รายการจะแสดงสถานะ คิวงาน และชื่อช่างผู้รับผิดชอบตรงนี้`}
                   </p>
                   <div className="flex items-center gap-2 mt-2 flex-wrap justify-center">
                     {myDepartment !== 'all' && (
@@ -1719,7 +1750,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                     {/* Middle Row: Title and Location */}
                     <div>
                       <h3 className="font-bold text-sm sm:text-base text-on-surface">
-                        {ticket.title}
+                        {formatTicketTitle(ticket.title)}
                       </h3>
                       {ticket.description && (
                         <p className="text-xs text-on-surface-variant mt-1 line-clamp-2">

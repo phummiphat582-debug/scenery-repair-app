@@ -5,7 +5,7 @@ import { DivisionBadge } from './DivisionBadge';
 import { DivisionFilterTabs } from './DivisionFilterTabs';
 import { RepairSummaryView } from './RepairSummaryView';
 import { getTicketAgingInfo } from '../lib/ticketAging';
-import { formatDepartmentName } from '../lib/departmentUtils';
+import { formatDepartmentName, formatTicketTitle } from '../lib/departmentUtils';
 import {
   Wrench,
   AlertTriangle,
@@ -197,7 +197,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   </span>
                 </div>
                 <h2 className="font-headline-sm text-headline-sm text-on-error-container font-bold leading-tight">
-                  {emergencyTicket.title}
+                  {formatTicketTitle(emergencyTicket.title)}
                 </h2>
                 <p className="font-body-sm text-body-sm text-on-error-container/85 mt-1 line-clamp-2">
                   แจ้งโดย {emergencyTicket.requesterName} ({formatDepartmentName(emergencyTicket.department)}) • {emergencyTicket.description}
@@ -482,7 +482,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                       </div>
 
                       <h4 className="font-bold text-slate-900 text-xs sm:text-sm mt-1.5 line-clamp-1">
-                        {ticket.title}
+                        {formatTicketTitle(ticket.title)}
                       </h4>
 
                       <div className="flex items-center gap-1 text-[11px] text-slate-500 mt-1 truncate">
@@ -642,7 +642,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
                   {/* Title */}
                   <h4 className="font-headline-sm text-headline-sm text-on-surface font-bold leading-snug">
-                    {ticket.title}
+                    {formatTicketTitle(ticket.title)}
                   </h4>
 
                   {/* Part info alert box if waiting parts */}

@@ -4,7 +4,7 @@ import { Phone, CheckCircle2, Clock, Wrench, AlertTriangle, ChevronRight, Eye, T
 import { ConfirmModal } from './ConfirmModal';
 import { DivisionBadge } from './DivisionBadge';
 import { getTicketAgingInfo } from '../lib/ticketAging';
-import { formatDepartmentName } from '../lib/departmentUtils';
+import { formatDepartmentName, formatTicketTitle } from '../lib/departmentUtils';
 
 interface QueueTableViewProps {
   tickets: Ticket[];
@@ -192,14 +192,14 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                         <DivisionBadge division={ticket.division} size="sm" />
-                        {ticket.category && (
+                        {ticket.category && !ticket.category.includes('84') && !ticket.category.includes('85') && !ticket.category.includes('86') && (
                           <span className="px-2 py-0.5 rounded-md bg-primary-fixed/40 text-primary font-bold text-[10px]">
                             {ticket.category}
                           </span>
                         )}
                       </div>
                       <div className="font-bold text-on-surface text-xs line-clamp-1 group-hover:text-primary transition-colors">
-                        {ticket.title}
+                        {formatTicketTitle(ticket.title)}
                       </div>
                       <div className="text-[11px] text-on-surface-variant line-clamp-1 mt-0.5">
                         {ticket.description || 'ไม่มีรายละเอียดเพิ่มเติม'}

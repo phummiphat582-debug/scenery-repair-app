@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Ticket, PartItem, Technician } from '../types';
 import { compressImage } from '../lib/imageCompress';
 import { ticketService } from '../services/ticketService';
-import { formatDepartmentName } from '../lib/departmentUtils';
+import { formatDepartmentName, formatTicketTitle } from '../lib/departmentUtils';
 import { 
   CheckCircle2, 
   X, 
@@ -320,7 +320,7 @@ export const CompleteWorkModal: React.FC<CompleteWorkModalProps> = ({
             </div>
 
             <h4 className="font-bold text-sm text-on-surface">
-              {ticket.title}
+              {formatTicketTitle(ticket.title)}
             </h4>
 
             <div className="flex items-center gap-2 text-xs text-on-surface-variant flex-wrap pt-1 border-t border-slate-200/60">

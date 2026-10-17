@@ -33,7 +33,7 @@ export const DivisionBadge: React.FC<DivisionBadgeProps> = ({
           {info.id === '84' ? '🛠️' : info.id === '85' ? '🏗️' : '🎨'}
         </span>
       )}
-      <span>{info.name}</span>
+      <span>{info.shortName || info.name.replace(/\s*(84|85|86)\s*/g, '').trim()}</span>
     </span>
   );
 };

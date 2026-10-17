@@ -7,7 +7,7 @@ import { DivisionBadge } from './DivisionBadge';
 import { getDivisionInfo } from '../data/divisionData';
 import { Clock } from 'lucide-react';
 import { getTicketAgingInfo } from '../lib/ticketAging';
-import { formatDepartmentName } from '../lib/departmentUtils';
+import { formatDepartmentName, formatTicketTitle } from '../lib/departmentUtils';
 
 interface TaskDetailsModalProps {
   ticket: Ticket | null;
@@ -255,7 +255,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
             <div>
               <h2 className="font-headline-sm text-headline-sm text-on-surface leading-snug font-bold">
-                {ticket.title}
+                {formatTicketTitle(ticket.title)}
               </h2>
               <div className="flex items-center gap-1.5 text-on-surface-variant mt-1 font-body-sm text-body-sm">
                 <span className="material-symbols-outlined text-[18px] text-secondary">location_on</span>

@@ -3,7 +3,7 @@ import { Clock, MapPin, User, CheckCircle, AlertTriangle, Zap, Wrench, ChevronRi
 import { Ticket, Department } from '../types';
 import { DivisionBadge } from './DivisionBadge';
 import { getTicketAgingInfo } from '../lib/ticketAging';
-import { formatDepartmentName } from '../lib/departmentUtils';
+import { formatDepartmentName, formatTicketTitle } from '../lib/departmentUtils';
 
 interface TicketCardProps {
   ticket: Ticket;
@@ -95,7 +95,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
 
         {/* Title */}
         <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-snug my-1 hover:text-teal-700 transition-colors">
-          {ticket.title}
+          {formatTicketTitle(ticket.title)}
         </h3>
 
         {/* Description snippet if any */}
