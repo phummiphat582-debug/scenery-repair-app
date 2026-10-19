@@ -4,7 +4,7 @@ import { supabase, isSupabaseConfigured, realtimeSupabase } from '../lib/supabas
 import { getTicketAgingInfo } from '../lib/ticketAging';
 import { oneSignalService } from './oneSignalService';
 import { savePhotoToIdb, getPhotoFromIdb } from '../lib/photoStorage';
-import { isSameDepartment, formatDepartmentName, getDepartmentCode } from '../lib/departmentUtils';
+import { isSameDepartment, formatDepartmentName, getDepartmentCode, formatTicketTitle, isMojibake } from '../lib/departmentUtils';
 
 const LOCAL_STORAGE_TICKETS = 'scenery_repair_v5_tickets';
 const LOCAL_STORAGE_DEPTS = 'scenery_repair_v5_departments';
@@ -90,7 +90,7 @@ function dbToTicket(row: any): Ticket {
   return {
     id: String(row.id),
     requestId: row.request_id || row.requestId || String(row.id),
-    title: row.title || '',
+    title: formatTicketTitle(row.title || ''),
     description: row.description || '',
     department: formatDepartmentName(row.department || ''),
     location: row.location || '',
@@ -136,7 +136,7 @@ function ticketToDb(t: Partial<Ticket>, isNewTicket: boolean = false): any {
     row.id = t.id;
   }
   if (t.requestId !== undefined) row.request_id = t.requestId;
-  if (t.title !== undefined) row.title = t.title;
+  if (t.title !== undefined) row.title = formatTicketTitle(t.title);
   if (t.description !== undefined) row.description = t.description;
   if (t.department !== undefined) {
     row.department = formatDepartmentName(t.department) || 'ฟร้อน';
@@ -234,13 +234,28 @@ function dbToTechnician(row: any): Technician {
 }
 
 function dbToDepartment(row: any): Department {
+  let name = formatDepartmentName(row.name);
+  let icon = row.icon || '📌';
+  let description = row.description || '';
+  const code = row.code || getDepartmentCode(row.name);
+
+  // If corrupted with Mojibake, recover clean details from INITIAL_DEPARTMENTS
+  if (isMojibake(name) || isMojibake(icon) || isMojibake(description)) {
+    const fallback = INITIAL_DEPARTMENTS.find(d => d.code === code || isSameDepartment(d.name, name));
+    if (fallback) {
+      name = fallback.name;
+      icon = fallback.icon;
+      description = fallback.description || '';
+    }
+  }
+
   return {
     id: String(row.id),
-    name: formatDepartmentName(row.name),
-    code: row.code || getDepartmentCode(row.name),
-    icon: row.icon || '📌',
+    name,
+    code,
+    icon,
     color: row.color || '#0f766e',
-    description: row.description || ''
+    description
   };
 }
 
@@ -376,7 +391,8 @@ class TicketService {
 
       const savedDepts = localStorage.getItem(LOCAL_STORAGE_DEPTS);
       const parsedDepts = savedDepts ? JSON.parse(savedDepts) : null;
-      if (Array.isArray(parsedDepts) && parsedDepts.some(d => d.code === '0' || d.name?.includes('ฟร้อน'))) {
+      const hasMojibake = Array.isArray(parsedDepts) && parsedDepts.some(d => isMojibake(d.name) || isMojibake(d.description) || isMojibake(d.icon));
+      if (Array.isArray(parsedDepts) && parsedDepts.length >= 20 && !hasMojibake) {
         this.departments = sortDepartments(parsedDepts.map(d => ({
           ...d,
           name: formatDepartmentName(d.name),
@@ -384,6 +400,9 @@ class TicketService {
         })));
       } else {
         this.departments = INITIAL_DEPARTMENTS;
+        try {
+          localStorage.setItem(LOCAL_STORAGE_DEPTS, JSON.stringify(INITIAL_DEPARTMENTS));
+        } catch {}
       }
 
       const savedTechs = localStorage.getItem(LOCAL_STORAGE_TECHS);
@@ -1361,9 +1380,18 @@ class TicketService {
 
           // Process Departments
           if (!dErr && Array.isArray(supaDepts) && supaDepts.length > 0) {
-            const mappedDepts = sortDepartments(supaDepts.map(dbToDepartment));
-            if (JSON.stringify(mappedDepts) !== JSON.stringify(this.departments)) {
-              this.departments = mappedDepts;
+            const cleanDepts = supaDepts
+              .filter(d => !isMojibake(d.name) && !isMojibake(d.description) && !isMojibake(d.icon))
+              .map(dbToDepartment);
+
+            if (cleanDepts.length >= 20) {
+              const mappedDepts = sortDepartments(cleanDepts);
+              if (JSON.stringify(mappedDepts) !== JSON.stringify(this.departments)) {
+                this.departments = mappedDepts;
+                changed = true;
+              }
+            } else if (this.departments.length < 20) {
+              this.departments = INITIAL_DEPARTMENTS;
               changed = true;
             }
           }
@@ -1853,6 +1881,15 @@ class TicketService {
     if (updates.division !== undefined || updates.remark !== undefined) {
       finalUpdates.division = updates.division || existing?.division || '84';
       finalUpdates.remark = updates.remark !== undefined ? updates.remark : (existing?.remark || '');
+    } else if (existing?.division) {
+      finalUpdates.division = existing.division;
+    }
+
+    if (updates.title) {
+      finalUpdates.title = formatTicketTitle(updates.title);
+    }
+    if (updates.department) {
+      finalUpdates.department = formatDepartmentName(updates.department);
     }
 
     if (updates.status === 'completed') {

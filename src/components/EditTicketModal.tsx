@@ -129,7 +129,7 @@ export const EditTicketModal: React.FC<EditTicketModalProps> = ({
                     }`}
                   >
                     <span className="material-symbols-outlined text-[16px]">{d.icon}</span>
-                    <span>{d.name}</span>
+                    <span>{d.shortName || d.name}</span>
                   </button>
                 );
               })}

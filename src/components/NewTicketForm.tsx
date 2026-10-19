@@ -225,9 +225,10 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
 
     const divInfo = getDivisionInfo(selectedDivision);
     const locText = specificLocation.trim() || department || 'พื้นที่ฟาร์ม';
+    const divisionCleanName = divInfo.shortName || divInfo.name.replace(/\s*(84|85|86)\s*/g, '').trim();
 
     const payload = {
-      title: `${divInfo.name}: ${locText}`,
+      title: `${divisionCleanName}: ${locText}`,
       division: selectedDivision,
       department: formatDepartmentName(department.trim()) || departments[0]?.name || 'ฟร้อน',
       location: locText,
@@ -237,7 +238,7 @@ export const NewTicketForm: React.FC<NewTicketFormProps> = ({
       priority,
       status: 'pending',
       requestImageUrl: photos[0]?.url || '',
-      category: divInfo.name
+      category: divisionCleanName
     };
 
     setPendingPayload(payload);

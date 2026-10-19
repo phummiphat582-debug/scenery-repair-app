@@ -946,7 +946,7 @@ export const RepairSummaryView: React.FC<RepairSummaryViewProps> = ({
                       <span className="w-7 h-7 rounded-lg flex items-center justify-center text-sm" style={{ backgroundColor: `${d.color}20` }}>
                         {d.icon}
                       </span>
-                      <span className="truncate">{d.name}</span>
+                      <span className="truncate">{formatDepartmentName(d.name)}</span>
                       {isSelected && (
                         <span className="px-1.5 py-0.2 rounded text-[9px] bg-primary text-white">เลือกอยู่</span>
                       )}
