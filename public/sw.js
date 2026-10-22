@@ -1,4 +1,4 @@
-const CACHE_NAME = 'scenery-repair-pwa-v5';
+const CACHE_NAME = 'scenery-repair-pwa-v6';
 
 // Static assets to pre-cache
 const PRECACHE_ASSETS = [
@@ -52,17 +52,18 @@ self.addEventListener('fetch', (event) => {
 
   // 2. Navigation requests: Network first, fall back to index.html
   if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match('./index.html') || caches.match('/index.html'))
-    );
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(event.request);
+        if (response.ok) {
+          const clone = response.clone();
+          await caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      } catch {
+        return (await caches.match('./index.html')) || (await caches.match('/index.html'));
+      }
+    })());
     return;
   }
 

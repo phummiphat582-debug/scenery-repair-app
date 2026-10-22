@@ -28,6 +28,16 @@ import { Ticket, Department, Technician, NavTab, UserRole } from './types';
 import confetti from 'canvas-confetti';
 import { RotateCw, Trash2 } from 'lucide-react';
 
+const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => (
+  new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error('DATA_LOAD_TIMEOUT')), timeoutMs);
+    promise.then(
+      (value) => { window.clearTimeout(timer); resolve(value); },
+      (error) => { window.clearTimeout(timer); reject(error); }
+    );
+  })
+);
+
 export const App: React.FC = () => {
   // User Role: 'requester' (ผู้แจ้ง) | 'technician' (ช่าง / หลังบ้าน)
   // ต้องยืนยันรหัส PIN 1234 เท่านั้นจึงจะเข้าหน้าช่างได้
@@ -88,15 +98,24 @@ export const App: React.FC = () => {
   const loadData = async () => {
     try {
       const [depts, techs, tix] = await Promise.all([
-        ticketService.getDepartments(),
-        ticketService.getTechnicians(),
-        ticketService.getTickets({ statusFilter: 'all', sortOrder: 'fifo' })
+        withTimeout(ticketService.getDepartments(), 8000),
+        withTimeout(ticketService.getTechnicians(), 8000),
+        withTimeout(ticketService.getTickets({ statusFilter: 'all', sortOrder: 'fifo' }), 8000)
       ]);
       setDepartments(depts);
       setTechnicians(techs);
       setTickets(tix);
     } catch (err: any) {
-      showToast('โหลดข้อมูลไม่สำเร็จ: ' + err.message, 'error');
+      // Do not leave a fresh device stuck on the loading screen when cloud sync is slow/offline.
+      const cached = ticketService.getCachedData();
+      setDepartments(cached.departments);
+      setTechnicians(cached.technicians);
+      setTickets(cached.tickets);
+      if (err?.message === 'DATA_LOAD_TIMEOUT') {
+        showToast('เชื่อมต่อฐานข้อมูลช้า ระบบเปิดโหมด Offline ให้ใช้งานก่อน', 'info');
+      } else {
+        showToast('โหลดข้อมูลไม่สำเร็จ: ' + err.message, 'error');
+      }
     } finally {
       setIsLoading(false);
     }
