@@ -59,7 +59,8 @@ export const App: React.FC = () => {
   const [tickets, setTickets] = useState<Ticket[]>(() => cachedData.tickets);
   const [departments, setDepartments] = useState<Department[]>(() => cachedData.departments);
   const [technicians, setTechnicians] = useState<Technician[]>(() => cachedData.technicians);
-  const [isLoading, setIsLoading] = useState<boolean>(() => cachedData.tickets.length === 0);
+  // Never block screen on fresh load if departments are available
+  const [isLoading, setIsLoading] = useState<boolean>(() => cachedData.departments.length === 0);
 
   // Selected ticket for Detail Modal
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -98,9 +99,9 @@ export const App: React.FC = () => {
   const loadData = async () => {
     try {
       const [depts, techs, tix] = await Promise.all([
-        withTimeout(ticketService.getDepartments(), 8000),
-        withTimeout(ticketService.getTechnicians(), 8000),
-        withTimeout(ticketService.getTickets({ statusFilter: 'all', sortOrder: 'fifo' }), 8000)
+        withTimeout(ticketService.getDepartments(), 15000),
+        withTimeout(ticketService.getTechnicians(), 15000),
+        withTimeout(ticketService.getTickets({ statusFilter: 'all', sortOrder: 'fifo' }), 15000)
       ]);
       setDepartments(depts);
       setTechnicians(techs);
@@ -108,9 +109,9 @@ export const App: React.FC = () => {
     } catch (err: any) {
       // Do not leave a fresh device stuck on the loading screen when cloud sync is slow/offline.
       const cached = ticketService.getCachedData();
-      setDepartments(cached.departments);
-      setTechnicians(cached.technicians);
-      setTickets(cached.tickets);
+      if (cached.departments.length > 0) setDepartments(cached.departments);
+      if (cached.technicians.length > 0) setTechnicians(cached.technicians);
+      if (cached.tickets.length > 0) setTickets(cached.tickets);
       if (err?.message === 'DATA_LOAD_TIMEOUT') {
         showToast('เชื่อมต่อฐานข้อมูลช้า ระบบเปิดโหมด Offline ให้ใช้งานก่อน', 'info');
       } else {

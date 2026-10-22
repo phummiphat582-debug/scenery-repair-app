@@ -219,7 +219,7 @@ export const QueueTableView: React.FC<QueueTableViewProps> = ({
                       {ticket.technicianName ? (
                         <div className="flex items-center gap-2.5">
                           {(() => {
-                            const tech = technicians?.find(t => t.name.toLowerCase() === ticket.technicianName?.toLowerCase());
+                            const tech = technicians?.find(t => (t.name || '').toLowerCase() === (ticket.technicianName || '').toLowerCase());
                             if (tech?.avatarUrl) {
                               return (
                                 <img 

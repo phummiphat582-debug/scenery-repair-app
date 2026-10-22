@@ -103,11 +103,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const match =
-          ticket.requestId.toLowerCase().includes(q) ||
-          ticket.title.toLowerCase().includes(q) ||
-          ticket.location.toLowerCase().includes(q) ||
-          ticket.department.toLowerCase().includes(q) ||
-          formatDepartmentName(ticket.department).toLowerCase().includes(q) ||
+          (ticket.requestId || '').toLowerCase().includes(q) ||
+          (ticket.title || '').toLowerCase().includes(q) ||
+          (ticket.location || '').toLowerCase().includes(q) ||
+          (ticket.department || '').toLowerCase().includes(q) ||
+          (ticket.department ? formatDepartmentName(ticket.department).toLowerCase().includes(q) : false) ||
           (ticket.technicianName && ticket.technicianName.toLowerCase().includes(q));
         if (!match) return false;
       }

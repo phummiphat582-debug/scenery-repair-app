@@ -166,7 +166,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
   const userActiveTicketsInDept = useMemo(() => {
     if (!activeRequesterName) return [];
     const q = activeRequesterName.toLowerCase();
-    return myDeptActiveTickets.filter(t => t.requesterName.trim().toLowerCase().includes(q));
+    return myDeptActiveTickets.filter(t => (t.requesterName || '').trim().toLowerCase().includes(q));
   }, [activeRequesterName, myDeptActiveTickets]);
 
   const myDeptFilteredQueueTickets = useMemo(() => {
@@ -176,7 +176,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       }
       if (filterMyTicketsOnly && activeRequesterName) {
         const q = activeRequesterName.toLowerCase();
-        return t.requesterName.trim().toLowerCase().includes(q);
+        return (t.requesterName || '').trim().toLowerCase().includes(q);
       }
       return true;
     });
@@ -189,6 +189,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
   // Filter tickets for tracking (scoped to department or all departments)
   const filteredTickets = useMemo(() => {
+    const q = (searchQuery || '').toLowerCase();
     return tickets.filter(t => {
       if (!isAllDepts && !isSameDepartment(t.department, myDepartment)) {
         return false;
@@ -198,19 +199,20 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
         return false;
       }
 
-      const matchSearch = 
-        t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.requestId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.requesterName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        formatDepartmentName(t.department).toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (t.department && t.department.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchSearch = !q || (
+        (t.title || '').toLowerCase().includes(q) ||
+        (t.requestId || '').toLowerCase().includes(q) ||
+        (t.location || '').toLowerCase().includes(q) ||
+        (t.requesterName || '').toLowerCase().includes(q) ||
+        (t.department ? formatDepartmentName(t.department).toLowerCase().includes(q) : false) ||
+        (t.department && t.department.toLowerCase().includes(q))
+      );
 
       if (!matchSearch) return false;
 
       if (filterMyTicketsOnly && activeRequesterName) {
-        const q = activeRequesterName.toLowerCase();
-        if (!t.requesterName.trim().toLowerCase().includes(q)) return false;
+        const rq = activeRequesterName.toLowerCase();
+        if (!(t.requesterName || '').trim().toLowerCase().includes(rq)) return false;
       }
 
       if (filterStatus === 'all') {

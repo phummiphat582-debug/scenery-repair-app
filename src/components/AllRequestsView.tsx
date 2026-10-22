@@ -99,10 +99,10 @@ export const AllRequestsView: React.FC<AllRequestsViewProps> = ({
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(t => 
-        t.requestId.toLowerCase().includes(q) ||
-        t.title.toLowerCase().includes(q) ||
-        t.location.toLowerCase().includes(q) ||
-        t.requesterName.toLowerCase().includes(q)
+        (t.requestId || '').toLowerCase().includes(q) ||
+        (t.title || '').toLowerCase().includes(q) ||
+        (t.location || '').toLowerCase().includes(q) ||
+        (t.requesterName || '').toLowerCase().includes(q)
       );
     }
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'scenery-repair-pwa-v6';
+const CACHE_NAME = 'scenery-repair-pwa-v7';
 
 // Static assets to pre-cache
 const PRECACHE_ASSETS = [

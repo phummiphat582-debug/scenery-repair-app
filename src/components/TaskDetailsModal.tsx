@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Ticket, Technician, PartItem } from '../types';
 import { ConfirmModal } from './ConfirmModal';
 import { AcceptWorkModal } from './AcceptWorkModal';
@@ -8,6 +8,7 @@ import { getDivisionInfo } from '../data/divisionData';
 import { Clock } from 'lucide-react';
 import { getTicketAgingInfo } from '../lib/ticketAging';
 import { formatDepartmentName, formatTicketTitle } from '../lib/departmentUtils';
+import { ticketService } from '../services/ticketService';
 
 interface TaskDetailsModalProps {
   ticket: Ticket | null;
@@ -109,9 +110,24 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
   const isEmergency = ticket.priority === 'critical' || ticket.priority === 'high';
   const aging = getTicketAgingInfo(ticket);
-  const requestImageUrl = ticket.requestImageUrl && ticket.requestImageUrl !== '-' && ticket.requestImageUrl !== '[ATTACHED]'
+  
+  const [fetchedPhoto, setFetchedPhoto] = useState<string>('');
+
+  useEffect(() => {
+    if (isOpen && ticket) {
+      if (!ticket.requestImageUrl || ticket.requestImageUrl === '-' || ticket.requestImageUrl === '[ATTACHED]') {
+        void ticketService.fetchTicketPhoto(ticket.id || ticket.requestId).then((res) => {
+          if (res.requestImageUrl) setFetchedPhoto(res.requestImageUrl);
+        });
+      } else {
+        setFetchedPhoto('');
+      }
+    }
+  }, [isOpen, ticket?.id, ticket?.requestId]);
+
+  const requestImageUrl = (ticket.requestImageUrl && ticket.requestImageUrl !== '-' && ticket.requestImageUrl !== '[ATTACHED]')
     ? ticket.requestImageUrl
-    : '';
+    : fetchedPhoto;
   const createdAtText = new Date(ticket.createdAt).toLocaleString('th-TH', {
     day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });

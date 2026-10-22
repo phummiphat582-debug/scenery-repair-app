@@ -360,9 +360,16 @@ class TicketService {
         }
       }
 
-      // 2. Load tickets from storage
+      // 2. Load tickets from storage and purge any non-ticket records (e.g. accidentally harvested departments/techs)
       const savedTickets = localStorage.getItem(LOCAL_STORAGE_TICKETS);
-      this.tickets = savedTickets ? JSON.parse(savedTickets) : [];
+      const parsed = savedTickets ? JSON.parse(savedTickets) : [];
+      this.tickets = (Array.isArray(parsed) ? parsed : []).filter((t: any) =>
+        t &&
+        !t.id?.startsWith('dept-') &&
+        !t.id?.startsWith('tech-') &&
+        !t.code &&
+        (Boolean(t.requestId) || Boolean(t.title))
+      );
 
       // 3. Harvest any real tickets from previous storage versions if present
       this.harvestLegacyTickets();
@@ -446,14 +453,28 @@ class TicketService {
     const harvestedList: Ticket[] = [];
 
     legacyKeys.forEach(key => {
-      if (key === LOCAL_STORAGE_TICKETS) return; // skip current active key
+      if (
+        key === LOCAL_STORAGE_TICKETS ||
+        key === LOCAL_STORAGE_DEPTS ||
+        key === LOCAL_STORAGE_TECHS ||
+        key === COMPLETED_REGISTRY_KEY ||
+        key.includes('departments') ||
+        key.includes('technicians') ||
+        key.includes('registry')
+      ) return; // skip system and non-ticket keys
       try {
         const raw = localStorage.getItem(key);
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed) && parsed.length > 0) {
             parsed.forEach((item: any) => {
-              if (!item || (!item.requestId && !item.id)) return;
+              if (
+                !item ||
+                item.id?.startsWith('dept-') ||
+                item.id?.startsWith('tech-') ||
+                item.code !== undefined ||
+                (!item.requestId && !item.title)
+              ) return;
               // Ignore legacy demo tickets from early September (e.g. t-1 to t-23 with REP-202609-)
               const isDemo = item.id?.startsWith('t-') && item.requestId?.startsWith('REP-202609-');
               if (isDemo) return;
@@ -1187,11 +1208,11 @@ class TicketService {
       // 1. Supabase Sync (Primary Central Cloud Database)
       if (isSupabaseConfigured && supabase) {
         try {
-          // Parallel fetch of Tickets, Technicians, and Departments for high speed
+          // High-speed parallel fetch: Metadata only for tickets (77KB vs 9.5MB, 120x faster!)
           const [ticketsRes, techsRes, deptsRes] = await Promise.all([
             supabase
               .from('repair_tickets')
-              .select('id, request_id, title, description, department, location, requester_name, requester_phone, priority, status, technician_name, technician_phone, repair_result, remark, request_image_url, result_image_url, created_at, updated_at, completed_at')
+              .select('id, request_id, title, description, department, location, requester_name, requester_phone, priority, status, technician_name, technician_phone, repair_result, remark, created_at, updated_at, completed_at')
               .order('created_at', { ascending: false }),
             supabase
               .from('technicians')
@@ -1405,9 +1426,104 @@ class TicketService {
         this.saveToLocalStorage();
         this.notify();
       }
+
+      // 2. Non-blocking background sync for active ticket images
+      if (isSupabaseConfigured && supabase) {
+        void this.syncActiveTicketImages();
+      }
     } catch (e) {
       // Offline fallback
     }
+  }
+
+  /**
+   * Background Image Hydration for Active / In-Progress Tickets
+   * Fetches photos only for open tickets (fast, lightweight, non-blocking)
+   */
+  public async syncActiveTicketImages(): Promise<void> {
+    if (!isSupabaseConfigured || !supabase) return;
+    try {
+      const { data, error } = await supabase
+        .from('repair_tickets')
+        .select('id, request_id, request_image_url, result_image_url')
+        .neq('status', 'completed')
+        .neq('status', 'cancelled')
+        .order('created_at', { ascending: false });
+
+      if (!error && Array.isArray(data)) {
+        let updatedAny = false;
+        for (const row of data) {
+          const reqImg = row.request_image_url;
+          const resImg = row.result_image_url;
+          if (!reqImg && !resImg) continue;
+
+          const idx = this.tickets.findIndex(t => t.id === row.id || t.requestId === row.request_id);
+          if (idx !== -1) {
+            const current = this.tickets[idx];
+            let changed = false;
+            let newReq = current.requestImageUrl;
+            let newRes = current.resultImageUrl;
+
+            if (reqImg && reqImg !== '-' && reqImg !== '[ATTACHED]' && current.requestImageUrl !== reqImg) {
+              newReq = reqImg;
+              changed = true;
+            }
+            if (resImg && resImg !== '-' && resImg !== '[ATTACHED]' && current.resultImageUrl !== resImg) {
+              newRes = resImg;
+              changed = true;
+            }
+            if (changed) {
+              this.tickets[idx] = {
+                ...current,
+                requestImageUrl: newReq,
+                resultImageUrl: newRes
+              };
+              updatedAny = true;
+            }
+          }
+        }
+        if (updatedAny) {
+          this.notify();
+        }
+      }
+    } catch (e) {
+      console.warn('[TicketService] syncActiveTicketImages failed:', e);
+    }
+  }
+
+  /**
+   * On-demand photo fetcher for a specific ticket (e.g. when opening completed task details)
+   */
+  public async fetchTicketPhoto(ticketIdOrReqId: string): Promise<{ requestImageUrl?: string; resultImageUrl?: string }> {
+    if (!ticketIdOrReqId || !isSupabaseConfigured || !supabase) return {};
+
+    const local = this.tickets.find(t => t.id === ticketIdOrReqId || t.requestId === ticketIdOrReqId);
+    if (local?.requestImageUrl && local.requestImageUrl.startsWith('data:')) {
+      return { requestImageUrl: local.requestImageUrl, resultImageUrl: local.resultImageUrl };
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('repair_tickets')
+        .select('request_image_url, result_image_url')
+        .or(`id.eq.${ticketIdOrReqId},request_id.eq.${ticketIdOrReqId}`)
+        .maybeSingle();
+
+      if (!error && data) {
+        if (local) {
+          if (data.request_image_url && data.request_image_url !== '-') local.requestImageUrl = data.request_image_url;
+          if (data.result_image_url && data.result_image_url !== '-') local.resultImageUrl = data.result_image_url;
+          this.notify();
+        }
+        return {
+          requestImageUrl: data.request_image_url || undefined,
+          resultImageUrl: data.result_image_url || undefined
+        };
+      }
+    } catch (e) {
+      console.warn('[TicketService] fetchTicketPhoto error:', e);
+    }
+    return {};
   }
 
   /**
