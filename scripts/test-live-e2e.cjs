@@ -118,8 +118,8 @@ const puppeteer = require('puppeteer-core');
 
     // Reload technician page
     console.log('Reloading Technician Backend to verify status is locked as completed...');
-    await techPage.reload({ waitUntil: 'networkidle2' });
-    await new Promise(r => setTimeout(r, 2000));
+    await techPage.reload({ waitUntil: 'domcontentloaded' });
+    await new Promise(r => setTimeout(r, 3000));
 
     const verifyLiveStatus = await techPage.evaluate((reqId) => {
       const stored = localStorage.getItem('scenery_repair_v5_tickets');
