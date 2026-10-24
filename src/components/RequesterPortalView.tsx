@@ -163,6 +163,64 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }, [tickets, myDepartment, isAllDepts]);
 
+  // High-performance single-pass department ticket counters
+  const deptActiveCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of tickets) {
+      if (t.status !== 'completed' && t.status !== 'cancelled' && t.status !== 'waiting_inspect') {
+        const d = t.department || '';
+        map.set(d, (map.get(d) || 0) + 1);
+      }
+    }
+    return map;
+  }, [tickets]);
+
+  const deptTotalCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of tickets) {
+      const d = t.department || '';
+      map.set(d, (map.get(d) || 0) + 1);
+    }
+    return map;
+  }, [tickets]);
+
+  const getDeptActiveCount = (deptName: string): number => {
+    let count = 0;
+    for (const [d, c] of deptActiveCounts.entries()) {
+      if (isSameDepartment(d, deptName)) count += c;
+    }
+    return count;
+  };
+
+  const getDeptTotalCount = (deptName: string): number => {
+    let count = 0;
+    for (const [d, c] of deptTotalCounts.entries()) {
+      if (isSameDepartment(d, deptName)) count += c;
+    }
+    return count;
+  };
+
+  const trackStatusCounts = useMemo(() => {
+    let pending = 0;
+    let in_progress = 0;
+    let completed = 0;
+    let cancelled = 0;
+    for (const t of myDeptTickets) {
+      if (t.status === 'pending' || t.status === 'assigned') pending++;
+      else if (t.status === 'in_progress' || t.status === 'waiting_parts') in_progress++;
+      else if (t.status === 'completed' || t.status === 'waiting_inspect') completed++;
+      else if (t.status === 'cancelled') cancelled++;
+    }
+    return {
+      all: pending + in_progress,
+      pending,
+      in_progress,
+      completed,
+      cancelled,
+      history: myDeptTickets.length
+    };
+  }, [myDeptTickets]);
+
   const userActiveTicketsInDept = useMemo(() => {
     if (!activeRequesterName) return [];
     const q = activeRequesterName.toLowerCase();
@@ -618,9 +676,9 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                           ทุกแผนก (แสดงคิวทั้งหมด)
                         </div>
                         <div className="text-[11px] text-on-surface-variant">
-                          {tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length > 0 ? (
+                          {allActiveTickets.length > 0 ? (
                             <span className="text-amber-600 font-semibold">
-                              {tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length} คิวรวมทั่วฟาร์ม
+                              {allActiveTickets.length} คิวรวมทั่วฟาร์ม
                             </span>
                           ) : (
                             'ไม่มีงานค้าง'
@@ -639,9 +697,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                     d.id.toLowerCase().includes(deptSearchText.toLowerCase())
                   )
                   .map(dept => {
-                    const deptActiveCount = tickets.filter(
-                      t => isSameDepartment(t.department, dept.name) && t.status !== 'completed' && t.status !== 'cancelled'
-                    ).length;
+                    const deptActiveCount = getDeptActiveCount(dept.name);
                     const isSelected = isSameDepartment(dept.name, myDepartment);
 
                     return (
@@ -804,19 +860,17 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                 >
                   <span>🏢</span>
                   <span>ทุกแผนก (ทั้งหมด)</span>
-                  {tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length > 0 && (
+                  {allActiveTickets.length > 0 && (
                     <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
                       myDepartment === 'all' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'
                     }`}>
-                      {tickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length}
+                      {allActiveTickets.length}
                     </span>
                   )}
                 </button>
 
                 {departments.map(dept => {
-                  const deptCount = tickets.filter(
-                    t => isSameDepartment(t.department, dept.name) && t.status !== 'completed' && t.status !== 'cancelled'
-                  ).length;
+                  const deptCount = getDeptActiveCount(dept.name);
                   const isCurrent = isSameDepartment(dept.name, myDepartment);
 
                   return (
@@ -1396,9 +1450,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                     d.id.toLowerCase().includes(deptSearchText.toLowerCase())
                   )
                   .map(dept => {
-                    const deptActiveCount = tickets.filter(
-                      t => isSameDepartment(t.department, dept.name) && t.status !== 'completed' && t.status !== 'cancelled'
-                    ).length;
+                    const deptActiveCount = getDeptActiveCount(dept.name);
                     const isSelected = isSameDepartment(dept.name, myDepartment);
 
                     return (
@@ -1509,7 +1561,7 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
                 </button>
 
                 {departments.map(dept => {
-                  const deptCount = tickets.filter(t => isSameDepartment(t.department, dept.name)).length;
+                  const deptCount = getDeptTotalCount(dept.name);
                   const isCurrent = isSameDepartment(dept.name, myDepartment);
 
                   return (
@@ -1561,12 +1613,12 @@ export const RequesterPortalView: React.FC<RequesterPortalViewProps> = ({
 
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
                   {[
-                    { id: 'all', label: 'งานทั้งหมด', count: myDeptTickets.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length },
-                    { id: 'pending', label: 'รอรับงาน', count: myDeptTickets.filter(t => t.status === 'pending' || t.status === 'assigned').length },
-                    { id: 'in_progress', label: 'กำลังซ่อม', count: myDeptTickets.filter(t => t.status === 'in_progress' || t.status === 'waiting_parts').length },
-                    { id: 'completed', label: '✅ หมวดงานที่เสร็จ', count: myDeptTickets.filter(t => t.status === 'completed' || t.status === 'waiting_inspect').length },
-                    { id: 'cancelled', label: 'ยกเลิก', count: myDeptTickets.filter(t => t.status === 'cancelled').length },
-                    { id: 'history', label: '📋 ประวัติรวมทั้งหมด', count: myDeptTickets.length },
+                    { id: 'all', label: 'งานทั้งหมด', count: trackStatusCounts.all },
+                    { id: 'pending', label: 'รอรับงาน', count: trackStatusCounts.pending },
+                    { id: 'in_progress', label: 'กำลังซ่อม', count: trackStatusCounts.in_progress },
+                    { id: 'completed', label: '✅ หมวดงานที่เสร็จ', count: trackStatusCounts.completed },
+                    { id: 'cancelled', label: 'ยกเลิก', count: trackStatusCounts.cancelled },
+                    { id: 'history', label: '📋 ประวัติรวมทั้งหมด', count: trackStatusCounts.history },
                   ].map(f => (
                     <button
                       key={f.id}

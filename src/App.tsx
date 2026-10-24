@@ -125,9 +125,29 @@ export const App: React.FC = () => {
   const updateStateFromCache = () => {
     try {
       const cached = ticketService.getCachedData();
-      if (cached.departments.length > 0) setDepartments(cached.departments);
-      if (cached.technicians.length > 0) setTechnicians(cached.technicians);
-      setTickets(cached.tickets);
+      setTickets(prev => {
+        if (prev === cached.tickets) return prev;
+        if (
+          prev.length === cached.tickets.length &&
+          prev[0]?.id === cached.tickets[0]?.id &&
+          prev[0]?.updatedAt === cached.tickets[0]?.updatedAt
+        ) {
+          return prev;
+        }
+        return cached.tickets;
+      });
+      setDepartments(prev => {
+        if (prev === cached.departments || (prev.length === cached.departments.length && prev[0]?.id === cached.departments[0]?.id)) {
+          return prev;
+        }
+        return cached.departments.length > 0 ? cached.departments : prev;
+      });
+      setTechnicians(prev => {
+        if (prev === cached.technicians || (prev.length === cached.technicians.length && prev[0]?.id === cached.technicians[0]?.id)) {
+          return prev;
+        }
+        return cached.technicians.length > 0 ? cached.technicians : prev;
+      });
       if (cached.tickets.length > 0) setIsLoading(false);
     } catch (err) {
       console.warn('Cache state sync error:', err);

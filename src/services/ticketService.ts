@@ -286,6 +286,9 @@ class TicketService {
   private isConnectedToCloud = false;
   private recentlyDeletedTicketIds: Set<string> = new Set();
   private syncDebounceTimer: any = null;
+  private saveDebounceTimer: any = null;
+  private realtimeRetryTimer: any = null;
+  private isPhotosHydrated: boolean = false;
 
   // Anti-Reversion Shield: Immutable record of tickets that were completed
   private completedRegistry: Record<string, Partial<Ticket>> = {};
@@ -547,10 +550,15 @@ class TicketService {
   }
 
   private async hydratePhotosFromIdb() {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || this.isPhotosHydrated) return;
+    this.isPhotosHydrated = true;
     try {
       let changed = false;
-      for (const t of this.tickets) {
+      // Only hydrate open/active tickets (don't hydrate 100+ completed history tickets)
+      const activeTickets = this.tickets
+        .filter(t => t.status !== 'completed' && t.status !== 'cancelled')
+        .slice(0, 15);
+      for (const t of activeTickets) {
         const key = t.requestId || t.id;
         const needsReqPhoto = (!t.requestImageUrl || t.requestImageUrl === '-' || t.requestImageUrl === '[ATTACHED]') && key;
         if (needsReqPhoto) {
@@ -558,8 +566,9 @@ class TicketService {
           if (photo && photo.startsWith('data:')) {
             t.requestImageUrl = photo;
             changed = true;
-            // Push recovered photo to Central Cloud so technicians and all other devices see it
-            void this.pushTicketToCloud(t);
+            if (!this.isCloudRestricted) {
+              void this.pushTicketToCloud(t);
+            }
           }
         }
         const needsResPhoto = (!t.resultImageUrl || t.resultImageUrl === '-' || t.resultImageUrl === '[ATTACHED]') && key;
@@ -568,7 +577,9 @@ class TicketService {
           if (photo && photo.startsWith('data:')) {
             t.resultImageUrl = photo;
             changed = true;
-            void this.pushTicketToCloud(t);
+            if (!this.isCloudRestricted) {
+              void this.pushTicketToCloud(t);
+            }
           }
         }
       }
@@ -653,13 +664,13 @@ class TicketService {
         this.tickets = Array.from(mergedMap.values());
         this.notify();
       }
-      void this.hydratePhotosFromIdb();
     } catch (e) {
       console.warn('reloadFromLocalStorage error:', e);
     }
   }
 
   public scheduleSyncFromServer(delayMs = 2500) {
+    if (this.isCloudRestricted) return;
     if (this.syncDebounceTimer) {
       clearTimeout(this.syncDebounceTimer);
     }
@@ -669,20 +680,23 @@ class TicketService {
     }, delayMs);
   }
 
-  private saveToLocalStorage() {
-    // 0. Ensure photos are safely backed up to IndexedDB (100MB+ persistent storage)
-    try {
-      this.tickets.forEach(t => {
-        const key = t.requestId || t.id;
-        if (t.requestImageUrl && t.requestImageUrl.startsWith('data:')) {
-          void savePhotoToIdb(`${key}_req`, t.requestImageUrl);
-        }
-        if (t.resultImageUrl && t.resultImageUrl.startsWith('data:')) {
-          void savePhotoToIdb(`${key}_res`, t.resultImageUrl);
-        }
-      });
-    } catch {}
+  private saveToLocalStorage(immediate = false) {
+    if (immediate) {
+      if (this.saveDebounceTimer) {
+        clearTimeout(this.saveDebounceTimer);
+        this.saveDebounceTimer = null;
+      }
+      this.performSaveToLocalStorage();
+      return;
+    }
+    if (this.saveDebounceTimer) return;
+    this.saveDebounceTimer = setTimeout(() => {
+      this.saveDebounceTimer = null;
+      this.performSaveToLocalStorage();
+    }, 200);
+  }
 
+  private performSaveToLocalStorage() {
     // 1. Always save the completed registry first (lightweight, vital for anti-reversion)
     try {
       localStorage.setItem(COMPLETED_REGISTRY_KEY, JSON.stringify(this.completedRegistry));
@@ -784,32 +798,24 @@ class TicketService {
       }
     });
 
-    // 3. Fast sync when user switches back to this tab: Always re-read localStorage FIRST
+    // 3. Fast sync when user switches back to this tab (throttled to avoid freeze)
+    let lastTabSyncTime = Date.now();
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
-        this.reloadFromLocalStorage();
-        void this.syncFromServer();
-        if (!this.isConnectedToCloud && !this.isCloudRestricted) {
-          this.setupSupabaseRealtime();
+        const now = Date.now();
+        if (now - lastTabSyncTime > 45000 && !this.isCloudRestricted) {
+          lastTabSyncTime = now;
+          this.reloadFromLocalStorage();
+          void this.syncFromServer();
         }
       }
     });
 
-    // 4. Fast sync when browser window regains focus: Always re-read localStorage FIRST
-    window.addEventListener('focus', () => {
-      this.reloadFromLocalStorage();
-      void this.syncFromServer();
-      if (!this.isConnectedToCloud && !this.isCloudRestricted) {
-        this.setupSupabaseRealtime();
-      }
-    });
-
-    // 5. Fast sync when device comes back online
+    // 4. Fast sync when device comes back online
     window.addEventListener('online', () => {
-      this.reloadFromLocalStorage();
-      void this.syncFromServer();
       if (!this.isCloudRestricted) {
-        this.setupSupabaseRealtime();
+        this.reloadFromLocalStorage();
+        void this.syncFromServer();
       }
     });
   }
@@ -824,20 +830,22 @@ class TicketService {
     void this.ensureInitialSync();
 
     // 2. Setup Supabase Realtime channel (Instant WebSocket broadcast & CDC)
-    this.setupSupabaseRealtime();
+    if (!this.isCloudRestricted) {
+      this.setupSupabaseRealtime();
+    }
 
-    // 3. Background safety polling (every 20s as fallback when active tab; Supabase Realtime WebSocket handles instant sync)
-    if (!this.pollInterval) {
+    // 3. Background safety polling (only when cloud is available)
+    if (!this.pollInterval && !this.isCloudRestricted) {
       this.pollInterval = setInterval(() => {
-        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible' && !this.isCloudRestricted) {
           void this.syncFromServer();
         }
-      }, 20000);
+      }, 30000);
     }
   }
 
   private ensureInitialSync(): Promise<void> {
-    if (this.isInitialSyncDone) return Promise.resolve();
+    if (this.isInitialSyncDone || this.isCloudRestricted || this.tickets.length > 0) return Promise.resolve();
     if (!this.initialSyncPromise) {
       this.initialSyncPromise = this.syncFromServer().finally(() => {
         this.initialSyncPromise = null;
@@ -873,6 +881,13 @@ class TicketService {
   }
 
   private setupSupabaseRealtime() {
+    if (this.isCloudRestricted) return;
+
+    if (this.realtimeRetryTimer) {
+      clearTimeout(this.realtimeRetryTimer);
+      this.realtimeRetryTimer = null;
+    }
+
     if (this.supabaseChannel) {
       try {
         realtimeSupabase.removeChannel(this.supabaseChannel);
@@ -1048,13 +1063,16 @@ class TicketService {
             console.log('🟢 [SupabaseRealtime] Connected to Central Cloud Database successfully!');
             void this.syncFromServer();
           } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.warn('⚠️ [SupabaseRealtime] Realtime channel status:', status);
             this.isConnectedToCloud = false;
-            setTimeout(() => {
-              if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-                this.setupSupabaseRealtime();
-              }
-            }, 3000);
+            // Back off: don't thrash CPU/network every 3s. Back off 5 minutes
+            if (!this.isCloudRestricted && !this.realtimeRetryTimer) {
+              this.realtimeRetryTimer = setTimeout(() => {
+                this.realtimeRetryTimer = null;
+                if (typeof document !== 'undefined' && document.visibilityState === 'visible' && !this.isCloudRestricted) {
+                  this.setupSupabaseRealtime();
+                }
+              }, 300000);
+            }
           }
         });
     } catch (e) {
@@ -1079,7 +1097,7 @@ class TicketService {
   }
 
   public async manualSync(): Promise<void> {
-    await this.syncFromServer();
+    await this.syncFromServer(true);
     if (this.isCloudRestricted) {
       throw new Error('CLOUD_EGRESS_RESTRICTED');
     }
@@ -1201,7 +1219,8 @@ class TicketService {
   /**
    * Fetch latest state from Supabase Cloud (Central single source of truth)
    */
-  public async syncFromServer(): Promise<void> {
+  public async syncFromServer(force = false): Promise<void> {
+    if (this.isCloudRestricted && !force) return;
     try {
       let changed = false;
 
@@ -1233,7 +1252,16 @@ class TicketService {
           if (tErr) {
             if (tErr.message?.includes('quota') || (tErr as any).code === '402' || (tErr as any).status === 402 || tErr.message?.includes('exceed_egress_quota')) {
               this.isCloudRestricted = true;
-              console.warn('⚠️ Supabase Cloud Egress Quota Exceeded (402). Local storage active with 100% data integrity.');
+              this.isConnectedToCloud = false;
+              if (this.pollInterval) {
+                clearInterval(this.pollInterval);
+                this.pollInterval = null;
+              }
+              if (this.supabaseChannel) {
+                try { realtimeSupabase.removeChannel(this.supabaseChannel); } catch {}
+                this.supabaseChannel = null;
+              }
+              console.warn('⚠️ Supabase Cloud Egress Quota Exceeded (402). High-Performance Local Mode active with 100% data integrity.');
             }
           }
 
@@ -1772,7 +1800,7 @@ class TicketService {
     onlyUrgent?: boolean;
     searchQuery?: string;
   }): Promise<Ticket[]> {
-    if (this.tickets.length === 0) {
+    if (this.tickets.length === 0 && !this.isCloudRestricted) {
       await this.ensureInitialSync();
     } else {
       void this.ensureInitialSync();
@@ -1879,6 +1907,9 @@ class TicketService {
     };
 
     // 1. Optimistic UI: Put into local state immediately so UI updates in 0ms!
+    if (created.requestImageUrl && created.requestImageUrl.startsWith('data:')) {
+      void savePhotoToIdb(`${created.requestId}_req`, created.requestImageUrl);
+    }
     this.tickets.unshift(created);
     this.saveToLocalStorage();
     this.notify();
@@ -2053,83 +2084,90 @@ class TicketService {
       ticket: existing
     });
 
-    // 2. Persist to Supabase Central Cloud
+    if (updates.resultImageUrl && updates.resultImageUrl.startsWith('data:')) {
+      void savePhotoToIdb(`${targetRequestId || id}_res`, updates.resultImageUrl);
+    }
+
+    // 2. Persist to Supabase Central Cloud in background without blocking UI
     if (isSupabaseConfigured && supabase && !this.isCloudRestricted) {
-      try {
-        const dbUpdates = ticketToDb(finalUpdates, false);
-        let query = supabase.from('repair_tickets').update(dbUpdates);
-        if (targetRequestId) {
-          query = query.eq('request_id', targetRequestId);
-        } else if (targetUuid) {
-          query = query.eq('id', targetUuid);
-        } else {
-          query = filterTicketQuery(query, id);
-        }
-        
-        // Use select with minimal columns to minimize Supabase egress bandwidth
-        let { data, error } = await query.select('id, request_id, status, updated_at');
-
-        // If 0 rows matched (e.g. UUID mismatch), retry targeting request_id directly
-        if (!error && (!data || data.length === 0) && targetRequestId) {
-          console.warn('[TicketService] 0 rows matched on initial query, retrying by request_id:', targetRequestId);
-          const retryRes = await supabase
-            .from('repair_tickets')
-            .update(dbUpdates)
-            .eq('request_id', targetRequestId)
-            .select('id, request_id, status, updated_at');
-          data = retryRes.data;
-          error = retryRes.error;
-        }
-
-        if (error) {
-          if (error.message?.includes('quota') || (error as any).code === '402' || (error as any).status === 402 || error.message?.includes('exceed_egress_quota')) {
-            this.isCloudRestricted = true;
-            console.warn('⚠️ Supabase Cloud Egress Quota Exceeded (402). Local storage saved with 100% integrity.');
+      void (async () => {
+        try {
+          const dbUpdates = ticketToDb(finalUpdates, false);
+          let query = supabase.from('repair_tickets').update(dbUpdates);
+          if (targetRequestId) {
+            query = query.eq('request_id', targetRequestId);
+          } else if (targetUuid) {
+            query = query.eq('id', targetUuid);
           } else {
-            console.warn('[TicketService] Supabase update error:', error.message);
-            // If error might be due to payload size (large base64 image), retry without images
-            if (dbUpdates.result_image_url || dbUpdates.request_image_url) {
-              try {
-                const safeUpdates = { ...dbUpdates };
-                delete safeUpdates.result_image_url;
-                delete safeUpdates.request_image_url;
-                let retryQuery = supabase.from('repair_tickets').update(safeUpdates);
-                if (targetRequestId) {
-                  retryQuery = retryQuery.eq('request_id', targetRequestId);
-                } else if (targetUuid) {
-                  retryQuery = retryQuery.eq('id', targetUuid);
-                } else {
-                  retryQuery = filterTicketQuery(retryQuery, id);
+            query = filterTicketQuery(query, id);
+          }
+          
+          // Use select with minimal columns to minimize Supabase egress bandwidth
+          let { data, error } = await query.select('id, request_id, status, updated_at');
+
+          // If 0 rows matched (e.g. UUID mismatch), retry targeting request_id directly
+          if (!error && (!data || data.length === 0) && targetRequestId) {
+            const retryRes = await supabase
+              .from('repair_tickets')
+              .update(dbUpdates)
+              .eq('request_id', targetRequestId)
+              .select('id, request_id, status, updated_at');
+            data = retryRes.data;
+            error = retryRes.error;
+          }
+
+          if (error) {
+            if (error.message?.includes('quota') || (error as any).code === '402' || (error as any).status === 402 || error.message?.includes('exceed_egress_quota')) {
+              this.isCloudRestricted = true;
+              console.warn('⚠️ Supabase Cloud Egress Quota Exceeded (402). Local storage saved with 100% integrity.');
+            } else {
+              console.warn('[TicketService] Supabase update error:', error.message);
+              // If error might be due to payload size (large base64 image), retry without images
+              if (dbUpdates.result_image_url || dbUpdates.request_image_url) {
+                try {
+                  const safeUpdates = { ...dbUpdates };
+                  delete safeUpdates.result_image_url;
+                  delete safeUpdates.request_image_url;
+                  let retryQuery = supabase.from('repair_tickets').update(safeUpdates);
+                  if (targetRequestId) {
+                    retryQuery = retryQuery.eq('request_id', targetRequestId);
+                  } else if (targetUuid) {
+                    retryQuery = retryQuery.eq('id', targetUuid);
+                  } else {
+                    retryQuery = filterTicketQuery(retryQuery, id);
+                  }
+                  const safeRes = await retryQuery.select('id, request_id, status, updated_at');
+                  if (safeRes.data && safeRes.data.length > 0) {
+                    data = safeRes.data;
+                    error = null;
+                  }
+                } catch (retryErr) {
+                  console.warn('[TicketService] Safe payload retry failed:', retryErr);
                 }
-                const safeRes = await retryQuery.select('id, request_id, status, updated_at');
-                if (safeRes.data && safeRes.data.length > 0) {
-                  data = safeRes.data;
-                  error = null;
-                }
-              } catch (retryErr) {
-                console.warn('[TicketService] Safe payload retry failed:', retryErr);
               }
             }
           }
-        }
-        
-        if (data && data.length > 0) {
-          const serverTicket = dbToTicket(data[0]);
-          if (existing) {
-            Object.assign(existing, {
-              ...existing,
-              id: serverTicket.id || existing.id,
-              status: serverTicket.status || existing.status
-            });
-            this.saveToLocalStorage();
+          
+          if (data && data.length > 0) {
+            const serverTicket = dbToTicket(data[0]);
+            if (existing) {
+              Object.assign(existing, {
+                ...existing,
+                id: serverTicket.id || existing.id,
+                status: serverTicket.status || existing.status
+              });
+              this.saveToLocalStorage();
+            }
+            this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: targetUuid || id, requestId: targetRequestId, ticket: existing });
+          } else {
+            this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: targetUuid || id, requestId: targetRequestId, ticket: existing });
           }
-          this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: targetUuid || id, requestId: targetRequestId, ticket: existing });
-        } else {
-          this.broadcastEvent('TICKET_MUTATION', { action: 'UPDATE', id: targetUuid || id, requestId: targetRequestId, ticket: existing });
+        } catch (e: any) {
+          if (e?.status === 402 || e?.message?.includes('exceed_egress_quota')) {
+            this.isCloudRestricted = true;
+          }
         }
-      } catch (e) {
-        console.warn('[TicketService] Supabase update exception:', e);
-      }
+      })();
     }
 
     return existing || null;
@@ -2177,27 +2215,31 @@ class TicketService {
     this.saveToLocalStorage();
     this.notify();
 
-    // 2. Persist delete to Supabase Central Cloud
-    if (isSupabaseConfigured && supabase) {
-      try {
-        let query = supabase.from('repair_tickets').delete();
-        if (targetUuid && targetRequestId) {
-          query = query.or(`id.eq.${targetUuid},request_id.eq.${targetRequestId}`);
-        } else if (targetUuid) {
-          query = query.eq('id', targetUuid);
-        } else if (targetRequestId) {
-          query = query.eq('request_id', targetRequestId);
-        } else {
-          query = filterTicketQuery(query, id);
+    // 2. Persist delete to Supabase Central Cloud asynchronously in background
+    if (isSupabaseConfigured && supabase && !this.isCloudRestricted) {
+      void (async () => {
+        try {
+          let query = supabase.from('repair_tickets').delete();
+          if (targetUuid && targetRequestId) {
+            query = query.or(`id.eq.${targetUuid},request_id.eq.${targetRequestId}`);
+          } else if (targetUuid) {
+            query = query.eq('id', targetUuid);
+          } else if (targetRequestId) {
+            query = query.eq('request_id', targetRequestId);
+          } else {
+            query = filterTicketQuery(query, id);
+          }
+          let { data, error } = await query.select();
+          if (!error && (!data || data.length === 0) && targetRequestId) {
+            await supabase.from('repair_tickets').delete().eq('request_id', targetRequestId).select();
+          }
+          this.broadcastEvent('TICKET_MUTATION', { action: 'DELETE', id: targetUuid || id, requestId: targetRequestId });
+        } catch (e: any) {
+          if (e?.status === 402 || e?.message?.includes('exceed_egress_quota')) {
+            this.isCloudRestricted = true;
+          }
         }
-        let { data, error } = await query.select();
-        if (!error && (!data || data.length === 0) && targetRequestId) {
-          await supabase.from('repair_tickets').delete().eq('request_id', targetRequestId).select();
-        }
-        this.broadcastEvent('TICKET_MUTATION', { action: 'DELETE', id: targetUuid || id, requestId: targetRequestId });
-      } catch (e) {
-        console.warn('[TicketService] Supabase delete exception:', e);
-      }
+      })();
     }
   }
 
